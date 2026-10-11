@@ -8,6 +8,7 @@ const leaflet = vi.hoisted(() => ({
   markers: [] as Array<{ bindTooltip: ReturnType<typeof vi.fn>; addTo: ReturnType<typeof vi.fn> }>,
   lineTooltips: [] as string[],
   triggerTileError: false,
+  hasView: false,
 }));
 
 vi.mock("leaflet", () => {
@@ -23,7 +24,12 @@ vi.mock("leaflet", () => {
       return tiles;
     }),
   };
-  const map = { fitBounds: vi.fn(), remove: vi.fn() };
+  // Real Leaflet throws when a marker is added to a map that has no view yet.
+  const map = {
+    fitBounds: vi.fn(() => { leaflet.hasView = true; }),
+    setView: vi.fn(() => { leaflet.hasView = true; return map; }),
+    remove: vi.fn(),
+  };
   const polyline = {
     bindTooltip: vi.fn((text: string) => { leaflet.lineTooltips.push(text); return polyline; }),
     addTo: vi.fn(() => polyline),
@@ -32,6 +38,7 @@ vi.mock("leaflet", () => {
     map: vi.fn(() => map),
     featureGroup: vi.fn(() => layer),
     circleMarker: vi.fn(() => {
+      if (!leaflet.hasView) throw new TypeError("Cannot read properties of undefined (reading 'intersects')");
       leaflet.markers.push(marker);
       return marker;
     }),
@@ -113,6 +120,7 @@ describe("retailer order route details", () => {
     resetOrder();
     leaflet.markers = [];
     leaflet.triggerTileError = false;
+    leaflet.hasView = false;
     renderOrders();
     fireEvent.click(screen.getByRole("button", { name: /Wholesale Supplier/ }));
 
@@ -139,6 +147,7 @@ describe("retailer order route details", () => {
 
   it("reports unavailable tiles while keeping tracking visible", async () => {
     resetOrder();
+    leaflet.hasView = false;
     leaflet.triggerTileError = true;
     renderOrders();
     fireEvent.click(screen.getByRole("button", { name: /Wholesale Supplier/ }));
