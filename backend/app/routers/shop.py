@@ -40,13 +40,29 @@ class ShopProfileInput(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: str | None = Field(default=None, max_length=255)
-    owner_name: str | None = Field(default=None, max_length=255)
-    address: str | None = None
+    name: str | None = Field(default=None, max_length=120)
+    owner_name: str | None = Field(default=None, max_length=120)
+    address: str | None = Field(default=None, max_length=500)
     location: LocationInput | None = None
     language: Literal["ml", "en"] = "ml"
     shop_type: ShopType | None = None
     phone: str | None = None  # must equal the logged-in phone if sent
+
+    @field_validator("name", "owner_name", "address", mode="before")
+    @classmethod
+    def tidy_text(cls, value):
+        """Trim and collapse spaces; blank becomes "not given" instead of an empty string."""
+        if isinstance(value, str):
+            value = " ".join(value.split())
+            return value or None
+        return value
+
+    @field_validator("name")
+    @classmethod
+    def name_long_enough(cls, value):
+        if value is not None and len(value) < 2:
+            raise ValueError("Shop name must be at least 2 characters")
+        return value
 
 
 class ShopProfilePatch(ShopProfileInput):
