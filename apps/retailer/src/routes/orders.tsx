@@ -1,3 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { OrdersPage, pageHead } from '@/components/kadanet/retailer-app';
-export const Route = createFileRoute('/orders')({ head:()=>pageHead('Orders','Review restock suggestions and track your supplier orders.'),component:OrdersPage });
+import { createFileRoute } from "@tanstack/react-router";
+
+import { pageHead } from "@/components/kannect/shell";
+import { OrdersPage } from "@/features/orders/orders-page";
+
+export const Route = createFileRoute("/orders")({
+  head: () => pageHead("Orders", "Reorder from suppliers and receive deliveries."),
+  component: OrdersPage,
+});

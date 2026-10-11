@@ -1,3 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { MorePage, pageHead } from '@/components/kadanet/retailer-app';
-export const Route = createFileRoute('/more')({ head:()=>pageHead('More','Manage your shop profile, recount stock and export your demo data.'),component:MorePage });
+import { createFileRoute } from "@tanstack/react-router";
+
+import { pageHead } from "@/components/kannect/shell";
+import { MorePage } from "@/features/home/more-page";
+
+export const Route = createFileRoute("/more")({
+  head: () => pageHead("More", "Set up from a photo, recount stock and sign out."),
+  component: MorePage,
+});

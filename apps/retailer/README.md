@@ -1,4 +1,4 @@
-# Swift Stock Lite
+# Kannect Retailer
 
 make it mobile focused more
 
