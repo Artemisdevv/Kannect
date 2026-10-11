@@ -824,19 +824,22 @@ paths:
               properties:
                 items:
                   type: array
-                  description: Defaults to the ordered quantities
+                  description: "If omitted, receives every ordered pack in full. If supplied, only listed products are received; omitted products remain unreceived and may be reported in a later request. Replaying the same quantities is idempotent; changing an already received quantity returns 409."
                   items:
                     type: object
                     required: [product_id, quantity]
                     properties:
                       product_id: { type: string }
-                      quantity: { type: integer, description: "Base units" }
+                      quantity: { type: integer, minimum: 0, description: "Received base units; zero means not received yet" }
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Order" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
 
   /shop/orders/{order_id}/invoice:
     get:

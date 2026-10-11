@@ -14,6 +14,7 @@ Refuses to run against anything that is not a local or CI database, so it can ne
 
 import os
 import uuid
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -370,4 +371,256 @@ def test_orders_idempotency_cancellation_and_supplier_rejection(world):
                     )
                     db.delete(supplier)
             db.execute(delete(OwnerIdentity).where(OwnerIdentity.phone == supplier_phone))
+            db.commit()
+
+
+def test_receive_order_is_partial_and_idempotent(world):
+    supplier_phone = fake_phone()
+    supplier_headers = login(supplier_phone, role="supplier")
+    retailer_headers = login(world["phone_a"])
+    other_retailer_headers = login(world["phone_b"])
+    supplier_id = None
+    order_ids: list[str] = []
+    received_client_ids = []
+    correction_client_id = uuid.uuid4()
+    sale_client_id = uuid.uuid4()
+    extra_product_id = uuid.uuid4()
+    with SessionLocal() as db:
+        extra = Product(
+            id=extra_product_id,
+            barcode=f"IR{uuid.uuid4().hex[:12]}",
+            name=f"Itest Extra {world['tag']}",
+            unit="piece",
+            category="grocery",
+            mrp=25,
+            is_active=True,
+        )
+        db.add(extra)
+        db.add(
+            StockEvent(
+                shop_id=world["a"],
+                product_id=world["product"],
+                client_id=correction_client_id,
+                type="correction",
+                quantity=10,
+            )
+        )
+        db.commit()
+        db.add(
+            StockEvent(
+                shop_id=world["a"],
+                product_id=world["product"],
+                client_id=sale_client_id,
+                type="sale",
+                quantity=8,
+            )
+        )
+        db.commit()
+
+    try:
+        profile = client.post(
+            "/api/v1/supplier",
+            headers=supplier_headers,
+            json={"name": "Itest Receive Supplier", "location": NEAR},
+        )
+        assert profile.status_code == 201, profile.text
+        supplier_id = profile.json()["id"]
+        for product_id, price, pack_size in (
+            (world["product"], 36, 6),
+            (extra_product_id, 50, 5),
+        ):
+            listed = client.post(
+                "/api/v1/supplier/products",
+                headers=supplier_headers,
+                json={"product_id": str(product_id), "price": price, "pack_size": pack_size},
+            )
+            assert listed.status_code == 201, listed.text
+
+        nearby = client.get(
+            "/api/v1/suppliers", headers=retailer_headers, params={"q": "Itest Receive"}
+        )
+        assert nearby.status_code == 200, nearby.text
+        assert [item["id"] for item in nearby.json()["items"]] == [supplier_id]
+        catalogue = client.get(
+            f"/api/v1/suppliers/{supplier_id}/products",
+            headers=retailer_headers,
+            params={"q": "Itest Soap"},
+        )
+        assert catalogue.status_code == 200, catalogue.text
+        assert len(catalogue.json()["items"]) == 1
+        with SessionLocal() as db:
+            recent_sales = sum(
+                db.scalars(
+                    select(StockEvent.quantity).where(
+                        StockEvent.shop_id == world["a"],
+                        StockEvent.product_id == world["product"],
+                        StockEvent.type == "sale",
+                        StockEvent.created_at >= datetime.now(UTC) - timedelta(days=7),
+                    )
+                ).all()
+            )
+        suggestions = client.get("/api/v1/shop/reorder-suggestions", headers=retailer_headers)
+        assert suggestions.status_code == 200, suggestions.text
+        suggestion = next(
+            item
+            for item in suggestions.json()["items"]
+            if item["shop_product"]["product"]["id"] == str(world["product"])
+        )
+        assert suggestion["shop_product"]["stock_qty"] == 2
+        needed_units = max(0, recent_sales * 2 + 5 - 2)
+        assert suggestion["suggested_packs"] == max(1, (needed_units + 5) // 6)
+        assert f"Sold {recent_sales} in the last 7 days" in suggestion["reason"]
+
+        order_input = {
+            "client_id": str(uuid.uuid4()),
+            "supplier_id": supplier_id,
+            "items": [
+                {"product_id": str(world["product"]), "packs": 2},
+                {"product_id": str(extra_product_id), "packs": 1},
+            ],
+        }
+        created = client.post("/api/v1/shop/orders", headers=retailer_headers, json=order_input)
+        assert created.status_code == 201, created.text
+        order = created.json()
+        order_ids.append(order["id"])
+        for status in ("accepted", "dispatched", "delivered"):
+            transitioned = client.post(
+                f"/api/v1/supplier/orders/{order['id']}/status",
+                headers=supplier_headers,
+                json={"status": status},
+            )
+            assert transitioned.status_code == 200, transitioned.text
+
+        receive_url = f"/api/v1/shop/orders/{order['id']}/receive"
+        partial = client.post(
+            receive_url,
+            headers=retailer_headers,
+            json={"items": [{"product_id": str(world["product"]), "quantity": 5}]},
+        )
+        assert partial.status_code == 200, partial.text
+        first_receipt_count = len(partial.json()["tracking"])
+        assert client.post(
+            receive_url,
+            headers=retailer_headers,
+            json={"items": [{"product_id": str(world["product"]), "quantity": 5}]},
+        ).status_code == 200
+
+        with SessionLocal() as db:
+            first_key = uuid.uuid5(
+                uuid.NAMESPACE_URL, f"kannect:receive:{order['id']}:{world['product']}"
+            )
+            received_client_ids.append(first_key)
+            first_event = db.scalar(select(StockEvent).where(StockEvent.client_id == first_key))
+            assert first_event is not None
+            assert first_event.quantity == 5
+            assert first_event.count_source == "owner_exact"
+            assert db.scalar(
+                select(StockEvent.id).where(
+                    StockEvent.shop_id == world["a"], StockEvent.client_id == first_key
+                )
+            ) is not None
+            second_key = uuid.uuid5(
+                uuid.NAMESPACE_URL, f"kannect:receive:{order['id']}:{extra_product_id}"
+            )
+            received_client_ids.append(second_key)
+            assert (
+                db.scalar(select(StockEvent.id).where(StockEvent.client_id == second_key))
+                is None
+            )
+            assert db.get(ShopProduct, (world["a"], extra_product_id)) is None
+
+        replay = client.post(
+            receive_url,
+            headers=retailer_headers,
+            json={"items": [{"product_id": str(world["product"]), "quantity": 4}]},
+        )
+        assert replay.status_code == 409
+        assert len(partial.json()["tracking"]) == first_receipt_count
+
+        # A missing line stays unreceived and can be received later.
+        second_partial = client.post(
+            receive_url,
+            headers=retailer_headers,
+            json={"items": [{"product_id": str(extra_product_id), "quantity": 3}]},
+        )
+        assert second_partial.status_code == 200, second_partial.text
+        with SessionLocal() as db:
+            second_event = db.scalar(select(StockEvent).where(StockEvent.client_id == second_key))
+            assert second_event is not None
+            assert second_event.quantity == 3
+            assert second_event.count_source == "owner_exact"
+            assert db.get(ShopProduct, (world["a"], extra_product_id)) is not None
+
+        assert client.post(
+            receive_url,
+            headers=other_retailer_headers,
+            json={"items": [{"product_id": str(world["product"]), "quantity": 5}]},
+        ).status_code == 404
+
+        # An omitted body uses the ordered quantities in base units.
+        default_order = client.post(
+            "/api/v1/shop/orders",
+            headers=retailer_headers,
+            json={**order_input, "client_id": str(uuid.uuid4())},
+        )
+        assert default_order.status_code == 201, default_order.text
+        order_ids.append(default_order.json()["id"])
+        for status in ("accepted", "dispatched", "delivered"):
+            result = client.post(
+                f"/api/v1/supplier/orders/{default_order.json()['id']}/status",
+                headers=supplier_headers,
+                json={"status": status},
+            )
+            assert result.status_code == 200, result.text
+        default_receive = client.post(
+            f"/api/v1/shop/orders/{default_order.json()['id']}/receive",
+            headers=retailer_headers,
+        )
+        assert default_receive.status_code == 200, default_receive.text
+        default_client_ids = []
+        for product_id in (world["product"], extra_product_id):
+            key = uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                f"kannect:receive:{default_order.json()['id']}:{product_id}",
+            )
+            received_client_ids.append(key)
+            default_client_ids.append(key)
+        with SessionLocal() as db:
+            quantities = {
+                event.product_id: event.quantity
+                for event in db.scalars(
+                    select(StockEvent).where(StockEvent.client_id.in_(default_client_ids))
+                ).all()
+            }
+            assert quantities[world["product"]] == 12
+            assert quantities[extra_product_id] == 5
+    finally:
+        with SessionLocal() as db:
+            db.execute(delete(StockEvent).where(StockEvent.client_id == sale_client_id))
+            db.execute(
+                delete(StockEvent).where(StockEvent.client_id == correction_client_id)
+            )
+            if received_client_ids:
+                db.execute(
+                    delete(StockEvent).where(StockEvent.client_id.in_(received_client_ids))
+                )
+            if order_ids:
+                db.execute(delete(Invoice).where(Invoice.order_id.in_(order_ids)))
+                db.execute(delete(OrderTracking).where(OrderTracking.order_id.in_(order_ids)))
+                db.execute(delete(OrderLine).where(OrderLine.order_id.in_(order_ids)))
+                db.execute(delete(SupplierOrder).where(SupplierOrder.id.in_(order_ids)))
+            db.execute(
+                delete(ShopProduct).where(
+                    ShopProduct.shop_id == world["a"], ShopProduct.product_id == extra_product_id
+                )
+            )
+            if supplier_id:
+                supplier = db.get(Supplier, uuid.UUID(supplier_id))
+                if supplier is not None:
+                    db.execute(
+                        delete(SupplierProduct).where(SupplierProduct.supplier_id == supplier.id)
+                    )
+                    db.delete(supplier)
+            db.execute(delete(OwnerIdentity).where(OwnerIdentity.phone == supplier_phone))
+            db.execute(delete(Product).where(Product.id == extra_product_id))
             db.commit()

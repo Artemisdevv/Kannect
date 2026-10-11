@@ -14,6 +14,7 @@ from app.routers import (
     group_buys,
     health,
     orders,
+    procurement,
     search,
     shop,
     supplier,
@@ -46,6 +47,7 @@ app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(catalogue.router, prefix=API_PREFIX)
 app.include_router(shop.router, prefix=API_PREFIX)
 app.include_router(supplier.router, prefix=API_PREFIX)
+app.include_router(procurement.router, prefix=API_PREFIX)
 app.include_router(orders.shop_router, prefix=API_PREFIX)
 app.include_router(orders.supplier_router, prefix=API_PREFIX)
 app.include_router(billing.router, prefix=API_PREFIX)
