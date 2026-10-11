@@ -54,3 +54,25 @@ Source of truth: [`openapi.yaml`](./openapi.yaml). This page is the quick read.
 4. `GET /search?q=soap&lat&lng` -> shops with status, nearest first.
 5. Shop runs out -> `GET /search/referral?shop_id&product_id` -> next shop.
 6. `GET /shop/export` -> data download.
+
+## Decisions
+
+Settled between Aswin and Adnan. Change via PR, same as the spec.
+
+### Auth tokens (JWT)
+- Algorithm **HS256**, signed with `JWT_SECRET`. Always decode with `algorithms=["HS256"]` pinned (rejects `alg: none`).
+- Claims: `sub` = owner phone in E.164 (`+919876543210`), `iss` = `kadanet`, `typ` = `access`, `iat`, `exp` (`JWT_EXPIRE_MINUTES`, default 7 days). No refresh token for the hackathon.
+- **No `shop_id` in the token.** A new owner has no shop yet (`verify` returns `shop: null`). The auth dependency resolves the shop from the phone on each request, so creating the shop never requires re-issuing the token. One phone owns one shop for the pilot, so the shop's owner phone must be unique.
+- The API refuses to start with `JWT_SECRET=change-me` outside local development.
+
+### Inactive catalogue products
+- Barcode lookup, catalogue name search and public search exclude `is_active = false`.
+- If an inactive product has `merged_into_id`, follow the chain and return the active product, so old scans keep working.
+- A shop's own `GET /shop/products` still lists products it already has, flagged inactive, so history stays visible.
+- Bills and stock events keep their references and snapshots. Billing an inactive product with no merge target returns `409 conflict`.
+- Products are never hard-deleted (`ON DELETE RESTRICT`).
+
+### Starter packs
+- **Data owner: Adnan (#39).** Curated JSON at `data/seed/packs/<shop_type>.json`. Each item: `barcode` (null for loose goods), `name`, `name_ml`, `brand`, `size`, `category`, `unit`, `mrp`, `image_url`, `mrp_source` (`verified` or `demo`). Adnan also supplies the loader that upserts catalogue products and pack membership.
+- **Schema and endpoints owner: Aswin (#37).** Membership table (for example `starter_pack_item(shop_type, product_id, position)`), `GET /catalogue/starter-packs` and `POST /shop/products/bulk`. Build against a few fixture rows until real packs land.
+- First packs: `grocery` and `provision`.
