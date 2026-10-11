@@ -85,6 +85,58 @@ paths:
                   supplier: { type: object, nullable: true, allOf: [{ $ref: "#/components/schemas/Supplier" }], description: "supplier role; null until POST /supplier" }
         "401": { $ref: "#/components/responses/Error" }
 
+  /auth/config:
+    get:
+      tags: [auth]
+      security: []
+      summary: Which login the app should show (demo OTP or phone.email). Nothing secret.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  otp_provider: { type: string, enum: [demo, phone_email] }
+                  phone_email_client_id: { type: string, nullable: true, description: "Public client id for the phone.email button; null in demo mode" }
+
+  /auth/phone-email/verify:
+    post:
+      tags: [auth]
+      security: []
+      summary: Log in with a number verified by phone.email (only when otp_provider = phone_email)
+      description: |
+        The app shows the phone.email "Sign in with Phone" button; on success it receives a
+        `user_json_url`. Send it here. The server accepts only https URLs on the configured
+        phone.email host, fetches the verified number itself, and issues the same token as
+        /auth/otp/verify. Each result URL works once. When this mode is on, the demo OTP only
+        works for the fictional demo numbers (+91900000...).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_json_url]
+              properties:
+                user_json_url: { type: string, example: "https://user.phone.email/user_abc123.json" }
+                role: { type: string, enum: [retailer, supplier], default: retailer }
+      responses:
+        "200":
+          description: Same body as /auth/otp/verify
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  role: { type: string, enum: [retailer, supplier] }
+                  shop: { type: object, nullable: true, allOf: [{ $ref: "#/components/schemas/Shop" }] }
+                  supplier: { type: object, nullable: true, allOf: [{ $ref: "#/components/schemas/Supplier" }] }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+
   /shop:
     post:
       tags: [shop]

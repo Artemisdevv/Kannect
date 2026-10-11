@@ -1,11 +1,13 @@
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Store } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { ApiError, createShop, isSignedIn, requestOtp, signIn } from "@/api";
+import { ApiError, authConfig, createShop, isSignedIn, requestOtp, signIn, signInWithPhoneEmail } from "@/api";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { PhoneEmailButton } from "./phone-email-button";
 import { LIMITS, parsePhone, tidy, validateShop, type ShopErrors } from "@/lib/validation";
 
 const SHOP_TYPES = [
@@ -29,6 +31,11 @@ export function LoginPage() {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showDemo, setShowDemo] = useState(false);
+  // Which login the server wants. If it cannot be reached we fall back to the demo form, which
+  // shows its own error when the server is down.
+  const config = useQuery({ queryKey: ["auth", "config"], queryFn: authConfig, retry: 1 });
+  const realLogin = config.data?.otp_provider === "phone_email" && !showDemo;
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [errors, setErrors] = useState<ShopErrors>({});
   const [shop, setShop] = useState({
@@ -65,6 +72,13 @@ export function LoginPage() {
       else setStep("shop");
     });
 
+  const verifiedByPhoneEmail = (url: string) =>
+    run(async () => {
+      const session = await signInWithPhoneEmail(url);
+      if (session.shop) await navigate({ to: "/" });
+      else setStep("shop");
+    });
+
   const register = () => {
     const found = validateShop(shop);
     setErrors(found);
@@ -96,7 +110,23 @@ export function LoginPage() {
           </div>
         </div>
 
-        {step === "phone" && (
+        {step === "phone" && realLogin && (
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold">Sign in with your phone</h2>
+            <p className="text-sm text-muted-foreground">
+              We send a code by SMS to confirm your number.
+            </p>
+            {config.data?.phone_email_client_id && (
+              <PhoneEmailButton clientId={config.data.phone_email_client_id} onVerified={(url) => void verifiedByPhoneEmail(url)} />
+            )}
+            {busy && <p className="text-sm text-muted-foreground">Signing you in…</p>}
+            <Button type="button" variant="ghost" className="w-full" onClick={() => setShowDemo(true)}>
+              Demo shop login
+            </Button>
+          </div>
+        )}
+
+        {step === "phone" && !realLogin && (
           <form
             className="space-y-4"
             onSubmit={(e) => {

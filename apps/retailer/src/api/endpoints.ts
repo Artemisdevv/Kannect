@@ -201,3 +201,21 @@ export async function cancelOrder(orderId: string) {
     await api.POST("/shop/orders/{order_id}/cancel", { params: { path: { order_id: orderId } } }),
   );
 }
+
+// ---------- login config ----------
+
+/** Which login the server wants: the demo OTP, or real verification through phone.email. */
+export async function authConfig() {
+  return unwrap(await api.GET("/auth/config"));
+}
+
+/** Log in with the result URL phone.email gave the app after the user verified their number. */
+export async function signInWithPhoneEmail(userJsonUrl: string) {
+  const data = unwrap(
+    await api.POST("/auth/phone-email/verify", {
+      body: { user_json_url: userJsonUrl, role: "retailer" },
+    }),
+  );
+  setSession({ token: data.token as string, shop: (data.shop as never) ?? null });
+  return data;
+}
