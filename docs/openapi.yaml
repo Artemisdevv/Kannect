@@ -381,8 +381,8 @@ paths:
       description: |
         The shopper gives a name and phone. The shop owner accepts or declines in the retailer app; an
         accepted request is held for a time window, and stock only drops when the owner hands it over.
-        The response includes `access_token`, a secret the shopper's device keeps to read or cancel this
-        request. Quantities are base units (pieces, or grams for loose goods). Resending the same
+        The response includes `access_token`, a secret the shopper's device keeps and sends in the
+        `X-Reservation-Token` header to read or cancel this request. Quantities are base units (pieces, or grams for loose goods). Resending the same
         `client_id` returns the same reservation (200). Limits: 10 lines, 20 pieces or 10 kg per line, 3
         open requests per phone per shop. The phone is not verified.
       requestBody:
@@ -411,7 +411,7 @@ paths:
       summary: A shopper's own reservation (needs the secret token)
       parameters:
         - { name: reservation_id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: token, in: query, required: true, schema: { type: string } }
+        - { name: X-Reservation-Token, in: header, required: true, schema: { type: string }, description: "The access_token from POST /reservations. A header, not a URL parameter, so it stays out of server logs." }
       responses:
         "200":
           description: OK. `status` may be `expired` (accepted, but the hold ran out).
@@ -427,7 +427,7 @@ paths:
       summary: Shopper cancels a request that is still open
       parameters:
         - { name: reservation_id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: token, in: query, required: true, schema: { type: string } }
+        - { name: X-Reservation-Token, in: header, required: true, schema: { type: string }, description: "The access_token from POST /reservations. A header, not a URL parameter, so it stays out of server logs." }
       responses:
         "200":
           description: OK

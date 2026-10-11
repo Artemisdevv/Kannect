@@ -112,9 +112,9 @@ def test_shopper_reserves_owner_accepts_and_collecting_sells_through_billing(wor
     assert [i["quantity"] for i in res["items"]] == [3, 500]
 
     # the shopper can read it with the token and only with the token
-    assert client.get(f"/api/v1/reservations/{rid}", params={"token": token}).json()["status"] == "requested"
-    assert client.get(f"/api/v1/reservations/{rid}", params={"token": "x" * 24}).status_code == 404
-    assert "access_token" not in client.get(f"/api/v1/reservations/{rid}", params={"token": token}).json()
+    assert client.get(f"/api/v1/reservations/{rid}", headers={"X-Reservation-Token": token}).json()["status"] == "requested"
+    assert client.get(f"/api/v1/reservations/{rid}", headers={"X-Reservation-Token": "x" * 24}).status_code == 404
+    assert "access_token" not in client.get(f"/api/v1/reservations/{rid}", headers={"X-Reservation-Token": token}).json()
 
     # the owner sees it first in the list and accepts it
     listing = client.get("/api/v1/shop/reservations", headers=h).json()["items"]
@@ -137,7 +137,7 @@ def test_shopper_reserves_owner_accepts_and_collecting_sells_through_billing(wor
     again = client.post(f"/api/v1/shop/reservations/{rid}/collect", headers=h)
     assert again.status_code == 200 and again.json()["bill_id"] == col.json()["bill_id"]
     assert stock_of(w, h, w["biscuit"]) == 7
-    assert client.get(f"/api/v1/reservations/{rid}", params={"token": token}).json()["status"] == "collected"
+    assert client.get(f"/api/v1/reservations/{rid}", headers={"X-Reservation-Token": token}).json()["status"] == "collected"
 
 
 def test_cannot_reserve_what_the_shop_does_not_have_or_too_much(world):
@@ -169,16 +169,16 @@ def test_shopper_cancel_owner_decline_and_closed_requests(world):
     b, _ = reserve(w, [(w["biscuit"], 1)], phone_no="9000011111")
     ra, rb = a.json(), b.json()
 
-    cancelled = client.post(f"/api/v1/reservations/{ra['id']}/cancel", params={"token": ra["access_token"]})
+    cancelled = client.post(f"/api/v1/reservations/{ra['id']}/cancel", headers={"X-Reservation-Token": ra["access_token"]})
     assert cancelled.status_code == 200 and cancelled.json()["status"] == "cancelled"
-    assert client.post(f"/api/v1/reservations/{ra['id']}/cancel", params={"token": "nope" * 6}).status_code == 404
+    assert client.post(f"/api/v1/reservations/{ra['id']}/cancel", headers={"X-Reservation-Token": "nope" * 6}).status_code == 404
     assert client.post(f"/api/v1/shop/reservations/{ra['id']}/accept", headers=h).status_code == 409  # already closed
 
     declined = client.post(f"/api/v1/shop/reservations/{rb['id']}/decline", headers=h, json={"reason": "  Sold   out today "})
     assert declined.json()["status"] == "declined" and declined.json()["decline_reason"] == "Sold out today"
-    seen = client.get(f"/api/v1/reservations/{rb['id']}", params={"token": rb["access_token"]}).json()
+    seen = client.get(f"/api/v1/reservations/{rb['id']}", headers={"X-Reservation-Token": rb["access_token"]}).json()
     assert seen["status"] == "declined" and seen["decline_reason"] == "Sold out today"
-    assert client.post(f"/api/v1/reservations/{rb['id']}/cancel", params={"token": rb["access_token"]}).status_code == 409
+    assert client.post(f"/api/v1/reservations/{rb['id']}/cancel", headers={"X-Reservation-Token": rb["access_token"]}).status_code == 409
     assert client.post(f"/api/v1/shop/reservations/{rb['id']}/collect", headers=h).status_code == 409  # never accepted
 
 
@@ -200,7 +200,7 @@ def test_a_hold_that_ran_out_no_longer_blocks_stock_and_shows_expired(world):
     with SessionLocal() as db:
         db.execute(update(Reservation).where(Reservation.id == uuid.UUID(rid)).values(hold_until=datetime.now(UTC) - timedelta(minutes=1)))
         db.commit()
-    assert client.get(f"/api/v1/reservations/{rid}", params={"token": token}).json()["status"] == "expired"
+    assert client.get(f"/api/v1/reservations/{rid}", headers={"X-Reservation-Token": token}).json()["status"] == "expired"
     assert client.get("/api/v1/shop/reservations", headers=h, params={"status": "expired"}).json()["items"][0]["id"] == rid
     assert reserve(w, [(w["biscuit"], 1)], phone_no="9000022222")[0].status_code == 201  # free again
 

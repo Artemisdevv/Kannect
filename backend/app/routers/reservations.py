@@ -1,9 +1,12 @@
 """Reserve for pickup: a shopper asks a shop to set items aside; the owner accepts or declines.
 
-No payment and no delivery. Shoppers have no account: they give a name and phone, and keep a secret
-token on their device to look at or cancel the request. Stock is only taken off when the owner marks
-the pickup collected, which makes a normal bill. An accepted reservation holds the quantity in the
-meantime, so two shoppers cannot both be promised the last packet.
+No payment and no delivery. Shoppers have no account: they give a name and phone, and keep a
+secret token on their device to look at or cancel the request. The token travels in the
+X-Reservation-Token header, never in the URL, because URLs end up in server logs.
+
+Stock is only taken off when the owner marks the pickup collected, which makes a normal bill. An
+accepted reservation holds the quantity in the meantime, so two shoppers cannot both be promised
+the last packet.
 """
 
 import re
@@ -13,7 +16,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import bindparam, select, text
 from sqlalchemy.exc import IntegrityError
@@ -362,7 +365,7 @@ def _shopper_reservation(db: Session, reservation_id: UUID, token: str) -> Reser
 @public_router.get("/{reservation_id}")
 def get_reservation(
     reservation_id: UUID,
-    token: str = Query(..., min_length=10, max_length=64),
+    token: str = Header(..., alias="X-Reservation-Token", min_length=10, max_length=64),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     reservation = _shopper_reservation(db, reservation_id, token)
@@ -374,7 +377,7 @@ def get_reservation(
 @public_router.post("/{reservation_id}/cancel")
 def cancel_reservation(
     reservation_id: UUID,
-    token: str = Query(..., min_length=10, max_length=64),
+    token: str = Header(..., alias="X-Reservation-Token", min_length=10, max_length=64),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     reservation = _shopper_reservation(db, reservation_id, token)
