@@ -1,30 +1,52 @@
+import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { ArrowLeft, Store, Navigation, Info } from 'lucide-react';
+import { ArrowLeft, Info, Loader2, Navigation, Phone, SearchX, Store } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { useShopper } from '@/components/shopper-shell';
-import { ShopCard, Availability } from '@/components/shop-result';
-import { alternatives, exampleShops, rupees } from '@/lib/shopper';
+import { Availability, ShopCard } from '@/components/shop-result';
+import { getReferral, getShopPage, rupees, type ShopResult } from '@/lib/shopper';
+
 export const Route = createFileRoute('/shops/$shopId')({
-  head: ({ params }) => ({ meta: [
-    { title: `${params.shopId.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')} — KadaNet shop availability` },
+  head: () => ({ meta: [
+    { title: 'Shop availability — Kannect' },
     { name: 'description', content: 'Check reported product availability at this local shop and find nearby alternatives.' },
-    { property: 'og:title', content: 'Local shop availability — KadaNet' },
-    { property: 'og:description', content: 'Find everyday essentials and alternative local shops with KadaNet.' },
-    { property: 'og:type', content: 'website' }, { name: 'twitter:card', content: 'summary_large_image' },
-  ] }), component: ShopDetail,
+  ] }),
+  component: ShopDetail,
 });
+
 function ShopDetail() {
   const { shopId } = Route.useParams();
-  const { response, nearby: discoveryShops } = useShopper();
-  const hasProduct = response?.shops.some(s => s.id === shopId) ?? false;
-  const shops = hasProduct && response ? response.shops : [...discoveryShops, ...exampleShops.filter(s => !discoveryShops.some(n => n.id === s.id))];
-  const shop = shops.find(s => s.id === shopId);
-  if (!shop) return <main className="app-main"><div className="empty-state"><Store /><h1>Shop not found</h1><p>Search again to find shops and their current reported availability.</p><Button asChild><Link to="/search">Back to search</Link></Button></div></main>;
-  const nearby = alternatives(shops, shop);
-  return <main className="app-main"><Button variant="ghost" asChild className="-ml-4"><Link to={hasProduct ? '/search' : '/'}><ArrowLeft />{hasProduct ? 'Back to results' : 'Back to nearby shops'}</Link></Button><div className="detail-header"><div className="detail-symbol"><Store /></div><h1>{shop.name}</h1><p>{shop.address}{shop.distanceKm !== undefined && <><br />{shop.distanceKm.toFixed(1)} km away</>}</p></div>
-    <div className="demo-banner"><Info size={14} />{response?.cachedAt ? 'Saved demo availability — may be out of date.' : 'Example shop — not live availability.'}</div>
-    {hasProduct ? <div className="detail-product"><div className="min-w-0"><h2>{shop.product}</h2><Availability status={shop.status} /><p>Example stock update · {shop.updatedMinutes} minutes ago</p></div><span className="detail-price">{rupees(shop.price)}</span></div> : <Button asChild className="mt-6"><Link to="/search">Search for an item</Link></Button>}
-    <Button variant="secondary" asChild className="mt-5"><a href={`https://www.google.com/maps/dir/?api=1&destination=${shop.coordinates.latitude},${shop.coordinates.longitude}`} target="_blank" rel="noopener noreferrer"><Navigation />Directions to example location</a></Button>
-    {hasProduct && shop.status === 'out' ? <><div className="local-note"><Info size={26} /><div><h3>Reported out at this shop</h3><p>{nearby.length ? 'These other example shops report the same item in stock.' : 'There are no in-stock alternatives in these results. Try another area or product.'}</p></div></div><div className="section-heading"><h2>Try another nearby shop</h2></div><div className="shop-list">{nearby.map(s => <ShopCard key={s.id} shop={s} />)}</div></> : <div className="local-note"><Info size={26} /><div><h3>A quick heads-up</h3><p>Availability is reported by shops and can change. Demo results don’t confirm that an item is available.</p></div></div>}
+  const page = useQuery({ queryKey: ['shop', shopId], queryFn: () => getShopPage(shopId), retry: 1 });
+
+  if (page.isLoading) return <main className="app-main"><div className="empty-state" role="status"><Loader2 className="animate-spin" /><h2>Loading shop…</h2></div></main>;
+  if (page.isError || !page.data) return <main className="app-main"><div className="empty-state" role="alert"><Store /><h1>Shop not found</h1><p>{page.error instanceof Error ? page.error.message : 'We couldn’t load this shop.'}</p><Button asChild><Link to="/search">Back to search</Link></Button></div></main>;
+
+  const { shop, products } = page.data;
+  return <main className="app-main">
+    <Button variant="ghost" asChild className="-ml-4"><Link to="/"><ArrowLeft />Back</Link></Button>
+    <div className="detail-header"><div className="detail-symbol"><Store /></div><h1>{shop.name}</h1><p>{shop.address}</p></div>
+    <div className="flex flex-wrap gap-2 mt-4">
+      {shop.coordinates.latitude !== 0 && <Button variant="secondary" asChild><a href={`https://www.google.com/maps/dir/?api=1&destination=${shop.coordinates.latitude},${shop.coordinates.longitude}`} target="_blank" rel="noopener noreferrer"><Navigation />Directions</a></Button>}
+      {shop.phone && <Button variant="outline" asChild><a href={`tel:${shop.phone}`}><Phone />Call</a></Button>}
+    </div>
+    <div className="section-heading"><h2>What they have</h2></div>
+    {products.length === 0 ? <div className="empty-state"><SearchX /><h2>No products listed yet</h2></div> : <div className="shop-list">{products.map(p => <ProductRow key={p.productId} shop={shop} product={p} />)}</div>}
+    <div className="local-note"><Info size={26} /><div><h3>A quick heads-up</h3><p>Availability is reported by the shop and can change before you arrive. We never show exact counts.</p></div></div>
   </main>;
+}
+
+function ProductRow({ shop, product }: { shop: ShopResult; product: { productId: string; name: string; price: number; status: 'in' | 'low' | 'out' } }) {
+  const [asked, setAsked] = useState(false);
+  const referral = useQuery({
+    queryKey: ['referral', shop.id, product.productId], enabled: asked, retry: 1,
+    queryFn: () => getReferral(shop.id, product.productId),
+  });
+  return <div className="detail-product" style={{ display: 'block' }}>
+    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2>{product.name}</h2><Availability status={product.status} /></div><span className="detail-price">{rupees(product.price)}</span></div>
+    {product.status === 'out' && !asked && <Button variant="outline" size="sm" className="mt-3" onClick={() => setAsked(true)}>Find it at another shop</Button>}
+    {asked && referral.isLoading && <p className="mt-3 text-sm" role="status">Checking nearby shops…</p>}
+    {asked && referral.isError && <p className="mt-3 text-sm text-destructive" role="alert">Couldn’t check other shops. Try again later.</p>}
+    {asked && referral.data === null && <p className="mt-3 text-sm">No nearby shop reports this item in stock right now.</p>}
+    {referral.data && <div className="mt-3"><p className="text-xs text-muted-foreground mb-2">Nearest shop that has it</p><ShopCard shop={referral.data} /></div>}
+  </div>;
 }

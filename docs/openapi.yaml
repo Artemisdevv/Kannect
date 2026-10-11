@@ -598,6 +598,31 @@ paths:
                     allOf: [{ $ref: "#/components/schemas/SearchResult" }]
                     nullable: true
 
+  /shops/nearby:
+    get:
+      tags: [search]
+      security: []
+      summary: Shops around a point, nearest first, without needing a product (for browsing)
+      parameters:
+        - { name: lat, in: query, required: true, schema: { type: number } }
+        - { name: lng, in: query, required: true, schema: { type: number } }
+        - { name: radius_m, in: query, schema: { type: integer, default: 2000 } }
+      responses:
+        "200":
+          description: OK. Shops with no products yet are left out.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  shops:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        shop: { $ref: "#/components/schemas/PublicShop" }
+                        distance_m: { type: integer }
+
   /shops/{shop_id}:
     get:
       tags: [search]

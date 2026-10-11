@@ -9,7 +9,7 @@ vi.mock('@tanstack/react-router', () => ({
 }));
 vi.mock('@/lib/pwa', () => ({ registerAppWorker: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/lib/shopper', async importOriginal => ({
-  ...await importOriginal<typeof import('@/lib/shopper')>(), searchProducts: vi.fn(),
+  ...await importOriginal<typeof import('@/lib/shopper')>(), searchProducts: vi.fn(), nearbyShops: vi.fn().mockResolvedValue([]),
 }));
 import { searchProducts } from '@/lib/shopper';
 import { ShopperShell, useShopper } from '@/components/shopper-shell';
@@ -24,7 +24,7 @@ function deferred() {
   const promise = new Promise<SearchResponse>(r => { resolve = r; });
   return { promise, resolve };
 }
-const result = (product: string): SearchResponse => ({ demo: true, shops: [{ id: 'one', name: 'Example', area: 'Edappally', address: 'Example', product, price: 1, status: 'in', coordinates: { latitude: 10, longitude: 76 }, updatedMinutes: 1 }] });
+const result = (product: string): SearchResponse => ({ shops: [{ id: 'one', uid: 'one:p', name: 'Example', area: 'Kaloor', address: 'Example', product, price: 1, status: 'in', coordinates: { latitude: 10, longitude: 76 } }] });
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); sessionStorage.clear(); });
 describe('Search state', () => {
   it('keeps the latest search when earlier results arrive last', async () => {

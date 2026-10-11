@@ -1,12 +1,26 @@
-# KadaNet Consumer integration
+# Kannect Consumer integration
 
-The app currently uses clearly marked demo fixtures. No live API contract or `VITE_API_URL` was supplied.
+The app reads the live Kannect API. Set `VITE_API_URL` (for example `https://kannect-i9bp.onrender.com/api/v1`); the
+default is `http://localhost:8000/api/v1`. Types are generated from `docs/openapi.yaml` with `bun run gen:api`.
 
-## Live catalogue
-Supply `VITE_API_URL` and the current OpenAPI contract. Replace the transport boundary in `src/lib/shopper.ts` with the exact documented search route and schema; validate responses and add abort-based timeouts there. The UI uses only public shop identity, address, product, price, reported status and update time. Do not pass through private stock counts or retailer fields. Implement the referral endpoint only if present in that contract; otherwise derive in-stock alternatives from search results. A configured URL without a contract intentionally shows an integration error rather than inventing requests.
+## What it calls (all public, no sign-in)
+- `GET /search` : shops that stock an item around a point (`include_out=true` so "out" shops show and can refer elsewhere)
+- `GET /shops/nearby` : shops around a point for browsing before any search (shops with no products are left out)
+- `GET /shops/{id}` : a shop's public page, products with status only
+- `GET /search/referral` : nearest other shop that has the item in stock
+
+Never exposed to the shopper: exact stock counts and any retailer data. Status is only in stock / low / out.
+All transport lives in `src/lib/shopper.ts` (+ `src/api/client.ts`); screens do not call `fetch`.
+
+## Where searches start
+The shopper's own location if they allow it ("Use my location"), otherwise the centre of the area they picked
+(`areaCenters` in `src/lib/shopper.ts`). Their position is never stored; only public results are cached per session.
 
 ## Map
-No map provider or key is configured. The map toggle intentionally offers an accessible list fallback. Supply a chosen provider and appropriate public key restrictions before adding a real map. Do not send precise shopper coordinates to analytics.
+No map provider or key is configured; the map toggle shows an accessible list fallback. Add a provider and public key
+restrictions before adding a real map. Do not send precise shopper coordinates to analytics.
 
-## PWA
-The PWA skill governs offline support. `vite-plugin-pwa` generates `/sw.js`, with a single preview-safe registration wrapper, network-first HTML and same-origin hashed-asset caching. Installation/offline behavior must be verified on the published app, not the editor preview. Public search results are session-cached without shopper coordinates; cached availability is explicitly marked stale. Font fallback remains readable without a connection.
+## PWA and Android
+`vite-plugin-pwa` generates `/sw.js` (network-first HTML, hashed assets cached). The Android app (Capacitor,
+`com.kannect.shopper`) bundles the web build and skips the service worker. Build: `bun run android:sync`, then open
+`android/` in Android Studio, or let CI build an APK (`.github/workflows/android.yml`, manual run).

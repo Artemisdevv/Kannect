@@ -144,6 +144,50 @@ def referral(
     return {"referral": _result(row) if row else None}
 
 
+@router.get("/shops/nearby")
+def nearby_shops(
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180),
+    radius_m: int = Query(DEFAULT_RADIUS_M, ge=100, le=MAX_RADIUS_M),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Shops around a point, nearest first (public: name, address, phone, location only).
+
+    For browsing before the shopper has searched for anything. Shops with no products yet are
+    left out so the list does not send people to an empty shop.
+    """
+    sql = """
+    SELECT s.id, s.name, s.address, s.phone, ST_Y(s.location) AS lat, ST_X(s.location) AS lng,
+      ROUND(ST_Distance(s.location::geography,
+            ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography)) AS distance_m
+    FROM shop s
+    WHERE s.location IS NOT NULL
+      AND EXISTS (SELECT 1 FROM shop_product sp WHERE sp.shop_id = s.id)
+      AND ST_DWithin(s.location::geography,
+                     ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radius)
+    ORDER BY distance_m, s.name
+    LIMIT :limit
+    """
+    rows = db.execute(
+        text(sql), {"lat": lat, "lng": lng, "radius": radius_m, "limit": RESULT_LIMIT}
+    ).mappings().all()  # fmt: skip
+    return {
+        "shops": [
+            {
+                "shop": {
+                    "id": str(r["id"]),
+                    "name": r["name"],
+                    "address": r["address"],
+                    "phone": r["phone"],
+                    "location": {"lat": r["lat"], "lng": r["lng"]},
+                },
+                "distance_m": int(r["distance_m"]),
+            }
+            for r in rows
+        ]
+    }
+
+
 @router.get("/shops/{shop_id}")
 def shop_page(
     shop_id: UUID,
