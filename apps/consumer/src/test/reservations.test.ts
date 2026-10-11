@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parsePhone, tidy } from '@/lib/phone';
-import { cancelReservation, createReservation, fetchReservation, forgetReservations, saveReservation, savedReservation, savedReservations } from '@/lib/reservations';
+import { cancelReservation, createReservation, fetchReservation, CLOSED_VISIBLE_MS, forgetReservations, noteClosed, pruneClosed, saveReservation, savedReservation, savedReservations, visibleReservations } from '@/lib/reservations';
 import { statusMessage } from '@/lib/reservation-text';
 import { lineTotal, qtyLabel } from '@/components/reserve-dialog';
 
@@ -53,6 +53,20 @@ describe('what this phone remembers', () => {
     expect(savedReservation('zzz')).toBeUndefined();
     forgetReservations();
     expect(savedReservations()).toEqual([]);
+  });
+});
+
+describe('requests that ended without a pickup', () => {
+  it('stay for two minutes after first being seen as closed, then leave the list', () => {
+    saveReservation({ id: 'a', token: 't-a', shopName: 'A', at: 1 });
+    saveReservation({ id: 'b', token: 't-b', shopName: 'B', at: 2 });
+    noteClosed('a', 1_000);
+    noteClosed('a', 99_000); // the clock starts once
+    expect(savedReservation('a')?.closedAt).toBe(1_000);
+    expect(visibleReservations(savedReservations(), 1_000 + CLOSED_VISIBLE_MS - 1).map(r => r.id)).toEqual(['b', 'a']);
+    expect(visibleReservations(savedReservations(), 1_000 + CLOSED_VISIBLE_MS).map(r => r.id)).toEqual(['b']);
+    pruneClosed(1_000 + CLOSED_VISIBLE_MS);
+    expect(savedReservations().map(r => r.id)).toEqual(['b']);
   });
 });
 

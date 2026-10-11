@@ -4,9 +4,9 @@ No payment and no delivery. Shoppers have no account: they give a name and phone
 secret token on their device to look at or cancel the request. The token travels in the
 X-Reservation-Token header, never in the URL, because URLs end up in server logs.
 
-Stock is only taken off when the owner marks the pickup collected, which makes a normal bill. An
-accepted reservation holds the quantity in the meantime, so two shoppers cannot both be promised
-the last packet.
+Stock is only taken off when the owner marks the pickup collected, which makes a normal bill. A
+request holds its quantity from the moment it is made (so two shoppers cannot both be promised the
+last packet), and the hold is released if the shop does not answer within REQUEST_TTL_MINUTES.
 """
 
 import re
@@ -27,6 +27,7 @@ from app.db import get_db
 from app.models import Product, Shop
 from app.models.reservation import Reservation, ReservationLine
 from app.routers.billing import BillInput, BillLineInput, create_bill
+from app.services.holds import HOLDING_SQL, REQUEST_TTL_MINUTES, WAITING_SQL
 from app.services.stock_sql import STOCK_CTE
 
 public_router = APIRouter(prefix="/reservations", tags=["reservations"])
@@ -132,6 +133,12 @@ class DeclineInput(BaseModel):
 def effective_status(reservation: Reservation, now: datetime | None = None) -> str:
     now = now or datetime.now(UTC)
     if (
+        reservation.status == "requested"
+        and reservation.created_at is not None
+        and reservation.created_at + timedelta(minutes=REQUEST_TTL_MINUTES) <= now
+    ):
+        return "expired"
+    if (
         reservation.status == "accepted"
         and reservation.hold_until is not None
         and reservation.hold_until <= now
@@ -190,7 +197,7 @@ def _available(
     db: Session, shop_id: UUID, product_ids: list[UUID], exclude: UUID | None = None
 ) -> dict[UUID, tuple[int, Decimal]]:
     """For each product: (quantity free to promise, shop price). Free = stock minus what other
-    accepted, unexpired reservations are already holding."""
+    live reservations (waiting for an answer, or accepted and unexpired) are already holding."""
     stock_sql = text(
         f"WITH {STOCK_CTE} SELECT product_id, qty, price FROM stock "
         "WHERE shop_id = :shop AND product_id IN :ids"
@@ -198,12 +205,11 @@ def _available(
     held_sql = text(
         "SELECT rl.product_id, COALESCE(SUM(rl.quantity), 0) AS held "
         "FROM reservation_line rl JOIN reservation r ON r.id = rl.reservation_id "
-        "WHERE r.shop_id = :shop AND r.status = 'accepted' "
-        "AND (r.hold_until IS NULL OR r.hold_until > now()) "
+        f"WHERE r.shop_id = :shop AND {HOLDING_SQL} "
         "AND rl.product_id IN :ids AND (CAST(:exclude AS uuid) IS NULL OR r.id <> :exclude) "
         "GROUP BY rl.product_id"
     ).bindparams(bindparam("ids", expanding=True))
-    args = {"shop": shop_id, "ids": product_ids}
+    args = {"shop": shop_id, "ids": product_ids, "request_ttl": REQUEST_TTL_MINUTES}
     stock = {
         r["product_id"]: (int(r["qty"]), r["price"])
         for r in db.execute(stock_sql, args).mappings()
@@ -256,11 +262,10 @@ def create_reservation(
 
     open_here = db.scalar(
         text(
-            "SELECT count(*) FROM reservation WHERE customer_phone = :phone AND shop_id = :shop "
-            "AND (status = 'requested' OR (status = 'accepted' AND "
-            "(hold_until IS NULL OR hold_until > now())))"
+            "SELECT count(*) FROM reservation r WHERE r.customer_phone = :phone "
+            f"AND r.shop_id = :shop AND {HOLDING_SQL}"
         ),
-        {"phone": request.customer_phone, "shop": shop.id},
+        {"phone": request.customer_phone, "shop": shop.id, "request_ttl": REQUEST_TTL_MINUTES},
     )
     if (open_here or 0) >= OPEN_PER_PHONE_PER_SHOP:
         raise HTTPException(
@@ -270,16 +275,15 @@ def create_reservation(
         )
     open_all = db.scalar(
         text(
-            "SELECT count(*) FROM reservation WHERE customer_phone = :phone "
-            "AND status IN ('requested', 'accepted')"
+            f"SELECT count(*) FROM reservation r WHERE r.customer_phone = :phone AND {HOLDING_SQL}"
         ),
-        {"phone": request.customer_phone},
+        {"phone": request.customer_phone, "request_ttl": REQUEST_TTL_MINUTES},
     )
     if (open_all or 0) >= OPEN_PER_PHONE:
         raise HTTPException(status_code=409, detail="You have too many open requests right now.")
     pending = db.scalar(
-        text("SELECT count(*) FROM reservation WHERE shop_id = :shop AND status = 'requested'"),
-        {"shop": shop.id},
+        text(f"SELECT count(*) FROM reservation r WHERE r.shop_id = :shop AND {WAITING_SQL}"),
+        {"shop": shop.id, "request_ttl": REQUEST_TTL_MINUTES},
     )
     if (pending or 0) >= PENDING_PER_SHOP:
         raise HTTPException(
@@ -383,7 +387,7 @@ def cancel_reservation(
     reservation = _shopper_reservation(db, reservation_id, token)
     shop = db.get(Shop, reservation.shop_id)
     assert shop is not None
-    if reservation.status == "cancelled":
+    if reservation.status == "cancelled" or effective_status(reservation) == "expired":
         return _payload(reservation, shop, owner_view=False)
     if reservation.status not in ("requested", "accepted"):
         raise HTTPException(status_code=409, detail="This request can no longer be cancelled")
@@ -451,6 +455,11 @@ def accept_reservation(
     owner: AuthenticatedOwner = Depends(require_retailer),
 ) -> dict[str, Any]:
     reservation = _locked(db, owner, reservation_id)
+    if effective_status(reservation) == "expired":
+        raise HTTPException(
+            status_code=409,
+            detail="This request ran out of time. Ask the shopper to send it again.",
+        )
     if reservation.status != "requested":
         raise HTTPException(status_code=409, detail="Only a new request can be accepted")
     ids = [line.product_id for line in reservation.lines]
@@ -480,7 +489,9 @@ def decline_reservation(
     owner: AuthenticatedOwner = Depends(require_retailer),
 ) -> dict[str, Any]:
     reservation = _locked(db, owner, reservation_id)
-    if reservation.status not in ("requested", "accepted"):
+    if reservation.status not in ("requested", "accepted") or (
+        effective_status(reservation) == "expired"
+    ):
         raise HTTPException(status_code=409, detail="This request is already closed")
     reservation.status = "declined"
     reservation.decline_reason = (request or DeclineInput()).reason

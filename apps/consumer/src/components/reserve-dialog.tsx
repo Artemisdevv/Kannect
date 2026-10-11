@@ -57,7 +57,7 @@ export function ReserveDialog({ open, onOpenChange, shop, lines, onDone }: {
 
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent>
     <DialogHeader><DialogTitle>Reserve at {shop.name}</DialogTitle>
-      <DialogDescription>The shop sets these aside if they can. You pay at the shop when you collect. No payment now.</DialogDescription></DialogHeader>
+      <DialogDescription>These are set aside for you while the shop answers (they have 10 minutes). You pay at the shop when you collect. No payment now.</DialogDescription></DialogHeader>
     <div className="rounded-2xl bg-secondary p-3 text-sm space-y-1">
       {lines.map(l => <div key={l.productId} className="flex justify-between gap-3"><span>{l.name} × {qtyLabel(l.quantity, l.unit)}</span><strong>{rupees(lineTotal(l))}</strong></div>)}
       <div className="flex justify-between border-t pt-1 font-semibold"><span>Estimated total</span><span>{rupees(total)}</span></div>

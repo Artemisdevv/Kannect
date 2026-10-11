@@ -1,9 +1,10 @@
 import { useQueries } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { ArrowUpRight, HandHelping } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { STATUS_LABEL, tone } from '@/lib/reservation-text';
-import { fetchReservation, savedReservations } from '@/lib/reservations';
+import { endedWithoutPickup, fetchReservation, noteClosed, pruneClosed, savedReservations, visibleReservations } from '@/lib/reservations';
 import { rupees } from '@/lib/shopper';
 
 export const Route = createFileRoute('/reservations/')({
@@ -15,7 +16,9 @@ export const Route = createFileRoute('/reservations/')({
 });
 
 function ReservationsPage() {
-  const saved = savedReservations();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = window.setInterval(() => setNow(Date.now()), 10_000); return () => window.clearInterval(t); }, []);
+  const saved = visibleReservations(savedReservations(), now);
   const results = useQueries({
     queries: saved.map((s) => ({
       queryKey: ['reservation', s.id],
@@ -24,6 +27,10 @@ function ReservationsPage() {
       refetchInterval: 20_000, // the shop may have answered while this screen is open
     })),
   });
+
+  // start the clock the first time a finished request is seen, and drop the ones whose time is up
+  const closedIds = saved.filter((s, i) => endedWithoutPickup(results[i]?.data?.status)).map((s) => s.id).join(',');
+  useEffect(() => { closedIds.split(',').filter(Boolean).forEach((id) => noteClosed(id)); pruneClosed(); }, [closedIds, now]);
 
   return <main className="app-main">
     <p className="eyebrow">Set aside for you</p>
