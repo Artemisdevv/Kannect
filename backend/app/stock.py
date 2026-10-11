@@ -1,15 +1,29 @@
 """Shared stock-ledger calculations used by retailer and billing routes."""
 
 from collections.abc import Iterable
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Literal
 
 from app.models import Product, ShopProduct, StockEvent
 
 DEFAULT_LOW_THRESHOLDS = {"piece": 5, "gram": 1000}
+StockLevel = Literal["plenty", "some", "few", "none", "unknown"]
 
 
 def default_low_threshold(unit: str) -> int:
     """Return the documented unit-based low-stock threshold."""
     return DEFAULT_LOW_THRESHOLDS[unit]
+
+
+def rough_stock_quantity(level: StockLevel, threshold: int) -> int:
+    """Map an onboarding stock level to an integer quantity in base units."""
+    if level == "plenty":
+        return threshold * 5
+    if level == "some":
+        return threshold * 2
+    if level == "few":
+        return int((Decimal(threshold) / 2).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    return 0
 
 
 def stock_quantity(events: Iterable[StockEvent]) -> int:

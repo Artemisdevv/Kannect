@@ -12,9 +12,11 @@ from app.models import Bill, Product, ShopProduct, StockEvent
 from app.routers import billing
 from app.routers.billing import BillInput, _line_total
 from app.routers.shop import (
+    BulkShopProductInput,
     ShopProductCreate,
     StockEventInput,
     add_shop_product,
+    add_shop_products_bulk,
     list_shop_products,
 )
 from app.stock import default_low_threshold, stock_quantity, stock_status
@@ -90,6 +92,66 @@ def test_shop_product_add_uses_unit_threshold_when_omitted(unit, expected_thresh
 
     assert result["low_threshold"] == expected_threshold
     assert session.added[0].low_threshold == expected_threshold
+
+
+def test_bulk_add_maps_levels_to_unit_quantities_thresholds_and_count_sources():
+    products = [
+        Product(id=uuid4(), name=level, unit="piece", is_active=True, mrp=Decimal("1.00"))
+        for level in ("plenty", "some", "few", "none", "unknown")
+    ]
+    products.append(
+        Product(id=uuid4(), name="Rice", unit="gram", is_active=True, mrp=Decimal("50.00"))
+    )
+    levels = ["plenty", "some", "few", "none", "unknown", "few"]
+    items = [
+        {"product_id": str(product.id), "stock_level": level, "count_source": "photo_estimate"}
+        for product, level in zip(products, levels, strict=True)
+    ]
+
+    class Session:
+        def __init__(self):
+            self.added = []
+            self.flushes = 0
+
+        def scalars(self, statement):
+            entity = statement.column_descriptions[0].get("entity")
+            return Results(products if entity is Product else [])
+
+        def add_all(self, rows):
+            self.added.extend(rows)
+
+        def flush(self):
+            self.flushes += 1
+
+        def add(self, row):
+            self.added.append(row)
+
+        def commit(self):
+            return None
+
+        def rollback(self):
+            raise AssertionError("unexpected rollback")
+
+    session = Session()
+    response = add_shop_products_bulk(
+        BulkShopProductInput.model_validate({"items": items}),
+        db=session,
+        owner=SimpleNamespace(shop=SimpleNamespace(id=uuid4())),
+    )
+
+    assert [item["stock_qty"] for item in response["items"]] == [25, 10, 3, 0, 0, 500]
+    assert [item["low_threshold"] for item in response["items"]] == [5, 5, 5, 5, 5, 1000]
+    assert [item["needs_recount"] for item in response["items"]] == [
+        False,
+        False,
+        False,
+        False,
+        True,
+        False,
+    ]
+    events = [item for item in session.added if isinstance(item, StockEvent)]
+    assert len(events) == len(items)
+    assert {item.count_source for item in events} == {"photo_estimate"}
 
 
 def test_bill_line_rounds_gram_price_per_kilogram_to_cents():

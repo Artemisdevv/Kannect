@@ -14,7 +14,13 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.auth import AuthenticatedOwner, require_retailer
 from app.db import get_db
 from app.models import Product, ShopProduct, StockEvent
-from app.stock import default_low_threshold, shop_product_payload, stock_quantity
+from app.stock import (
+    StockLevel,
+    default_low_threshold,
+    rough_stock_quantity,
+    shop_product_payload,
+    stock_quantity,
+)
 
 router = APIRouter(prefix="/shop", tags=["shop"])
 
@@ -35,6 +41,18 @@ class ShopProductPatch(BaseModel):
     cost_price: Decimal | None = None
     low_threshold: int | None = Field(default=None, ge=0)
     pinned: bool | None = None
+
+
+class BulkShopProductItem(BaseModel):
+    product_id: UUID
+    price: Decimal | None = None
+    stock_level: StockLevel | None = None
+    opening_stock: int | None = Field(default=None, ge=0)
+    count_source: Literal["owner_exact", "photo_estimate", "level_guess"] = "level_guess"
+
+
+class BulkShopProductInput(BaseModel):
+    items: list[BulkShopProductItem]
 
 
 class StockEventInput(BaseModel):
@@ -161,6 +179,98 @@ def add_shop_product(
         product,
         request.opening_stock if request.opening_stock is not None else 0,
     )
+
+
+@router.post("/products/bulk", status_code=201)
+def add_shop_products_bulk(
+    request: BulkShopProductInput,
+    db: Session = Depends(get_db),
+    owner: AuthenticatedOwner = Depends(require_retailer),
+) -> dict[str, list[dict[str, Any]]]:
+    shop_id = _shop_id(owner)
+    product_ids = [item.product_id for item in request.items]
+    if len(product_ids) != len(set(product_ids)):
+        raise HTTPException(status_code=400, detail="Each product may appear only once")
+
+    requested_ids = set(product_ids)
+    products = {
+        product.id
+        : product
+        for product in db.scalars(select(Product).where(Product.id.in_(requested_ids))).all()
+    }
+    if len(products) != len(requested_ids):
+        raise HTTPException(status_code=404, detail="Product not found")
+    if any(not product.is_active for product in products.values()):
+        raise HTTPException(status_code=409, detail="Inactive product cannot be added")
+
+    existing_ids = (
+        set(
+            db.scalars(
+                select(ShopProduct.product_id).where(
+                    ShopProduct.shop_id == shop_id,
+                    ShopProduct.product_id.in_(requested_ids),
+                )
+            ).all()
+        )
+        if requested_ids
+        else set()
+    )
+    if existing_ids:
+        raise HTTPException(status_code=409, detail="Product already belongs to this shop")
+
+    rows: list[tuple[ShopProduct, Product, int]] = []
+    for item in request.items:
+        product = products[item.product_id]
+        price = item.price if item.price is not None else product.mrp
+        if price is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Product {product.id} has no price or catalogue MRP; provide a price.",
+            )
+        threshold = default_low_threshold(product.unit)
+        stock_level = item.stock_level or "unknown"
+        quantity = (
+            item.opening_stock
+            if item.opening_stock is not None
+            else rough_stock_quantity(stock_level, threshold)
+        )
+        row = ShopProduct(
+            shop_id=shop_id,
+            product_id=product.id,
+            price=price,
+            low_threshold=threshold,
+            needs_recount=(stock_level == "unknown" and item.opening_stock is None),
+            pinned=False,
+        )
+        rows.append((row, product, quantity))
+
+    try:
+        db.add_all([row for row, _, _ in rows])
+        db.flush()
+        for (row, _, quantity), item in zip(rows, request.items, strict=True):
+            db.add(
+                StockEvent(
+                    shop_id=shop_id,
+                    product_id=row.product_id,
+                    client_id=uuid4(),
+                    type="correction",
+                    quantity=quantity,
+                    count_source=item.count_source,
+                )
+            )
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="Bulk products conflict with existing data"
+        ) from exc
+
+    return {
+        "items": [
+            shop_product_payload(row, product, quantity)
+            for row, product, quantity in rows
+        ]
+    }
 
 
 @router.patch("/products/{product_id}")
