@@ -27,7 +27,7 @@
 }
 @layer base { * { border-color: var(--border); letter-spacing: 0; } body { margin:0; background:var(--background); color:var(--foreground); font-family:var(--font-sans); } button, a, input { -webkit-tap-highlight-color: transparent; } button { touch-action:manipulation; } }
 .app-shell { max-width: 760px; min-height:100dvh; margin:0 auto; background:var(--background); }
-.app-header { height:64px; padding:0 24px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; border-bottom:1px solid var(--border); background:var(--card); }
+.app-header { height:calc(64px + var(--sat)); padding:var(--sat) 24px 0; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; border-bottom:1px solid var(--border); background:var(--card); }
 .brand { display:flex; align-items:center; gap:9px; font-size:20px; font-weight:750; }
 .brand-mark { display:grid; place-items:center; width:34px; height:34px; border-radius:14px; background:var(--primary); color:var(--primary-foreground); }
 .brand-caption { font-size:9.5px; font-weight:500; text-transform:uppercase; color:var(--muted-foreground); margin-top:0; }
@@ -58,7 +58,7 @@ h1 { font-size:25px; line-height:1.25; font-weight:750; margin:4px 0; }
 .group-banner { background:var(--accent); border-radius:32px; padding:16px 18px; display:grid; grid-template-columns:minmax(0,1fr) 112px; gap:12px; overflow:hidden; }
 .group-banner img { width:112px; height:88px; object-fit:cover; border-radius:22px; align-self:center; }
 .group-banner h3 { font-size:15px; font-weight:700; margin:6px 0 4px; }
-.bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:min(100%,760px); padding:6px 12px max(8px,env(safe-area-inset-bottom)); background:var(--card); border-top:1px solid var(--border); border-radius:30px 30px 0 0; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); z-index:30; }
+.bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:min(100%,760px); padding:6px 12px max(8px,var(--sab)); background:var(--card); border-top:1px solid var(--border); border-radius:30px 30px 0 0; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); z-index:30; }
 .nav-item { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; min-height:52px; color:var(--muted-foreground); font-size:9.5px; text-decoration:none; border-radius:20px; }
 .nav-item svg { width:21px; height:21px; }
 .nav-item.active { color:var(--primary); background:var(--secondary); font-weight:700; }
@@ -69,8 +69,8 @@ h1 { font-size:25px; line-height:1.25; font-weight:750; margin:4px 0; }
 .mobile-dialog { width:calc(100% - 28px); max-height:85dvh; overflow:auto; border-radius:32px; }
 .mobile-dialog > button { min-width:48px; min-height:48px; right:6px; top:6px; }
 .quantity-controls { display:flex; align-items:center; gap:8px; }
-@media(min-width:800px) { body { background:var(--muted); } .app-shell { border-left:1px solid var(--border); border-right:1px solid var(--border); } .app-main { padding-left:40px; padding-right:40px; } .app-header { padding:0 40px; } }
-@media(max-width:380px) { .app-main { padding-left:16px; padding-right:16px; } .app-header { padding:0 16px; } .product-row { padding:10px 14px; gap:10px; } .group-banner { grid-template-columns:minmax(0,1fr) 88px; } .group-banner img { width:88px; } h1 { font-size:23px; } }
+@media(min-width:800px) { body { background:var(--muted); } .app-shell { border-left:1px solid var(--border); border-right:1px solid var(--border); } .app-main { padding-left:40px; padding-right:40px; } .app-header { padding:var(--sat) 40px 0; } }
+@media(max-width:380px) { .app-main { padding-left:16px; padding-right:16px; } .app-header { padding:var(--sat) 16px 0; } .product-row { padding:10px 14px; gap:10px; } .group-banner { grid-template-columns:minmax(0,1fr) 88px; } .group-banner img { width:88px; } h1 { font-size:23px; } }
 @media(prefers-reduced-motion:reduce) { *, *::before, *::after { animation:none!important; transition:none!important; } }
 
 .summary,.list-surface,.action-tile,.product-row,.nav-item,button{transition:transform 160ms ease,background-color 160ms ease,color 160ms ease,box-shadow 160ms ease,border-color 160ms ease}
@@ -120,3 +120,16 @@ button:active:not(:disabled),.nav-item:active,.action-tile:active{transform:scal
 .order-tracking li p{grid-column:1/-1}
 .leaflet-container{font:inherit}
 .pe_signin_button #btn_ph_login_text { color: inherit !important; }
+
+/* Phone safe areas. On Android 15+ the app draws under the status bar and gesture bar, so the
+   header must start below the status bar. Capacitor injects --safe-area-inset-* (older WebViews
+   cannot read env()); fall back to env() in browsers. On desktop and in the browser they are 0. */
+:root {
+  --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+}
+/* a screen with no header (sign-in) still has to clear the status bar */
+.app-shell > .app-main:first-child { padding-top: calc(20px + var(--sat)); }
+/* easy-to-hit header buttons */
+.app-header button, .app-header a { min-height: 48px; }
+.app-header button { min-width: 48px; }

@@ -40,7 +40,7 @@
  h2, h3 { font-size:15px; font-weight:700; }
 }
 .app-shell { max-width:760px; min-height:100dvh; margin:0 auto; background:var(--background); border-inline:1px solid var(--border); }
-.app-header { height:76px; padding:0 28px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; border-bottom:1px solid var(--border); }
+.app-header { height:calc(76px + var(--sat)); padding:var(--sat) 28px 0; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; border-bottom:1px solid var(--border); }
 .brand { display:flex; align-items:center; gap:9px; font-size:23px; font-weight:800; color:var(--primary); }
 .brand-mark { width:35px; height:39px; display:grid; place-items:center; color:var(--primary); }
 .brand-mark svg { width:31px; height:31px; stroke-width:1.7; }
@@ -81,7 +81,7 @@
 .local-note h3 { font-size:13px; }
 .local-note p { font-size:11px; margin-top:5px; line-height:1.6; }
 .trust-note { display:flex; gap:8px; align-items:flex-start; justify-content:center; font-size:10px; color:var(--muted-foreground); margin-top:24px; line-height:1.6; }
-.bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:min(100%,760px); display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; padding:9px 22px max(10px,env(safe-area-inset-bottom)); border-top:1px solid var(--border); background:var(--background); z-index:30; }
+.bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:min(100%,760px); display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; padding:9px 22px max(10px,var(--sab)); border-top:1px solid var(--border); background:var(--background); z-index:30; }
 .nav-item { min-height:54px; padding:6px 8px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:5px; color:var(--muted-foreground); font-size:10px; border-radius:18px; }
 .nav-item svg { width:21px; height:21px; stroke-width:1.7; }
 .nav-item.active { background:var(--secondary); color:var(--primary); font-weight:700; }
@@ -133,5 +133,15 @@
 .settings-section p { font-size:12px; color:var(--muted-foreground); line-height:1.8; margin-bottom:15px; }
 @keyframes kn-fade-up { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
 @media(min-width:600px) { .search-submit { display:inline-flex; } .intro-photo { height:255px; } .intro-photo-copy { top:58px; } .intro-photo-copy h2 { font-size:28px; } }
-@media(max-width:420px) { .app-header { padding-inline:20px; height:68px; } .app-main { padding:23px 20px 112px; } .intro-photo { margin-inline:-20px; height:185px; } .intro-photo-copy { left:20px; top:37px; max-width:164px; } .intro-photo-copy h2 { font-size:21px; } .intro-photo-copy p { max-width:155px; font-size:10px; } .intro-photo img { object-position:57% center; } .example-grid { gap:8px; } .example-tile { height:105px; border-radius:22px; } .example-tile span { font-size:11px; } .example-tile small { font-size:9px; } .shop-card { grid-template-columns:48px minmax(0,1fr) auto; gap:10px; padding:14px 12px; } .shop-art { width:48px; height:58px; } .shop-card h3 { font-size:12px; } }
+@media(max-width:420px) { .app-header { padding-inline:20px; height:calc(68px + var(--sat)); } .app-main { padding:23px 20px 112px; } .intro-photo { margin-inline:-20px; height:185px; } .intro-photo-copy { left:20px; top:37px; max-width:164px; } .intro-photo-copy h2 { font-size:21px; } .intro-photo-copy p { max-width:155px; font-size:10px; } .intro-photo img { object-position:57% center; } .example-grid { gap:8px; } .example-tile { height:105px; border-radius:22px; } .example-tile span { font-size:11px; } .example-tile small { font-size:9px; } .shop-card { grid-template-columns:48px minmax(0,1fr) auto; gap:10px; padding:14px 12px; } .shop-art { width:48px; height:58px; } .shop-card h3 { font-size:12px; } }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none !important; transition:none !important; } }
+
+/* Phone safe areas. On Android 15+ the app draws under the status bar and gesture bar, so the
+   header must start below the status bar. Capacitor injects --safe-area-inset-* (older WebViews
+   cannot read env()); fall back to env() in browsers. On desktop and in the browser they are 0. */
+:root {
+  --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+}
+.app-shell > .app-main:first-child { padding-top: calc(26px + var(--sat)); }
+.app-header button, .app-header a { min-height: 48px; }
