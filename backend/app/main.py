@@ -15,6 +15,7 @@ from app.routers import (
     health,
     search,
     shop,
+    supplier,
     supplier_insight,
 )
 
@@ -43,6 +44,7 @@ app.include_router(health.router, prefix=API_PREFIX)
 app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(catalogue.router, prefix=API_PREFIX)
 app.include_router(shop.router, prefix=API_PREFIX)
+app.include_router(supplier.router, prefix=API_PREFIX)
 app.include_router(billing.router, prefix=API_PREFIX)
 app.include_router(ai.router, prefix=API_PREFIX)
 app.include_router(search.router, prefix=API_PREFIX)

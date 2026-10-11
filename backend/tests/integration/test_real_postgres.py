@@ -32,6 +32,8 @@ from app.models import (
     Shop,
     ShopProduct,
     StockEvent,
+    Supplier,
+    SupplierProduct,
 )
 
 pytestmark = pytest.mark.skipif(
@@ -102,10 +104,11 @@ client = TestClient(app)
 NEAR = {"lat": 9.9990, "lng": 76.3020}
 
 
-def login(phone: str) -> dict:
-    client.post("/api/v1/auth/otp/request", json={"phone": phone, "role": "retailer"})
+def login(phone: str, role: str = "retailer") -> dict:
+    client.post("/api/v1/auth/otp/request", json={"phone": phone})
     r = client.post(
-        "/api/v1/auth/otp/verify", json={"phone": phone, "otp": get_settings().demo_otp}
+        "/api/v1/auth/otp/verify",
+        json={"phone": phone, "otp": get_settings().demo_otp} | {"role": role},
     )
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['token']}"}
@@ -163,3 +166,70 @@ def test_restock_event_path_locks_correctly(world):
               "type": "restock", "quantity": 5},
     )  # fmt: skip
     assert r.status_code == 201, r.text
+
+
+def test_supplier_profile_and_wholesale_catalogue_round_trip(world):
+    phone = fake_phone()
+    headers = login(phone, role="supplier")
+    try:
+        profile = client.post(
+            "/api/v1/supplier",
+            headers=headers,
+            json={
+                "name": "Itest Wholesale",
+                "location": {"lat": 9.9312, "lng": 76.2673},
+            },
+        )
+        assert profile.status_code == 201, profile.text
+        supplier_id = profile.json()["id"]
+        assert profile.json()["phone"] == phone
+        assert profile.json()["location"] == {"lat": 9.9312, "lng": 76.2673}
+        duplicate_profile = client.post("/api/v1/supplier", headers=headers, json={"name": "Again"})
+        assert duplicate_profile.status_code == 409
+
+        created = client.post(
+            "/api/v1/supplier/products",
+            headers=headers,
+            json={
+                "product_id": str(world["product"]),
+                "price": 35.25,
+                "pack_size": 12,
+                "min_order_packs": 2,
+            },
+        )
+        assert created.status_code == 201, created.text
+        assert created.json()["price"] == 35.25
+        assert created.json()["product"]["id"] == str(world["product"])
+        duplicate_product = client.post(
+            "/api/v1/supplier/products",
+            headers=headers,
+            json={"product_id": str(world["product"]), "price": 35.25, "pack_size": 12},
+        )
+        assert duplicate_product.status_code == 409
+
+        listed = client.get("/api/v1/supplier/products", headers=headers)
+        assert listed.status_code == 200, listed.text
+        assert len(listed.json()["items"]) == 1
+        assert listed.json()["items"][0]["supplier"]["id"] == supplier_id
+
+        updated = client.patch(
+            f"/api/v1/supplier/products/{world['product']}",
+            headers=headers,
+            json={"available": False},
+        )
+        assert updated.status_code == 200, updated.text
+        assert updated.json()["available"] is False
+
+        own_profile = client.get("/api/v1/supplier", headers=headers)
+        assert own_profile.status_code == 200
+        assert own_profile.json()["id"] == supplier_id
+    finally:
+        with SessionLocal() as db:
+            supplier = db.scalar(select(Supplier).where(Supplier.phone == phone))
+            if supplier is not None:
+                db.execute(
+                    delete(SupplierProduct).where(SupplierProduct.supplier_id == supplier.id)
+                )
+                db.delete(supplier)
+            db.execute(delete(OwnerIdentity).where(OwnerIdentity.phone == phone))
+            db.commit()
