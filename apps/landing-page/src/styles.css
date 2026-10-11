@@ -249,11 +249,42 @@ h1, h2 { margin: 0; font: 500 clamp(64px, 9.2vw, 122px)/.91 "Manrope", sans-seri
 .role-card h3 { max-width: 300px; }
 .role-card__body { margin-left: auto; margin-right: auto; }
 
+/* SpecularButton context sizing and pill treatment. */
+.specular-button { text-decoration: none; border-radius: var(--sb-radius); }
+.nav-button { border-radius: 999px; background: color-mix(in srgb, var(--sb-tint) calc(var(--sb-tint-opacity) * 100%), transparent); }
+.nav-button .specular-button__label, .button--glow .specular-button__label, .hero__text-link .specular-button__label { margin: 0; color: var(--sb-text-color); font-size: inherit; }
+.nav-button .button-arrow, .button--glow .button-arrow, .hero__text-link .button-arrow { margin: 0; color: #ffc176; font-size: 1.25em; }
+.button--glow { border-radius: 999px; background: color-mix(in srgb, var(--sb-tint) calc(var(--sb-tint-opacity) * 100%), transparent); }
+.button--disabled { border-radius: 999px; background: color-mix(in srgb, var(--sb-tint) calc(var(--sb-tint-opacity) * 100%), transparent); }
+.button--disabled:disabled { opacity: .62; }
+.header .specular-button--sm { min-height: 39px; padding: 0 14px; font-size: 10px; }
+.hero__text-link.specular-button--sm { min-height: 40px; padding: 0 16px; font-size: 10px; }
+.button--glow.specular-button--md, .button--disabled.specular-button--md { min-height: 49px; padding: 0 17px; font-size: 10px; }
+@media (max-width: 760px) {
+  .header .specular-button--sm { min-height: 34px; padding: 0 8px; font-size: 8px; }
+}
+@media (max-width: 390px) {
+  .header .specular-button--sm { min-height: 32px; padding: 0 6px; font-size: 7px; }
+}
+
 /* The first second is a black title card, followed by the rest of the page. */
 .landing__intro-curtain { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: #000; animation: intro-black-out 1s ease-out forwards; }
 .hero { z-index: 4; }
 .hero h1 { position: relative; z-index: 5; opacity: 0; animation: intro-title-in 1s ease-out forwards; }
 .header, .hero__copy, .hero__actions, .hero__chapter, .ticker, .network, .roles, .rhythm, .download, .closing, .footer { opacity: 0; animation: intro-content-in .75s ease-out 1s both; }
+.ending { position: relative; z-index: 2; display: flex; min-height: calc(100svh - 56px); flex-direction: column; margin: 28px; overflow: hidden; border: 1px solid rgba(255, 209, 158, .24); border-radius: clamp(28px, 4vw, 64px); background: radial-gradient(ellipse at 50% 45%, rgba(255, 193, 118, .045), transparent 68%), rgba(16, 9, 3, .24); box-shadow: inset 0 1px 0 rgba(255, 238, 215, .08), 0 24px 90px rgba(0, 0, 0, .12), 0 0 42px rgba(255, 193, 118, .035); }
+.header { z-index: 20; }
+.ending > .closing { flex: 1 0 0; min-height: 0; padding: clamp(32px, 8svh, 100px) clamp(24px, 7vw, 100px); background: transparent; }
+.ending > .footer { flex: 0 0 auto; }
+.download__apps { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 4px; }
+.download__app-button.specular-button--md { min-height: 44px; gap: 9px; padding-inline: 14px; font-size: 9px; }
+.download__app-button .button__coming-soon { color: rgba(255, 233, 207, .58); font-size: 7px; font-weight: 500; }
+@media (max-width: 760px) {
+  .ending { min-height: calc(100svh - 40px); margin: 20px; border-radius: 30px; }
+  .ending > .footer { padding-inline: 7%; }
+  .download__apps { gap: 7px; }
+  .download__app-button.specular-button--md { min-height: 42px; padding-inline: 11px; font-size: 8px; }
+}
 @keyframes intro-black-out { from { opacity: 1; } to { opacity: 0; } }
 @keyframes intro-title-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes intro-content-in { from { opacity: 0; } to { opacity: 1; } }

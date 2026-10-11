@@ -1,5 +1,6 @@
 import Iridescence from "@/components/Iridescence";
 import SpotlightCard from "@/components/SpotlightCard";
+import SpecularButton from "@/components/SpecularButton";
 
 const roles = [
   {
@@ -93,14 +94,21 @@ export default function App() {
 
       <header className="header">
         <a className="brand" href="#home" aria-label="കnnect home"><img src="/brand-mark.png" alt="കnnect" /></a>
-        <nav aria-label="Main navigation"><a className="nav-button" href="#network">The network <span>↘</span></a><a className="nav-button" href="#apps">Who it’s for <span>↘</span></a><a className="nav-button nav-button--primary" href="#download">Get the app <span>↗</span></a></nav>
+        <nav aria-label="Main navigation">
+          <SpecularButton href="#network" className="nav-button" size="sm" radius={999} tint="#9c5425" tintOpacity={0.07} textColor="#ffefd9" lineColor="#ffd59b" baseColor="#8e542e" intensity={0.78} idleIntensity={0.2} shineSize={7} shineFade={28} thickness={1} glow={0.65} proximity={150} blur={0}>The network <span className="button-arrow">↘</span></SpecularButton>
+          <SpecularButton href="#apps" className="nav-button" size="sm" radius={999} tint="#9c5425" tintOpacity={0.07} textColor="#ffefd9" lineColor="#ffd59b" baseColor="#8e542e" intensity={0.78} idleIntensity={0.2} shineSize={7} shineFade={28} thickness={1} glow={0.65} proximity={150} blur={0}>Who it’s for <span className="button-arrow">↘</span></SpecularButton>
+          <SpecularButton href="#download" className="nav-button nav-button--primary" size="sm" radius={999} tint="#b66d35" tintOpacity={0.15} textColor="#fff3e4" lineColor="#ffe2b4" baseColor="#b46a35" intensity={0.95} idleIntensity={0.3} shineSize={9} shineFade={30} thickness={1.1} glow={0.9} proximity={170} blur={0}>Get the app <span className="button-arrow">↗</span></SpecularButton>
+        </nav>
       </header>
 
       <section className="hero" id="home">
         <div className="hero__content">
           <h1>Good things<br />move <em>locally.</em></h1>
           <p className="hero__copy">A little more connected. A lot closer to home. കnnect brings neighbourhood shops, shoppers and suppliers into one easy rhythm.</p>
-          <div className="hero__actions"><a className="button button--glow" href="#network">Discover the network <span>↘</span></a><a className="hero__text-link" href="#download">Get the app <span>↗</span></a></div>
+          <div className="hero__actions">
+            <SpecularButton href="#network" className="hero__text-link" size="sm" radius={999} tint="#74401f" tintOpacity={0.04} textColor="#ffefd9" lineColor="#efbb7d" baseColor="#a65b2a" intensity={0.8} idleIntensity={0.23} shineSize={6} shineFade={26} thickness={0.9} glow={0.6} proximity={140} blur={0}>Discover the network <span className="button-arrow">↘</span></SpecularButton>
+            <SpecularButton href="#download" className="button button--glow" size="md" radius={999} tint="#a85f2d" tintOpacity={0.2} textColor="#fff4e7" lineColor="#ffdda9" baseColor="#a65b2a" intensity={1} idleIntensity={0.28} shineSize={9} shineFade={31} thickness={1.5} glow={1.1} proximity={180} blur={0}>Get the app <span className="button-arrow">↗</span></SpecularButton>
+          </div>
         </div>
         <div className="hero__chapter"><span>01</span><i /> THE EVERYDAY, RECONNECTED</div>
       </section>
@@ -154,11 +162,30 @@ export default function App() {
       <section className="rhythm">
         <div className="rhythm__heading"><p className="section-label"><span>03</span> A GOOD DAY, IN THREE STEPS</p><h2>Local life,<br /><em>in better rhythm.</em></h2></div>
         <div className="rhythm__steps">
-          {steps.map(([number, title, body], index) => <article className="rhythm-step" key={number}>
+          {steps.map(([number, title, body], index) => <SpotlightCard
+            className="rhythm-step"
+            key={number}
+            role="article"
+            aria-label={`${number}: ${title}`}
+            theme="dark"
+            spotlightColor="rgba(255, 190, 113, 0.9)"
+            intensity={0.2}
+            spotlightSize={220}
+            softness={0.78}
+            borderGlow={0.5}
+            proximity={80}
+            smoothing={0.32}
+            grain={0.02}
+            style={{
+              "--spotlight-card-surface": "linear-gradient(180deg, rgba(192, 105, 39, .14), rgba(32, 18, 8, .28) 72%)",
+              "--spotlight-card-border": "rgba(245, 174, 104, .52)",
+              "--spotlight-card-shadow": "0 18px 42px rgba(5, 2, 0, .12)",
+            }}
+          >
             <div className="rhythm-step__number">{number}<span>{index === 0 ? "◉" : index === 1 ? "⌂" : "↗"}</span></div>
             <h3>{title}</h3><p>{body}</p>
             {index < steps.length - 1 && <div className="rhythm-step__connector" aria-hidden="true">····································→</div>}
-          </article>)}
+          </SpotlightCard>)}
         </div>
         <div className="rhythm__note"><span>✳</span> Thoughtful tools for the people who keep a neighbourhood going.</div>
       </section>
@@ -167,9 +194,11 @@ export default function App() {
         <div className="download__copy">
           <p className="section-label"><span>04</span> TAKE കnnect WITH YOU</p>
           <h2>Your neighbourhood<br />is <em>just around the corner.</em></h2>
-          <p>Bring the local loop along for the day. The കnnect Android app is getting ready to meet you.</p>
-          <a className="button button--disabled" href="#download" aria-disabled="true" onClick={(event) => event.preventDefault()}><span className="button__android">◉</span> Android app coming soon <span>↗</span></a>
-          <span className="download__fineprint">The APK link and scannable QR code will go live with the Android release.</span>
+          <p>Bring the local loop along for the day. Separate Android apps for shoppers, shops and suppliers are on the way.</p>
+          <div className="download__apps" aria-label="Android apps">
+            {["Consumer", "Retailer", "Supplier"].map((app) => <SpecularButton key={app} className="button button--disabled download__app-button" size="md" radius={999} tint="#764b2d" tintOpacity={0.1} textColor="#f5dec4" lineColor="#d7a16b" baseColor="#76502f" intensity={0.38} idleIntensity={0.08} shineSize={5} shineFade={22} thickness={0.8} glow={0.35} followMouse={false} blur={0} disabled><span className="button__android">◉</span> {app} <span className="button__coming-soon">Coming soon</span></SpecularButton>)}
+          </div>
+          <span className="download__fineprint">APK links and app specific QR codes will go live with each release.</span>
         </div>
         <div className="download__device-wrap">
           <div className="download__glow" aria-hidden="true" /><div className="download__halo download__halo--one" /><div className="download__halo download__halo--two" />
@@ -178,11 +207,13 @@ export default function App() {
         </div>
       </section>
 
-      <section className="closing">
-        <span className="closing__asterisk">✳</span><p>The best things are<br />happening <em>right here.</em></p><a href="#home">Back to the top <span>↑</span></a>
-      </section>
+      <div className="ending">
+        <section className="closing">
+          <span className="closing__asterisk">✳</span><p>The best things are<br />happening <em>right here.</em></p><a href="#home">Back to the top <span>↑</span></a>
+        </section>
 
-      <footer className="footer"><a className="brand" href="#home" aria-label="കnnect home"><img src="/brand-mark.png" alt="കnnect" /></a><span>Good things move locally.</span><nav aria-label="Footer navigation"><a href="#network">Our network</a><a href="#apps">For everyone</a><a href="#download">Get the app</a></nav><span>© 2026 കnnect</span></footer>
+        <footer className="footer"><a className="brand" href="#home" aria-label="കnnect home"><img src="/brand-mark.png" alt="കnnect" /></a><span>Good things move locally.</span><nav aria-label="Footer navigation"><a href="#network">Our network</a><a href="#apps">For everyone</a><a href="#download">Get the app</a></nav><span>© 2026 കnnect</span></footer>
+      </div>
     </main>
   );
 }
