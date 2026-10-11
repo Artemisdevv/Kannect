@@ -7,11 +7,13 @@ import { Heading, Shell } from "@/components/kannect/shell";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { keys, useOrders, useReceiveOrder, useReorderSuggestions } from "@/features/queries";
+import { OrderRouteMap } from "@/features/orders/order-route-map";
 import { newId, rupees } from "@/lib/format";
 import { useQueryClient } from "@tanstack/react-query";
 
 type Suggestion = NonNullable<ReturnType<typeof useReorderSuggestions>["data"]>[number];
 type Order = NonNullable<ReturnType<typeof useOrders>["data"]>[number];
+type TrackingEvent = NonNullable<Order["tracking"]>[number];
 
 const STATUS_TEXT: Record<string, string> = {
   placed: "Waiting for supplier",
@@ -21,6 +23,22 @@ const STATUS_TEXT: Record<string, string> = {
   delivered: "Delivered",
   cancelled: "Cancelled",
 };
+
+function chronologicalTracking(events: TrackingEvent[] | undefined) {
+  return [...(events ?? [])]
+    .filter((event) => event.at && Number.isFinite(Date.parse(event.at)))
+    .sort((a, b) => Date.parse(a.at!) - Date.parse(b.at!));
+}
+
+function latestEta(events: TrackingEvent[]) {
+  return [...events]
+    .filter((event) => event.eta && Number.isFinite(Date.parse(event.eta)))
+    .sort((a, b) => Date.parse(b.at!) - Date.parse(a.at!))[0]?.eta;
+}
+
+function formatTimestamp(value: string) {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
 
 export function OrdersPage() {
   const orders = useOrders();
@@ -86,6 +104,8 @@ export function OrdersPage() {
   };
 
   const count = suggestions.data?.length ?? 0;
+  const tracking = chronologicalTracking(detail?.tracking);
+  const eta = latestEta(tracking);
 
   return (
     <Shell active="Orders">
@@ -165,16 +185,38 @@ export function OrdersPage() {
         <DialogContent className="mobile-dialog">
           <DialogTitle>{detail?.supplier?.name}</DialogTitle>
           <DialogDescription>{STATUS_TEXT[detail?.status ?? ""] ?? detail?.status} · {rupees(detail?.total)}</DialogDescription>
+          {detail && (
+            <OrderRouteMap
+              supplier={{ label: detail.supplier?.name ?? "Supplier", location: detail.supplier?.location }}
+              shop={{ label: detail.shop?.name ?? "Your shop", location: detail.shop?.location }}
+            />
+          )}
+          <section className="order-tracking" aria-label="Order tracking">
+            <div className="order-tracking-heading">
+              <h3>Tracking history</h3>
+              <p>{eta ? `Expected ${formatTimestamp(eta)}` : "No ETA provided"}</p>
+            </div>
+            {tracking.length ? (
+              <ol>
+                {tracking.map((event, index) => (
+                  <li key={`${event.at}-${event.status}-${index}`}>
+                    <strong>{STATUS_TEXT[event.status ?? ""] ?? event.status ?? "Order update"}</strong>
+                    <time dateTime={event.at}>{formatTimestamp(event.at!)}</time>
+                    {event.note && <p>{event.note}</p>}
+                    {event.eta && Number.isFinite(Date.parse(event.eta)) && (
+                      <p>ETA updated to {formatTimestamp(event.eta)}</p>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            ) : <p>No tracking updates yet.</p>}
+          </section>
           <div className="border-y py-3 text-sm space-y-1">
             {(detail?.items ?? []).map((l) => (
               <p key={l.product_id}>{l.name} · {l.packs} pack{l.packs === 1 ? "" : "s"} × {rupees(l.unit_price)}</p>
             ))}
           </div>
-          <ol className="text-xs text-muted-foreground space-y-1">
-            {(detail?.tracking ?? []).map((t, i) => (
-              <li key={i}>{STATUS_TEXT[t.status ?? ""] ?? t.status}{t.note ? ` · ${t.note}` : ""}</li>
-            ))}
-          </ol>
+
           {detail?.status === "delivered" && (
             <Button disabled={receive.isPending} onClick={() => void doReceive(detail)}>
               {receive.isPending ? "Saving…" : "Confirm everything arrived"}
