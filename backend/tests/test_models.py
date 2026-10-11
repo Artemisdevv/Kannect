@@ -7,11 +7,16 @@ from app.db import Base
 
 def test_domain_models_register_and_relationships_configure():
     configure_mappers()
-    assert len(models.__all__) == 8
+    assert len(models.__all__) == 13
     assert set(Base.metadata.tables) == {
         "shop",
         "owner_identity",
         "supplier",
+        "supplier_product",
+        "order",
+        "order_line",
+        "order_tracking",
+        "invoice",
         "product",
         "shop_product",
         "stock_event",
@@ -26,6 +31,10 @@ def test_money_columns_use_contract_precision():
         "shop_product": ["price", "cost_price"],
         "bill": ["total"],
         "bill_line": ["unit_price", "line_total"],
+        "supplier_product": ["price"],
+        "order": ["total"],
+        "order_line": ["unit_price", "line_total"],
+        "invoice": ["subtotal", "gst", "total"],
     }.items():
         for column_name in column_names:
             column_type = Base.metadata.tables[table_name].columns[column_name].type
@@ -47,6 +56,7 @@ def test_idempotency_keys_are_scoped_to_shop():
     for table_name, expected_columns in {
         "bill": ("shop_id", "client_id"),
         "stock_event": ("shop_id", "client_id"),
+        "order": ("shop_id", "client_id"),
     }.items():
         unique_column_sets = {
             tuple(column.name for column in constraint.columns)
@@ -62,6 +72,18 @@ def test_shop_phone_is_unique_for_owner_resolution():
         isinstance(constraint, UniqueConstraint)
         and tuple(column.name for column in constraint.columns) == ("phone",)
         for constraint in constraints
+    )
+
+
+def test_supplier_order_prices_are_snapshots_and_invoice_is_one_to_one():
+    order_line = Base.metadata.tables["order_line"]
+    assert {"name", "pack_size", "unit_price", "line_total"} <= set(order_line.c.keys())
+    invoice_order = Base.metadata.tables["invoice"].c.order_id
+    assert not invoice_order.nullable
+    assert any(
+        isinstance(constraint, UniqueConstraint)
+        and tuple(column.name for column in constraint.columns) == ("order_id",)
+        for constraint in Base.metadata.tables["invoice"].constraints
     )
 
 
