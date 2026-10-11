@@ -28,6 +28,10 @@ tags:
     description: "Owner: Adnan"
   - name: ai
     description: "Owner: Adnan (nice-to-have)"
+  - name: procurement
+    description: "Retailer buys from suppliers. Owner: Aswin"
+  - name: supplier
+    description: "Supplier app. Owner: Aswin (orders, catalogue), Adnan (demand, group buys)"
 
 security:
   - bearer: []
@@ -66,6 +70,7 @@ paths:
               properties:
                 phone: { type: string }
                 otp: { type: string, example: "123456" }
+                role: { type: string, enum: [retailer, supplier], default: retailer, description: "Which app is logging in. One role per phone for the pilot. Token carries a role claim." }
       responses:
         "200":
           description: OK
@@ -75,7 +80,9 @@ paths:
                 type: object
                 properties:
                   token: { type: string }
-                  shop: { allOf: [{ $ref: "#/components/schemas/Shop" }], nullable: true }
+                  role: { type: string, enum: [retailer, supplier] }
+                  shop: { allOf: [{ $ref: "#/components/schemas/Shop" }], nullable: true, description: "retailer role; null until POST /shop" }
+                  supplier: { allOf: [{ $ref: "#/components/schemas/Supplier" }], nullable: true, description: "supplier role; null until POST /supplier" }
         "401": { $ref: "#/components/responses/Error" }
 
   /shop:
@@ -629,6 +636,418 @@ paths:
                         quantity: { type: integer }
                         confidence: { type: number }
 
+  # ---------------- Procurement (retailer buys from suppliers) ----------------
+  /suppliers:
+    get:
+      tags: [procurement]
+      summary: Suppliers that serve this shop's area
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Supplier" }
+
+  /suppliers/{supplier_id}/products:
+    get:
+      tags: [procurement]
+      summary: A supplier's wholesale catalogue
+      parameters:
+        - { name: supplier_id, in: path, required: true, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/SupplierProduct" }
+
+  /shop/reorder-suggestions:
+    get:
+      tags: [procurement]
+      summary: Low/out products with supplier options for each. Suggests only; the owner decides.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        shop_product: { $ref: "#/components/schemas/ShopProduct" }
+                        suggested_packs: { type: integer }
+                        reason: { type: string, description: "Shown to the owner, e.g. Sold 18 in the last 7 days, 3 left" }
+                        options:
+                          type: array
+                          items: { $ref: "#/components/schemas/SupplierProduct" }
+
+  /shop/orders:
+    post:
+      tags: [procurement]
+      summary: Place an order with one supplier. Idempotent on client_id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+    get:
+      tags: [procurement]
+      summary: This shop's orders, newest first
+      parameters:
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/OrderStatus" } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Order" }
+
+  /shop/orders/{order_id}:
+    get:
+      tags: [procurement]
+      parameters:
+        - { name: order_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+
+  /shop/orders/{order_id}/cancel:
+    post:
+      tags: [procurement]
+      summary: Cancel while status is placed
+      parameters:
+        - { name: order_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /shop/orders/{order_id}/receive:
+    post:
+      tags: [procurement]
+      summary: Mark delivered and add received quantities to stock (writes restock events). Owner confirms quantities.
+      parameters:
+        - { name: order_id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  description: Defaults to the ordered quantities
+                  items:
+                    type: object
+                    required: [product_id, quantity]
+                    properties:
+                      product_id: { type: string }
+                      quantity: { type: integer, description: "Base units" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+
+  /shop/orders/{order_id}/invoice:
+    get:
+      tags: [procurement]
+      summary: Invoice for an accepted order
+      parameters:
+        - { name: order_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+
+  /group-buys:
+    get:
+      tags: [procurement]
+      summary: Open group buys near this shop. Pooled quantity unlocks lower price tiers.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/GroupBuy" }
+
+  /group-buys/{group_buy_id}/join:
+    post:
+      tags: [procurement]
+      summary: Commit packs to a group buy. Confirms when the deadline passes and a tier is reached.
+      parameters:
+        - { name: group_buy_id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [packs]
+              properties:
+                packs: { type: integer, minimum: 1 }
+      responses:
+        "201":
+          description: Joined
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GroupBuy" }
+
+  # ---------------- Supplier app ----------------
+  /supplier:
+    post:
+      tags: [supplier]
+      summary: Create the supplier profile (role supplier)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SupplierInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Supplier" }
+    get:
+      tags: [supplier]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Supplier" }
+    patch:
+      tags: [supplier]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SupplierInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Supplier" }
+
+  /supplier/products:
+    get:
+      tags: [supplier]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/SupplierProduct" }
+    post:
+      tags: [supplier]
+      summary: List a catalogue product for wholesale
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id, price, pack_size]
+              properties:
+                product_id: { type: string }
+                price: { type: number, format: double, description: "₹ per pack" }
+                pack_size: { type: integer, description: "Base units per pack, e.g. 12 pieces" }
+                min_order_packs: { type: integer, default: 1 }
+                available: { type: boolean, default: true }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SupplierProduct" }
+
+  /supplier/products/{product_id}:
+    patch:
+      tags: [supplier]
+      parameters:
+        - { name: product_id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                price: { type: number, format: double }
+                pack_size: { type: integer }
+                min_order_packs: { type: integer }
+                available: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SupplierProduct" }
+
+  /supplier/orders:
+    get:
+      tags: [supplier]
+      summary: Orders placed with this supplier
+      parameters:
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/OrderStatus" } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Order" }
+
+  /supplier/orders/{order_id}/status:
+    post:
+      tags: [supplier]
+      summary: |
+        Move an order forward. Allowed: placed to accepted or rejected, accepted to dispatched, dispatched to delivered.
+        Accepting generates the invoice. Each change is appended to the order tracking history.
+      parameters:
+        - { name: order_id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [accepted, rejected, dispatched, delivered] }
+                note: { type: string }
+                eta: { type: string, format: date-time, description: "For accepted or dispatched" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /supplier/orders/{order_id}/invoice:
+    get:
+      tags: [supplier]
+      parameters:
+        - { name: order_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+
+  /supplier/demand:
+    get:
+      tags: [supplier]
+      summary: |
+        Aggregated, anonymised demand: how many nearby shops are low or out of each product.
+        Never names a shop or exposes its numbers. A product appears only when at least 3 shops contribute.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        product: { $ref: "#/components/schemas/Product" }
+                        shops_low_or_out: { type: integer }
+                        shops_total: { type: integer }
+
+  /supplier/group-buys:
+    get:
+      tags: [supplier]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/GroupBuy" }
+    post:
+      tags: [supplier]
+      summary: Open a group buy with quantity-based price tiers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id, tiers, deadline]
+              properties:
+                product_id: { type: string }
+                tiers:
+                  type: array
+                  items: { $ref: "#/components/schemas/PriceTier" }
+                deadline: { type: string, format: date-time }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GroupBuy" }
+
 components:
   securitySchemes:
     bearer:
@@ -797,3 +1216,130 @@ components:
         price: { type: number, format: double }
         stock_status: { $ref: "#/components/schemas/StockStatus" }
         distance_m: { type: integer }
+
+    SupplierInput:
+      type: object
+      properties:
+        name: { type: string }
+        contact_name: { type: string }
+        phone: { type: string }
+        address: { type: string }
+        location: { $ref: "#/components/schemas/Location" }
+        delivery_radius_m: { type: integer, default: 10000 }
+        gstin: { type: string, nullable: true }
+
+    Supplier:
+      allOf:
+        - $ref: "#/components/schemas/SupplierInput"
+        - type: object
+          properties:
+            id: { type: string }
+
+    SupplierProduct:
+      type: object
+      properties:
+        supplier: { $ref: "#/components/schemas/Supplier" }
+        product: { $ref: "#/components/schemas/Product" }
+        price: { type: number, format: double, description: "₹ per pack" }
+        pack_size: { type: integer, description: "Base units per pack" }
+        min_order_packs: { type: integer }
+        available: { type: boolean }
+
+    OrderStatus:
+      type: string
+      enum: [placed, accepted, rejected, dispatched, delivered, cancelled]
+
+    OrderLineInput:
+      type: object
+      required: [product_id, packs]
+      properties:
+        product_id: { type: string }
+        packs: { type: integer, minimum: 1 }
+
+    OrderLine:
+      allOf:
+        - $ref: "#/components/schemas/OrderLineInput"
+        - type: object
+          properties:
+            name: { type: string }
+            pack_size: { type: integer }
+            unit_price: { type: number, format: double, description: "₹ per pack at order time (snapshot)" }
+            line_total: { type: number, format: double }
+
+    OrderInput:
+      type: object
+      required: [client_id, supplier_id, items]
+      properties:
+        client_id: { type: string }
+        supplier_id: { type: string }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/OrderLineInput" }
+        note: { type: string }
+
+    TrackingEvent:
+      type: object
+      properties:
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        at: { type: string, format: date-time }
+        note: { type: string, nullable: true }
+        eta: { type: string, format: date-time, nullable: true }
+
+    Order:
+      type: object
+      properties:
+        id: { type: string }
+        client_id: { type: string }
+        shop: { $ref: "#/components/schemas/PublicShop" }
+        supplier: { $ref: "#/components/schemas/Supplier" }
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/OrderLine" }
+        total: { type: number, format: double }
+        group_buy_id: { type: string, nullable: true }
+        tracking:
+          type: array
+          items: { $ref: "#/components/schemas/TrackingEvent" }
+        created_at: { type: string, format: date-time }
+
+    Invoice:
+      type: object
+      properties:
+        number: { type: string }
+        order_id: { type: string }
+        issued_at: { type: string, format: date-time }
+        supplier: { $ref: "#/components/schemas/Supplier" }
+        shop: { $ref: "#/components/schemas/PublicShop" }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/OrderLine" }
+        subtotal: { type: number, format: double }
+        gst: { type: number, format: double, description: "Demo only: flat illustrative rate, label clearly in the UI" }
+        total: { type: number, format: double }
+        status: { type: string, enum: [unpaid, paid] }
+
+    PriceTier:
+      type: object
+      required: [min_packs, price]
+      properties:
+        min_packs: { type: integer, description: "Total packs pooled across shops to unlock this price" }
+        price: { type: number, format: double, description: "₹ per pack" }
+
+    GroupBuy:
+      type: object
+      properties:
+        id: { type: string }
+        supplier: { $ref: "#/components/schemas/Supplier" }
+        product: { $ref: "#/components/schemas/Product" }
+        pack_size: { type: integer }
+        tiers:
+          type: array
+          items: { $ref: "#/components/schemas/PriceTier" }
+        pooled_packs: { type: integer }
+        shops_joined: { type: integer }
+        current_price: { type: number, format: double }
+        deadline: { type: string, format: date-time }
+        status: { type: string, enum: [open, confirmed, failed] }
+        my_packs: { type: integer, nullable: true, description: "Present for retailers who joined" }
