@@ -26,12 +26,14 @@ def norm(text: str | None) -> str:
 class Match:
     product: Product
     score: float
+    closeness: float = 0.0
 
 
 class CatalogueIndex:
     def __init__(self, products: list[Product]):
         self.products = products
         self.keys = [norm(f"{p.brand} {p.name} {p.size}") for p in products]
+        self.names = [norm(p.name) for p in products]
 
     def match(self, brand: str, name: str, size: str, limit: int = 3) -> list[Match]:
         if not self.products:
@@ -40,7 +42,9 @@ class CatalogueIndex:
         if not query:
             return []
         brand_n = norm(brand)
-        words = {w for w in norm(name).split() if len(w) > 2 and w != brand_n}
+        name_n = norm(name)
+        words = {w for w in name_n.split() if len(w) > 2 and w != brand_n}
+        brand_only = name_n in ("", brand_n)  # e.g. "Aachi" / "" or "Sunlight" / "Sunlight"
 
         shortlist = process.extract(query, self.keys, scorer=fuzz.token_set_ratio, limit=SHORTLIST)
         scored: list[Match] = []
@@ -50,11 +54,22 @@ class CatalogueIndex:
             if words:
                 present = sum(any(fuzz.ratio(w, k) >= 85 for k in key.split()) for w in words)
                 score *= 0.5 + 0.5 * present / len(words)
-            if not brand_n:
-                # No readable brand: can be offered as an alternative, never auto-accepted
-                score = min(score, STRONG - 1)
-            scored.append(Match(self.products[idx], float(score)))
-        scored.sort(key=lambda m: -m.score)
+            if len(brand_n) <= 2:
+                score = min(score, STRONG - 1)  # a 1-2 letter "brand" cannot be verified
+            elif brand_only:
+                # Only one phrase was read (models often put the product name in the brand
+                # field). Accept it only if that phrase is really in the product's NAME;
+                # a bare brand like "Parle" must not pick one arbitrary Parle product.
+                phrase = brand_n or name_n
+                fits = sum(
+                    fuzz.partial_ratio(phrase, self.names[j]) >= 90 for _, _, j in shortlist
+                )
+                # not in the product name, too short to trust, or fits several products
+                if len(phrase) < 4 or fuzz.partial_ratio(phrase, self.names[idx]) < 90 or fits > 1:
+                    score = min(score, STRONG - 1)
+            scored.append(Match(self.products[idx], float(score), float(fuzz.ratio(query, key))))
+        # equal scores are common (subset matches), so prefer the closest whole string
+        scored.sort(key=lambda m: (-m.score, -m.closeness))
         return scored[:limit]
 
 
