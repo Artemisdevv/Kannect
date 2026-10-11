@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ApiError, createShop, isSignedIn, requestOtp, signIn } from "@/api";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { LIMITS, parsePhone, tidy, validateShop, type ShopErrors } from "@/lib/validation";
 
 const SHOP_TYPES = [
   ["grocery", "Grocery"],
@@ -28,6 +29,8 @@ export function LoginPage() {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [errors, setErrors] = useState<ShopErrors>({});
   const [shop, setShop] = useState({
     name: "",
     owner_name: "",
@@ -35,10 +38,8 @@ export function LoginPage() {
     shop_type: "grocery" as (typeof SHOP_TYPES)[number][0],
   });
 
-  const e164 = () => {
-    const digits = phone.replace(/\D/g, "");
-    return digits.length === 10 ? `+91${digits}` : `+${digits}`;
-  };
+  const parsed = parsePhone(phone);
+  const e164 = () => parsed.e164 ?? "";
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -64,16 +65,23 @@ export function LoginPage() {
       else setStep("shop");
     });
 
-  const register = () =>
-    run(async () => {
+  const register = () => {
+    const found = validateShop(shop);
+    setErrors(found);
+    if (Object.keys(found).length > 0) return Promise.resolve();
+    return run(async () => {
       const location = await currentLocation();
       await createShop({
-        ...shop,
+        name: tidy(shop.name),
+        shop_type: shop.shop_type,
+        ...(tidy(shop.owner_name) ? { owner_name: tidy(shop.owner_name) } : {}),
+        ...(tidy(shop.address) ? { address: tidy(shop.address) } : {}),
         language: "en",
         ...(location ? { location } : {}),
       });
       await navigate({ to: "/onboard" });
     });
+  };
 
   return (
     <div className="app-shell">
@@ -107,10 +115,13 @@ export function LoginPage() {
               inputMode="tel"
               autoComplete="tel"
               placeholder="98765 43210"
+              aria-invalid={phoneTouched && Boolean(parsed.error)}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              onBlur={() => setPhoneTouched(true)}
             />
-            <Button className="w-full" disabled={busy || phone.replace(/\D/g, "").length < 10}>
+            {phoneTouched && parsed.error && <p className="text-xs text-destructive">{parsed.error}</p>}
+            <Button className="w-full" disabled={busy || Boolean(parsed.error)}>
               {busy ? "Sending…" : "Send code"}
             </Button>
           </form>
@@ -151,27 +162,45 @@ export function LoginPage() {
             }}
           >
             <h2 className="text-lg font-semibold">Set up your shop</h2>
-            <input
-              className="page-search"
-              aria-label="Shop name"
-              placeholder="Shop name"
-              value={shop.name}
-              onChange={(e) => setShop({ ...shop, name: e.target.value })}
-            />
-            <input
-              className="page-search"
-              aria-label="Your name"
-              placeholder="Your name"
-              value={shop.owner_name}
-              onChange={(e) => setShop({ ...shop, owner_name: e.target.value })}
-            />
-            <input
-              className="page-search"
-              aria-label="Address"
-              placeholder="Area or address"
-              value={shop.address}
-              onChange={(e) => setShop({ ...shop, address: e.target.value })}
-            />
+            <div>
+              <input
+                className="page-search"
+                aria-label="Shop name"
+                placeholder="Shop name"
+                maxLength={LIMITS.shopName.max}
+                aria-invalid={Boolean(errors.name)}
+                value={shop.name}
+                onChange={(e) => setShop({ ...shop, name: e.target.value })}
+                onBlur={() => setErrors(validateShop(shop))}
+              />
+              {errors.name && <p className="text-xs text-destructive mt-1 px-2">{errors.name}</p>}
+            </div>
+            <div>
+              <input
+                className="page-search"
+                aria-label="Your name"
+                placeholder="Your name (optional)"
+                maxLength={LIMITS.ownerName.max}
+                aria-invalid={Boolean(errors.owner_name)}
+                value={shop.owner_name}
+                onChange={(e) => setShop({ ...shop, owner_name: e.target.value })}
+                onBlur={() => setErrors(validateShop(shop))}
+              />
+              {errors.owner_name && <p className="text-xs text-destructive mt-1 px-2">{errors.owner_name}</p>}
+            </div>
+            <div>
+              <input
+                className="page-search"
+                aria-label="Address"
+                placeholder="Area or address (optional)"
+                maxLength={LIMITS.address.max}
+                aria-invalid={Boolean(errors.address)}
+                value={shop.address}
+                onChange={(e) => setShop({ ...shop, address: e.target.value })}
+                onBlur={() => setErrors(validateShop(shop))}
+              />
+              {errors.address && <p className="text-xs text-destructive mt-1 px-2">{errors.address}</p>}
+            </div>
             <select
               className="page-search"
               aria-label="Shop type"
@@ -190,7 +219,7 @@ export function LoginPage() {
               We use your phone's location so nearby shoppers can find you. If you decline, you
               can add it later.
             </p>
-            <Button className="w-full" disabled={busy || !shop.name.trim()}>
+            <Button className="w-full" disabled={busy}>
               {busy ? "Creating…" : "Create shop"}
             </Button>
           </form>
