@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://localhost:8080"
     demo_otp: str = "123456"
     public_base_url: str = "http://localhost:8000"
-    anthropic_api_key: str = ""
+    llm_api_key: str = ""
+    llm_model: str = "gemini-2.5-flash"
 
     @property
     def cors_origin_list(self) -> list[str]:
