@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import { textElement } from "@/lib/safe-dom";
 import { type MapShop, type StockStatus } from "@/lib/shopper";
 import "leaflet/dist/leaflet.css";
 
@@ -66,7 +67,8 @@ export function ShopMap({
             fillOpacity: 1,
           },
         ).addTo(layer);
-        marker.bindTooltip(shop.name, { direction: "top" });
+        // shop.name is typed by the shop owner: pass an element, never a string (Leaflet parses strings as HTML)
+        marker.bindTooltip(textElement(shop.name), { direction: "top" });
         marker.on("click", () => selectRef.current(shop.id));
         markers.current.set(shop.id, marker);
       }
