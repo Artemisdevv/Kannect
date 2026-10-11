@@ -374,7 +374,8 @@ paths:
   /shop/recount-suggestions:
     get:
       tags: [shop]
-      summary: 10-15 items to recount this week (loose items first, flagged conflicts first)
+      summary: Up to 15 items to recount, ordered by needs_recount, photo estimates, level guesses, then loose items
+      description: Within each priority, loose gram items precede other products; names break remaining ties.
       responses:
         "200":
           description: OK
