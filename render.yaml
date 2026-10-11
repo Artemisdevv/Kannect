@@ -1,0 +1,27 @@
+# Render blueprint: New + > Blueprint > pick this repo. See docs/deploy.md.
+services:
+  - type: web
+    name: kannect-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    region: singapore        # close to the Supabase project (ap-southeast-1)
+    plan: free
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL    # Supabase SESSION pooler string, see docs/supabase.md
+        sync: false
+      - key: PUBLIC_BASE_URL # this service's own URL, e.g. https://kannect-api.onrender.com
+        sync: false
+      - key: CORS_ORIGINS    # comma-separated origins of the four frontends
+        sync: false
+      - key: DEMO_OTP
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: gemini-2.5-flash
