@@ -4,15 +4,20 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from fastapi import Response
+from fastapi import HTTPException, Response
 from pydantic import ValidationError
 
 from app.config import Settings
 from app.models import Bill, Product, ShopProduct, StockEvent
 from app.routers import billing
 from app.routers.billing import BillInput, _line_total
-from app.routers.shop import StockEventInput, list_shop_products
-from app.stock import stock_quantity, stock_status
+from app.routers.shop import (
+    ShopProductCreate,
+    StockEventInput,
+    add_shop_product,
+    list_shop_products,
+)
+from app.stock import default_low_threshold, stock_quantity, stock_status
 
 
 def event(kind: str, quantity: int, created_at: datetime, event_id: str):
@@ -42,6 +47,49 @@ def test_stock_uses_latest_absolute_correction_then_later_movements():
 )
 def test_stock_status(quantity, threshold, expected):
     assert stock_status(quantity, threshold) == expected
+
+
+def test_unit_based_low_threshold_defaults():
+    assert default_low_threshold("piece") == 5
+    assert default_low_threshold("gram") == 1000
+
+
+@pytest.mark.parametrize(("unit", "expected_threshold"), [("piece", 5), ("gram", 1000)])
+def test_shop_product_add_uses_unit_threshold_when_omitted(unit, expected_threshold):
+    product = Product(id=uuid4(), name="Item", unit=unit, is_active=True)
+
+    class Session:
+        added = []
+
+        def get(self, model, _key):
+            return product if model is Product else None
+
+        def add(self, row):
+            self.added.append(row)
+
+        def flush(self):
+            return None
+
+        def commit(self):
+            return None
+
+        def refresh(self, _row):
+            return None
+
+    session = Session()
+    shop_id = uuid4()
+    request = ShopProductCreate(
+        product_id=product.id,
+        price=Decimal("3.00"),
+    )
+    result = add_shop_product(
+        request,
+        db=session,
+        owner=SimpleNamespace(shop=SimpleNamespace(id=shop_id)),
+    )
+
+    assert result["low_threshold"] == expected_threshold
+    assert session.added[0].low_threshold == expected_threshold
 
 
 def test_bill_line_rounds_gram_price_per_kilogram_to_cents():
@@ -191,6 +239,7 @@ def test_bill_auto_adds_catalogue_product_and_records_sale_with_negative_stock(m
     assert result["share_url"].startswith("https://shop.example/b/")
     assert len(session.shop_products) == 1
     assert session.shop_products[0].needs_recount is True
+    assert session.shop_products[0].low_threshold == 5
     sale_events = [row for row in session.added if isinstance(row, StockEvent)]
     assert len(sale_events) == 1
     assert sale_events[0].type == "sale"
@@ -228,3 +277,55 @@ def test_bill_replay_returns_existing_record_with_http_200(monkeypatch):
 
     assert result["id"] == str(existing.id)
     assert response.status_code == 200
+
+
+def test_bill_uses_catalogue_mrp_when_new_shop_product_line_has_no_price(monkeypatch):
+    product = Product(
+        id=uuid4(), name="Rice", unit="gram", is_active=True, mrp=Decimal("84.00")
+    )
+    shop_id = uuid4()
+    owner = SimpleNamespace(shop=SimpleNamespace(id=shop_id))
+    session = BillingSession(product)
+    monkeypatch.setattr(
+        billing, "get_settings", lambda: Settings(public_base_url="https://shop.example")
+    )
+    request = BillInput.model_validate(
+        {
+            "client_id": str(uuid4()),
+            "payment_mode": "cash",
+            "items": [{"product_id": str(product.id), "quantity": 250}],
+        }
+    )
+
+    result = billing.create_bill(request, Response(), session, owner)
+
+    assert result["items"][0]["price"] == 84.0
+    assert result["total"] == 21.0
+    assert session.shop_products[0].price == Decimal("84.00")
+    assert session.shop_products[0].low_threshold == 1000
+
+
+def test_bill_requests_price_when_new_shop_product_has_no_line_price_or_mrp(monkeypatch):
+    product = Product(id=uuid4(), name="Rice", unit="gram", is_active=True, mrp=None)
+    session = BillingSession(product)
+    monkeypatch.setattr(
+        billing, "get_settings", lambda: Settings(public_base_url="https://shop.example")
+    )
+    request = BillInput.model_validate(
+        {
+            "client_id": str(uuid4()),
+            "payment_mode": "cash",
+            "items": [{"product_id": str(product.id), "quantity": 250}],
+        }
+    )
+
+    with pytest.raises(HTTPException) as error:
+        billing.create_bill(
+            request,
+            Response(),
+            session,
+            SimpleNamespace(shop=SimpleNamespace(id=uuid4())),
+        )
+
+    assert error.value.status_code == 400
+    assert "Enter a price" in error.value.detail

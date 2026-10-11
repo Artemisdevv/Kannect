@@ -4,6 +4,13 @@ from collections.abc import Iterable
 
 from app.models import Product, ShopProduct, StockEvent
 
+DEFAULT_LOW_THRESHOLDS = {"piece": 5, "gram": 1000}
+
+
+def default_low_threshold(unit: str) -> int:
+    """Return the documented unit-based low-stock threshold."""
+    return DEFAULT_LOW_THRESHOLDS[unit]
+
 
 def stock_quantity(events: Iterable[StockEvent]) -> int:
     """Return stock after the most recent absolute correction and later movements."""

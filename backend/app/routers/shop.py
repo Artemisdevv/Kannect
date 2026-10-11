@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.auth import AuthenticatedOwner, require_retailer
 from app.db import get_db
 from app.models import Product, ShopProduct, StockEvent
-from app.stock import shop_product_payload, stock_quantity
+from app.stock import default_low_threshold, shop_product_payload, stock_quantity
 
 router = APIRouter(prefix="/shop", tags=["shop"])
 
@@ -130,7 +130,11 @@ def add_shop_product(
         product_id=product.id,
         price=request.price,
         cost_price=request.cost_price,
-        low_threshold=request.low_threshold if request.low_threshold is not None else 0,
+        low_threshold=(
+            request.low_threshold
+            if request.low_threshold is not None
+            else default_low_threshold(product.unit)
+        ),
         pinned=request.pinned if request.pinned is not None else False,
     )
     db.add(shop_product)

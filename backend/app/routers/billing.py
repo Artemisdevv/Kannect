@@ -15,7 +15,7 @@ from app.auth import AuthenticatedOwner, require_retailer
 from app.config import get_settings
 from app.db import get_db
 from app.models import Bill, BillLine, Product, ShopProduct, StockEvent
-from app.stock import stock_quantity
+from app.stock import default_low_threshold, stock_quantity
 
 router = APIRouter(prefix="/shop/bills", tags=["billing"])
 CENT = Decimal("0.01")
@@ -154,16 +154,20 @@ def create_bill(
     shop_products = {row.product_id: row for row in shop_rows}
     for line, product in resolved:
         if product.id not in shop_products:
-            if line.price is None:
+            resolved_price = line.price if line.price is not None else product.mrp
+            if resolved_price is None:
                 raise HTTPException(
                     status_code=400,
-                    detail="Price is required when billing a product not yet in this shop",
+                    detail=(
+                        "This product has no shop price or catalogue MRP. "
+                        "Enter a price to complete the sale."
+                    ),
                 )
             row = ShopProduct(
                 shop_id=shop_id,
                 product_id=product.id,
-                price=line.price,
-                low_threshold=0,
+                price=resolved_price,
+                low_threshold=default_low_threshold(product.unit),
                 needs_recount=True,
                 pinned=False,
             )
