@@ -162,7 +162,11 @@ def verify_otp(
 ) -> dict[str, Any]:
     if settings.otp_provider != "demo" and not _is_demo_phone(request.phone, settings):
         # Real numbers must be verified with the provider, never with the shared demo code.
-        raise HTTPException(status_code=401, detail="Verify this number with phone.email")
+        raise HTTPException(
+            status_code=401,
+            detail="That number is not a demo account. "
+            "Use Continue with phone number to verify it by SMS.",
+        )
     if request.otp != settings.demo_otp:
         raise HTTPException(status_code=401, detail="Invalid phone or OTP")
     return _start_session(db, settings, request.phone, request.role)
@@ -170,7 +174,7 @@ def verify_otp(
 
 # ---------- phone.email ----------
 
-_PATH = re.compile(r"^/[A-Za-z0-9_\-]{6,128}\.json$")
+_PATH = re.compile(r"^/(?:[A-Za-z0-9_\-]+/){0,3}[A-Za-z0-9_\-]{3,128}\.json$")
 _used: OrderedDict[str, None] = OrderedDict()  # results already turned into a login (per instance)
 _USED_MAX = 5000
 
@@ -206,10 +210,13 @@ def get_phone_email_fetcher() -> Callable[[str], dict[str, Any]]:
 def check_result_url(url: str, settings: Settings) -> str:
     """Only ever fetch an https result URL on an allowed host (the client sent it: untrusted)."""
     parsed = urlparse(url.strip())
-    hosts = {h.strip().lower() for h in settings.phone_email_hosts.split(",") if h.strip()}
+    domains = {
+        h.strip().lower().lstrip(".") for h in settings.phone_email_hosts.split(",") if h.strip()
+    }
+    host = (parsed.hostname or "").lower()
     if (
         parsed.scheme != "https"
-        or (parsed.hostname or "").lower() not in hosts
+        or not any(host == d or host.endswith(f".{d}") for d in domains)
         or parsed.port not in (None, 443)
         or parsed.username
         or parsed.password

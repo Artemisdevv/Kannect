@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     # cannot be taken over with the demo OTP.
     otp_provider: Literal["demo", "phone_email"] = "demo"
     phone_email_client_id: str = ""  # public id from the phone.email dashboard (the app needs it)
-    phone_email_hosts: str = "user.phone.email"  # hosts we will fetch a verification result from
+    # Domains we will fetch a verification result from (the domain and its subdomains, https only).
+    phone_email_hosts: str = "phone.email"
     # The exact seeded demo numbers (8 retailers, 3 suppliers) that may still use the demo OTP in
     # phone_email mode. An explicit list, not a prefix: a prefix would cover real numbers too. Set
     # DEMO_PHONES to an empty value before a real pilot to switch the demo logins off completely.

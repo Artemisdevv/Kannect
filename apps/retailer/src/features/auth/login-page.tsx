@@ -119,9 +119,16 @@ export function LoginPage() {
             {config.data?.phone_email_client_id && (
               <PhoneEmailButton clientId={config.data.phone_email_client_id} onVerified={(url) => void verifiedByPhoneEmail(url)} />
             )}
-            {busy && <p className="text-sm text-muted-foreground">Signing you in…</p>}
+            {busy ? (
+              <p className="text-sm text-muted-foreground">Signing you in…</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                A small window opens to check your number. If it stays on “Verifying…”, switch off your
+                browser's ad-blocker or shields for this site and try again.
+              </p>
+            )}
             <Button type="button" variant="ghost" className="w-full" onClick={() => setShowDemo(true)}>
-              Demo shop login
+              Demo shop login (test accounts only)
             </Button>
           </div>
         )}
