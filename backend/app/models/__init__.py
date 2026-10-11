@@ -15,8 +15,11 @@ from app.models.domain import (
     SupplierOrder,
     SupplierProduct,
 )
+from app.models.group_buy import GroupBuy, GroupBuyMember  # noqa: E402
 
 __all__ = [
+    "GroupBuy",
+    "GroupBuyMember",
     "Bill",
     "BillLine",
     "Invoice",
