@@ -12,6 +12,7 @@ export interface Supplier {
   gstin?: string;
   address: string;
   serviceArea: string;
+  location?: { lat: number; lng: number } | null;
 }
 
 export type SupplierInput = Omit<Supplier, "id" | "phone">;
@@ -49,7 +50,7 @@ export interface TrackingEvent {
 export interface Order {
   id: string;
   reference: string;
-  retailer: { name: string; area: string };
+  retailer: { name: string; area: string; location?: { lat: number | null; lng: number | null } };
   items: OrderItem[];
   total: number;
   status: OrderStatus;

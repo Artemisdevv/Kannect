@@ -13,6 +13,7 @@ import { dateTime, inr, pack } from "@/lib/format";
 import { ORDER_TRANSITIONS } from "@/lib/rules";
 import { seo } from "@/lib/seo";
 import type { OrderStatus } from "@/lib/api/types";
+import { RouteMap } from "@/lib/RouteMap";
 
 export const Route = createFileRoute("/orders/$id")({
   head: () => seo("Order details", "Review a retailer order, accept or reject it, and update delivery status."),
@@ -35,6 +36,7 @@ function OrderDetail() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
   const orders = useQuery(q.orders);
+  const sup = useQuery(q.supplier);
   const [pending, setPending] = useState<OrderStatus | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
   const order = orders.data?.find((o) => o.id === id);
@@ -149,6 +151,19 @@ function OrderDetail() {
           destructive={!!ACTION[pending].destructive}
           pending={mut.isPending}
           onConfirm={() => mut.mutate(pending)}
+        />
+      )}
+
+      {sup.data && order && (
+        <RouteMap
+          supplier={{
+            label: sup.data.businessName,
+            location: sup.data.location
+          }}
+          shop={{
+            label: `${order.retailer.name} (${order.retailer.area})`,
+            location: order.retailer.location
+          }}
         />
       )}
     </>
