@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { components } from "@/api/schema";
+import { textElement } from "@/lib/safe-dom";
 import "leaflet/dist/leaflet.css";
 
 type Location = components["schemas"]["Location"];
@@ -47,7 +48,7 @@ export function OrderRouteMap({ supplier, shop }: { supplier: RouteEndpoint; sho
         fillColor: "#633b13",
         fillOpacity: 1,
       })
-        .bindTooltip(supplier.label)
+        .bindTooltip(textElement(supplier.label))
         .addTo(endpoints);
       L.circleMarker(shopPoint, {
         radius: 8,
@@ -56,7 +57,7 @@ export function OrderRouteMap({ supplier, shop }: { supplier: RouteEndpoint; sho
         fillColor: "#18834b",
         fillOpacity: 1,
       })
-        .bindTooltip(shop.label)
+        .bindTooltip(textElement(shop.label))
         .addTo(endpoints);
 
       const route = L.polyline([supplierPoint, shopPoint], {
