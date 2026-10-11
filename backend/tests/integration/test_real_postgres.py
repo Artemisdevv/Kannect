@@ -35,8 +35,8 @@ from app.models import (
     Product,
     Shop,
     ShopProduct,
-    StockEvent,
     StarterPackItem,
+    StockEvent,
     Supplier,
     SupplierOrder,
     SupplierProduct,
@@ -93,6 +93,13 @@ def world():
     finally:
         with SessionLocal() as db:
             both = [ids["a"], ids["b"]]
+            scoped_order_ids = select(SupplierOrder.id).where(SupplierOrder.shop_id.in_(both))
+            db.execute(delete(Invoice).where(Invoice.order_id.in_(scoped_order_ids)))
+            db.execute(delete(OrderTracking).where(OrderTracking.order_id.in_(
+                scoped_order_ids)))
+            db.execute(delete(OrderLine).where(OrderLine.order_id.in_(
+                scoped_order_ids)))
+            db.execute(delete(SupplierOrder).where(SupplierOrder.shop_id.in_(both)))
             bill_ids = list(db.scalars(select(Bill.id).where(Bill.shop_id.in_(both))))
             db.execute(delete(BillLine).where(BillLine.bill_id.in_(bill_ids)))
             db.execute(delete(Bill).where(Bill.id.in_(bill_ids)))
@@ -266,6 +273,7 @@ def test_gram_pack_price_is_converted_to_price_per_kg_before_billing(world):
             bill_ids = [uuid.UUID(bill_id)] if bill_id is not None else []
             db.execute(delete(BillLine).where(BillLine.bill_id.in_(bill_ids)))
             db.execute(delete(Bill).where(Bill.id.in_(bill_ids)))
+            db.execute(delete(StockEvent).where(StockEvent.product_id == product_id))
             db.execute(delete(ShopProduct).where(ShopProduct.product_id == product_id))
             db.execute(delete(SupplierProduct).where(SupplierProduct.product_id == product_id))
             db.execute(delete(Product).where(Product.id == product_id))

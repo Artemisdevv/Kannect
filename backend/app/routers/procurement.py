@@ -1,6 +1,7 @@
 """Retailer procurement endpoints: suppliers, reorder suggestions, receive orders."""
 
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
 
@@ -173,7 +174,7 @@ def reorder_suggestions(
                 Supplier.location.is_not(None),
                 func.ST_DWithin(
                     cast(Supplier.location, Geography(srid=4326)),
-                    cast(shop.location, Geography(srid=4326)),
+                    cast(func.ST_GeomFromEWKB(shop.location), Geography(srid=4326)),
                     Supplier.delivery_radius_m,
                 ),
             )
@@ -350,5 +351,5 @@ def receive_order(
 
 def _price_per_base_unit(pack_price: Any, pack_size: int, unit: str) -> Any:
     """Return price per piece, or per kg for gram-based products."""
-    divisor = pack_size / 1000 if unit == "gram" else pack_size
+    divisor = Decimal(pack_size) / Decimal(1000) if unit == "gram" else Decimal(pack_size)
     return pack_price / divisor
