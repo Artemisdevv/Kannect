@@ -645,6 +645,15 @@ paths:
                         confidence: { type: number, minimum: 0, maximum: 1 }
                         suggested_price: { type: number, format: double, nullable: true, description: "Pre-filled price for the confirm list: the printed MRP, else the median price other shops charge. null when neither is known (the owner types one). Never invented." }
                         price_source: { type: string, enum: [mrp, nearby_median], nullable: true }
+                        read:
+                          type: object
+                          description: "What the model read from the label, split out. Use it to offer 'add as a new product' when `match` is null; the owner confirms."
+                          properties:
+                            brand: { type: string }
+                            name: { type: string }
+                            size: { type: string }
+                            category: { type: string }
+                        readable: { type: boolean, description: "False when the model was only guessing from shape or colour: do not pre-select these" }
                         in_shop: { type: boolean, description: "True when the matched product is already in this shop. Onboarding skips it; offer a recount instead (POST /shop/recount)." }
                         current_quantity: { type: integer, nullable: true, description: "The system's count for an in_shop item, in base units" }
                         current_status: { type: string, enum: [in_stock, low, out], nullable: true }
