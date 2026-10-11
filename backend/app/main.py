@@ -46,6 +46,7 @@ app.add_middleware(
 
 app.include_router(health.router, prefix=API_PREFIX)
 app.include_router(auth.router, prefix=API_PREFIX)
+app.include_router(auth.config_router, prefix=API_PREFIX)
 app.include_router(catalogue.router, prefix=API_PREFIX)
 app.include_router(shop.router, prefix=API_PREFIX)
 app.include_router(recount.router, prefix=API_PREFIX)

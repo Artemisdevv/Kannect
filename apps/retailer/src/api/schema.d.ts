@@ -105,6 +105,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which login the app should show (demo OTP or phone.email). Nothing secret. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            otp_provider?: "demo" | "phone_email";
+                            /** @description Public client id for the phone.email button; null in demo mode */
+                            phone_email_client_id?: string | null;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/phone-email/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log in with a number verified by phone.email (only when otp_provider = phone_email)
+         * @description The app shows the phone.email "Sign in with Phone" button; on success it receives a
+         *     `user_json_url`. Send it here. The server accepts only https URLs on the configured
+         *     phone.email host, fetches the verified number itself, and issues the same token as
+         *     /auth/otp/verify. Each result URL works once. When this mode is on, the demo OTP only
+         *     works for the fictional demo numbers (+91900000...).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @example https://user.phone.email/user_abc123.json */
+                        user_json_url: string;
+                        /**
+                         * @default retailer
+                         * @enum {string}
+                         */
+                        role?: "retailer" | "supplier";
+                    };
+                };
+            };
+            responses: {
+                /** @description Same body as /auth/otp/verify */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            token?: string;
+                            /** @enum {string} */
+                            role?: "retailer" | "supplier";
+                            shop?: components["schemas"]["Shop"] | null;
+                            supplier?: components["schemas"]["Supplier"] | null;
+                        };
+                    };
+                };
+                400: components["responses"]["Error"];
+                401: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/shop": {
         parameters: {
             query?: never;
@@ -870,7 +974,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Export all shop data (no lock-in) */
+        /**
+         * Export this retailer's product, stock, and sales data (no lock-in)
+         * @description Requires retailer authentication. JSON includes shop details, current shop products and stock quantities, bills with line items, and stock-event history. CSV downloads the same data as product, sale-line, and stock-event records. The export is scoped to the authenticated retailer's shop.
+         */
         get: {
             parameters: {
                 query?: {
@@ -882,14 +989,19 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description File download */
+                /** @description Shop data file download */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": unknown;
-                        "text/csv": unknown;
+                        "application/json": {
+                            shop?: Record<string, never>;
+                            products?: Record<string, never>[];
+                            bills?: Record<string, never>[];
+                            stock_events?: Record<string, never>[];
+                        };
+                        "text/csv": string;
                     };
                 };
             };
@@ -2264,6 +2376,7 @@ export interface components {
             lng: number;
         };
         ShopInput: {
+            /** @description Trimmed; blank counts as not given */
             name?: string;
             owner_name?: string;
             phone?: string;
