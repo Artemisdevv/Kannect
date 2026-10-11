@@ -4,7 +4,7 @@ import { ShoppingBag, MapPin, ChevronDown, Search, Store, SlidersHorizontal, Loc
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { areas, nearbyShops, searchProducts, type Coordinates, type SearchResponse, type ShopResult } from '@/lib/shopper';
+import { areas, DEFAULT_AREA, isKnownArea, nearbyShops, searchProducts, type Coordinates, type SearchResponse, type ShopResult } from '@/lib/shopper';
 import { registerAppWorker } from '@/lib/pwa';
 
 type ShopperContext = {
@@ -12,7 +12,7 @@ type ShopperContext = {
   response: SearchResponse | null; loading: boolean; error: string; offline: boolean;
   search: (q: string) => Promise<void>; locationOpen: boolean; setLocationOpen: (v: boolean) => void;
   hasLocation: boolean;
-  resetSearch: () => void; nearby: ShopResult[];
+  resetSearch: () => void; nearby: ShopResult[]; nearbyLoading: boolean; nearbyError: string;
 };
 const Context = createContext<ShopperContext | null>(null);
 export function useShopper() {
@@ -22,7 +22,7 @@ export function useShopper() {
 }
 export function ShopperShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: state => state.location.pathname });
-  const [area, setArea] = useState('Edappally');
+  const [area, setArea] = useState(DEFAULT_AREA);
   const [query, updateQuery] = useState('');
   const requestId = useRef(0);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -35,6 +35,18 @@ export function ShopperShell({ children }: { children: ReactNode }) {
   const [locationMessage, setLocationMessage] = useState('');
   const [locating, setLocating] = useState(false);
   const [manualArea, setManualArea] = useState('');
+  const [nearby, setNearby] = useState<ShopResult[]>([]);
+  const [nearbyLoading, setNearbyLoading] = useState(true);
+  const [nearbyError, setNearbyError] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    setNearbyLoading(true); setNearbyError('');
+    nearbyShops(area, coordinates)
+      .then(list => { if (!cancelled) setNearby(list); })
+      .catch(e => { if (!cancelled) { setNearby([]); setNearbyError(e instanceof Error ? e.message : 'Couldn’t load nearby shops.'); } })
+      .finally(() => { if (!cancelled) setNearbyLoading(false); });
+    return () => { cancelled = true; };
+  }, [area, coordinates]);
   useEffect(() => {
     const update = () => setOffline(!navigator.onLine);
     update(); window.addEventListener('online', update); window.addEventListener('offline', update);
@@ -49,7 +61,7 @@ export function ShopperShell({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       // Cache only public results. Shopper coordinates are never persisted.
-      const cacheKey = `kadanet:${area}:${q.trim().toLowerCase()}`;
+      const cacheKey = `kannect:${area}:${q.trim().toLowerCase()}`;
       if (!navigator.onLine) {
         const raw = sessionStorage.getItem(cacheKey);
         if (raw) { setResponse(JSON.parse(raw)); return; }
@@ -76,6 +88,7 @@ export function ShopperShell({ children }: { children: ReactNode }) {
   useEffect(() => () => { clearTimeout(searchTimer.current); ++requestId.current; }, []);
   function chooseArea(value: string) {
     if (!value.trim()) return;
+    if (!isKnownArea(value.trim())) { setLocationMessage('We don’t cover that area yet. Choose one from the list, or use your location.'); return; }
     resetSearch(); setArea(value.trim()); setCoordinates(undefined); setLocationOpen(false); setLocationMessage('');
   }
   function locate() {
@@ -87,10 +100,10 @@ export function ShopperShell({ children }: { children: ReactNode }) {
       setLocating(false); setArea('Your location'); setResponse(null); setLocationOpen(false);
     }, e => { setLocating(false); setLocationMessage(e.code === 1 ? 'Location permission was denied. You can still search by choosing an area.' : 'We couldn’t find your location. Choose an area or try again.'); }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
   }
-  return <Context.Provider value={{ area, query, setQuery, resetSearch, nearby: nearbyShops(area, coordinates), response, loading, error, offline, search, locationOpen, setLocationOpen, hasLocation: !!coordinates }}>
+  return <Context.Provider value={{ area, query, setQuery, resetSearch, nearby, nearbyLoading, nearbyError, response, loading, error, offline, search, locationOpen, setLocationOpen, hasLocation: !!coordinates }}>
     <div className="app-shell">
       <header className="app-header">
-        <Link to="/" className="brand min-w-0" aria-label="KadaNet home"><span className="brand-mark"><ShoppingBag /></span><span>KadaNet<span className="text-accent-foreground">.</span></span></Link>
+        <Link to="/" className="brand min-w-0" aria-label="Kannect home"><span className="brand-mark"><ShoppingBag /></span><span>Kannect<span className="text-accent-foreground">.</span></span></Link>
         <Button variant="ghost" className="area-button px-2" onClick={() => setLocationOpen(true)} aria-label="Choose your area"><MapPin className="text-accent-foreground" /><span className="min-w-0"><small>Looking around</small><strong className="max-w-32 truncate">{area}</strong></span><ChevronDown className="size-3" /></Button>
       </header>
       {offline && <div className="offline-banner flex items-center gap-2" role="status"><WifiOff size={15} />You’re offline. Saved results may be out of date.</div>}

@@ -1,6 +1,6 @@
 # Kadence Consumer App
 
-we're building the consumer app now. keep the kadanet design system specs
+we're building the consumer app now. keep the kannect design system specs
 
 This project was built with [Lovable](https://lovable.dev).
 

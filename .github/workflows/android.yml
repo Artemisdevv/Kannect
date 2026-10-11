@@ -10,6 +10,7 @@ on:
   pull_request:
     paths:
       - "apps/retailer/**"
+      - "apps/consumer/**"
       - ".github/workflows/android.yml"
 
 jobs:
@@ -18,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [retailer]
+        app: [retailer, consumer]
     defaults:
       run:
         working-directory: apps/${{ matrix.app }}

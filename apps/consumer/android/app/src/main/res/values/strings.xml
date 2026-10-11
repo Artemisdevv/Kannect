@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Kannect</string>
+    <string name="title_activity_main">Kannect</string>
+    <string name="package_name">com.kannect.shopper</string>
+    <string name="custom_url_scheme">com.kannect.shopper</string>
+</resources>

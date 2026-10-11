@@ -803,3 +803,15 @@ def test_starter_pack_returns_active_products_in_curated_order(world):
             )
             db.execute(delete(Product).where(Product.id == extra_product_id))
             db.commit()
+
+
+def test_nearby_shops_lists_shops_by_distance_without_a_product_query(world):
+    r = client.get("/api/v1/shops/nearby", params={**NEAR, "radius_m": 1000})
+    assert r.status_code == 200, r.text
+    mine = [s for s in r.json()["shops"] if s["shop"]["id"] in (str(world["a"]), str(world["b"]))]
+    assert [s["shop"]["id"] for s in mine] == [str(world["a"]), str(world["b"])]  # nearest first
+    assert mine[0]["distance_m"] < mine[1]["distance_m"] <= 400
+    assert "stock_qty" not in str(mine)  # public: no counts, no owner data
+    far = client.get("/api/v1/shops/nearby", params={"lat": 12.0, "lng": -40.0}).json()["shops"]
+    assert far == []
+    assert client.get("/api/v1/shops/nearby", params={"lat": 100, "lng": 0}).status_code == 400
