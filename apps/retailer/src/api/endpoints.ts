@@ -254,3 +254,20 @@ export async function collectReservation(id: string, paymentMode: "cash" | "upi"
     }),
   );
 }
+
+// ---------- group buys ----------
+
+export type GroupBuy = components["schemas"]["GroupBuy"];
+
+export async function listOpenGroupBuys() {
+  return unwrap(await api.GET("/group-buys"));
+}
+
+export async function joinGroupBuy(groupBuyId: string, packs: number) {
+  return unwrap(
+    await api.POST("/group-buys/{group_buy_id}/join", {
+      params: { path: { group_buy_id: groupBuyId } },
+      body: { packs },
+    }),
+  );
+}

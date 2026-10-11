@@ -17,6 +17,8 @@ import { Route as OnboardRouteImport } from './routes/onboard'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as PickupsRouteImport } from './routes/pickups'
 import { Route as StockRouteImport } from './routes/stock'
+import { Route as GroupBuysIndexRouteImport } from './routes/group-buys.index'
+import { Route as GroupBuysIdRouteImport } from './routes/group-buys.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -58,6 +60,16 @@ const StockRoute = StockRouteImport.update({
   path: '/stock',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GroupBuysIndexRoute = GroupBuysIndexRouteImport.update({
+  id: '/group-buys/',
+  path: '/group-buys/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GroupBuysIdRoute = GroupBuysIdRouteImport.update({
+  id: '/group-buys/$id',
+  path: '/group-buys/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -68,6 +80,8 @@ export interface FileRoutesByFullPath {
   '/orders': typeof OrdersRoute
   '/pickups': typeof PickupsRoute
   '/stock': typeof StockRoute
+  '/group-buys/$id': typeof GroupBuysIdRoute
+  '/group-buys/': typeof GroupBuysIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -78,6 +92,8 @@ export interface FileRoutesByTo {
   '/orders': typeof OrdersRoute
   '/pickups': typeof PickupsRoute
   '/stock': typeof StockRoute
+  '/group-buys/$id': typeof GroupBuysIdRoute
+  '/group-buys': typeof GroupBuysIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -89,6 +105,8 @@ export interface FileRoutesById {
   '/orders': typeof OrdersRoute
   '/pickups': typeof PickupsRoute
   '/stock': typeof StockRoute
+  '/group-buys/$id': typeof GroupBuysIdRoute
+  '/group-buys/': typeof GroupBuysIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,6 +119,8 @@ export interface FileRouteTypes {
     | '/orders'
     | '/pickups'
     | '/stock'
+    | '/group-buys/$id'
+    | '/group-buys/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,6 +131,8 @@ export interface FileRouteTypes {
     | '/orders'
     | '/pickups'
     | '/stock'
+    | '/group-buys/$id'
+    | '/group-buys'
   id:
     | '__root__'
     | '/'
@@ -121,6 +143,8 @@ export interface FileRouteTypes {
     | '/orders'
     | '/pickups'
     | '/stock'
+    | '/group-buys/$id'
+    | '/group-buys/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -132,6 +156,8 @@ export interface RootRouteChildren {
   OrdersRoute: typeof OrdersRoute
   PickupsRoute: typeof PickupsRoute
   StockRoute: typeof StockRoute
+  GroupBuysIdRoute: typeof GroupBuysIdRoute
+  GroupBuysIndexRoute: typeof GroupBuysIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -192,6 +218,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StockRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/group-buys/': {
+      id: '/group-buys/'
+      path: '/group-buys'
+      fullPath: '/group-buys/'
+      preLoaderRoute: typeof GroupBuysIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/group-buys/$id': {
+      id: '/group-buys/$id'
+      path: '/group-buys/$id'
+      fullPath: '/group-buys/$id'
+      preLoaderRoute: typeof GroupBuysIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -204,6 +244,8 @@ const rootRouteChildren: RootRouteChildren = {
   OrdersRoute: OrdersRoute,
   PickupsRoute: PickupsRoute,
   StockRoute: StockRoute,
+  GroupBuysIdRoute: GroupBuysIdRoute,
+  GroupBuysIndexRoute: GroupBuysIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

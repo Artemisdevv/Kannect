@@ -9,7 +9,9 @@ import {
   createShop,
   declineReservation,
   getMyShop,
+  joinGroupBuy,
   listBills,
+  listOpenGroupBuys,
   listOrders,
   listReservations,
   listShopProducts,
@@ -27,6 +29,7 @@ export const keys = {
   reorder: ["shop", "reorder"] as const,
   recountSuggestions: ["shop", "recount-suggestions"] as const,
   pickups: ["shop", "pickups"] as const,
+  groupBuys: ["group-buys", "open"] as const,
 };
 
 export function useShopProducts() {
@@ -102,6 +105,26 @@ export function useCreateShop() {
 }
 
 export { getMyShop };
+
+// ---------- group buys ----------
+
+export function useOpenGroupBuys() {
+  return useQuery({
+    queryKey: keys.groupBuys,
+    queryFn: async () => (await listOpenGroupBuys()).items ?? [],
+  });
+}
+
+export function useJoinGroupBuy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupBuyId, packs }: { groupBuyId: string; packs: number }) =>
+      joinGroupBuy(groupBuyId, packs),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.groupBuys });
+    },
+  });
+}
 
 // ---------- pickup requests ----------
 
