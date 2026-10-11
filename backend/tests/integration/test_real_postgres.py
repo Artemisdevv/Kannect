@@ -27,12 +27,16 @@ from app.main import app
 from app.models import (
     Bill,
     BillLine,
+    Invoice,
+    OrderLine,
+    OrderTracking,
     OwnerIdentity,
     Product,
     Shop,
     ShopProduct,
     StockEvent,
     Supplier,
+    SupplierOrder,
     SupplierProduct,
 )
 
@@ -232,4 +236,138 @@ def test_supplier_profile_and_wholesale_catalogue_round_trip(world):
                 )
                 db.delete(supplier)
             db.execute(delete(OwnerIdentity).where(OwnerIdentity.phone == phone))
+            db.commit()
+
+
+def test_orders_idempotency_cancellation_and_supplier_rejection(world):
+    supplier_phone = fake_phone()
+    supplier_headers = login(supplier_phone, role="supplier")
+    supplier_id = None
+    order_ids = []
+    try:
+        profile = client.post(
+            "/api/v1/supplier", headers=supplier_headers, json={"name": "Itest Supplier"}
+        )
+        assert profile.status_code == 201, profile.text
+        supplier_id = profile.json()["id"]
+        product_listing = client.post(
+            "/api/v1/supplier/products",
+            headers=supplier_headers,
+            json={"product_id": str(world["product"]), "price": 55.25, "pack_size": 6},
+        )
+        assert product_listing.status_code == 201, product_listing.text
+
+        retailer_headers = login(world["phone_a"])
+        client_id = str(uuid.uuid4())
+        order_request = {
+            "client_id": client_id,
+            "supplier_id": supplier_id,
+            "items": [{"product_id": str(world["product"]), "packs": 2}],
+        }
+        created = client.post("/api/v1/shop/orders", headers=retailer_headers, json=order_request)
+        assert created.status_code == 201, created.text
+        order = created.json()
+        order_ids.append(order["id"])
+        assert order["total"] == 110.5
+        assert order["items"][0]["name"] == "Itest Soap " + world["tag"]
+        assert order["items"][0]["pack_size"] == 6
+        assert len(order["tracking"]) == 1
+
+        replay = client.post("/api/v1/shop/orders", headers=retailer_headers, json=order_request)
+        assert replay.status_code == 200
+        assert replay.json()["id"] == order["id"]
+        assert len(client.get("/api/v1/shop/orders", headers=retailer_headers).json()["items"]) == 1
+
+        cancelled = client.post(
+            f"/api/v1/shop/orders/{order['id']}/cancel", headers=retailer_headers
+        )
+        assert cancelled.status_code == 200
+        assert cancelled.json()["status"] == "cancelled"
+        assert len(cancelled.json()["tracking"]) == 2
+        assert (
+            client.post(
+                f"/api/v1/shop/orders/{order['id']}/cancel", headers=retailer_headers
+            ).status_code
+            == 409
+        )
+
+        second_request = {**order_request, "client_id": str(uuid.uuid4())}
+        second = client.post("/api/v1/shop/orders", headers=retailer_headers, json=second_request)
+        assert second.status_code == 201, second.text
+        order_ids.append(second.json()["id"])
+        listed = client.get("/api/v1/supplier/orders", headers=supplier_headers)
+        assert listed.status_code == 200
+        assert len(listed.json()["items"]) == 2
+
+        accepted = client.post(
+            f"/api/v1/supplier/orders/{second.json()['id']}/status",
+            headers=supplier_headers,
+            json={"status": "accepted", "note": "Ready to fulfill"},
+        )
+        assert accepted.status_code == 200, accepted.text
+        assert accepted.json()["status"] == "accepted"
+        invoice_response = client.get(
+            f"/api/v1/supplier/orders/{second.json()['id']}/invoice", headers=supplier_headers
+        )
+        assert invoice_response.status_code == 200, invoice_response.text
+        invoice = invoice_response.json()
+        assert invoice["subtotal"] == 110.5
+        assert invoice["gst"] == 0
+        assert invoice["total"] == 110.5
+        assert invoice["tax_status"] == "not_implemented"
+        assert "GST is not currently implemented" in invoice["tax_note"]
+        shop_invoice = client.get(
+            f"/api/v1/shop/orders/{second.json()['id']}/invoice", headers=retailer_headers
+        )
+        assert shop_invoice.status_code == 200
+        assert shop_invoice.json()["number"] == invoice["number"]
+        other_retailer_headers = login(world["phone_b"])
+        assert (
+            client.get(
+                f"/api/v1/shop/orders/{second.json()['id']}/invoice",
+                headers=other_retailer_headers,
+            ).status_code
+            == 404
+        )
+
+        third_request = {**order_request, "client_id": str(uuid.uuid4())}
+        third = client.post("/api/v1/shop/orders", headers=retailer_headers, json=third_request)
+        assert third.status_code == 201, third.text
+        order_ids.append(third.json()["id"])
+        rejected = client.post(
+            f"/api/v1/supplier/orders/{third.json()['id']}/status",
+            headers=supplier_headers,
+            json={"status": "rejected", "note": "Unavailable"},
+        )
+        assert rejected.status_code == 200, rejected.text
+        assert rejected.json()["status"] == "rejected"
+        assert rejected.json()["tracking"][-1]["note"] == "Unavailable"
+        illegal = client.post(
+            f"/api/v1/supplier/orders/{third.json()['id']}/status",
+            headers=supplier_headers,
+            json={"status": "delivered"},
+        )
+        assert illegal.status_code == 409
+        assert (
+            client.get(
+                f"/api/v1/supplier/orders/{third.json()['id']}/invoice",
+                headers=supplier_headers,
+            ).status_code
+            == 404
+        )
+    finally:
+        with SessionLocal() as db:
+            if order_ids:
+                db.execute(delete(Invoice).where(Invoice.order_id.in_(order_ids)))
+                db.execute(delete(OrderTracking).where(OrderTracking.order_id.in_(order_ids)))
+                db.execute(delete(OrderLine).where(OrderLine.order_id.in_(order_ids)))
+                db.execute(delete(SupplierOrder).where(SupplierOrder.id.in_(order_ids)))
+            if supplier_id:
+                supplier = db.get(Supplier, uuid.UUID(supplier_id))
+                if supplier is not None:
+                    db.execute(
+                        delete(SupplierProduct).where(SupplierProduct.supplier_id == supplier.id)
+                    )
+                    db.delete(supplier)
+            db.execute(delete(OwnerIdentity).where(OwnerIdentity.phone == supplier_phone))
             db.commit()

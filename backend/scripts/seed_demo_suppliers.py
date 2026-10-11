@@ -4,6 +4,7 @@ Usage (from backend/):
     python scripts/seed_demo_suppliers.py            # dry run
     python scripts/seed_demo_suppliers.py --apply
     python scripts/seed_demo_suppliers.py --apply --reset   # rebuild this data
+    python scripts/seed_demo_orders.py --apply             # seed accepted orders/invoices via API
 
 Needs scripts/seed_demo.py to have created the shops and suppliers first.
 Everything is fictional demo data. Wholesale prices are derived from the demo retail MRPs in the

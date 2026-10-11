@@ -64,5 +64,5 @@ Rules that keep it fair and safe:
 - **Demand is anonymised and aggregated.** A product shows only when at least 3 shops contribute. Never name a shop or expose its numbers.
 - **AI suggests, owner decides.** Reorder suggestions never place orders automatically.
 - **Retailers choose freely.** No supplier gets ranking by payment.
-- **Invoices are demo documents.** GST on invoices is an illustrative flat rate and must be labelled as such in the UI.
+- **Invoices are demo documents.** GST is not currently implemented or calculated. Invoice responses expose `tax_status: not_implemented` and a display note. Keep invoice totals GST-free and describe the implementation as GST-ready for future work, not GST-compliant.
 - **Payments are out of scope.** Invoices have a status field (`unpaid`/`paid`) set by the supplier; no money moves in the app.

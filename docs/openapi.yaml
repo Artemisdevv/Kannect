@@ -761,6 +761,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Order" }
+        "200":
+          description: Existing order returned for an idempotent replay
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
     get:
       tags: [procurement]
       summary: This shop's orders, newest first
@@ -836,12 +841,12 @@ paths:
   /shop/orders/{order_id}/invoice:
     get:
       tags: [procurement]
-      summary: Invoice for an accepted order
+      summary: Demo invoice for an accepted order; GST is not currently implemented
       parameters:
         - { name: order_id, in: path, required: true, schema: { type: string } }
       responses:
         "200":
-          description: OK
+          description: Demo invoice without GST calculation
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Invoice" }
@@ -1002,12 +1007,26 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Order" }
 
+  /supplier/orders/{order_id}/invoice:
+    get:
+      summary: Demo invoice for an accepted order; GST is not currently implemented
+      tags: [supplier]
+      parameters:
+        - { name: order_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Demo invoice
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+        "404": { $ref: "#/components/responses/Error" }
+
   /supplier/orders/{order_id}/status:
     post:
       tags: [supplier]
       summary: |
         Move an order forward. Allowed: placed to accepted or rejected, accepted to dispatched, dispatched to delivered.
-        Accepting generates the invoice. Each change is appended to the order tracking history.
+        Accepting generates a demo invoice without GST calculation. Each change is appended to the order tracking history.
       parameters:
         - { name: order_id, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -1028,19 +1047,6 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Order" }
         "409": { $ref: "#/components/responses/Error" }
-
-  /supplier/orders/{order_id}/invoice:
-    get:
-      summary: Invoice for an order
-      tags: [supplier]
-      parameters:
-        - { name: order_id, in: path, required: true, schema: { type: string } }
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Invoice" }
 
   /supplier/demand:
     get:
@@ -1371,7 +1377,9 @@ components:
           type: array
           items: { $ref: "#/components/schemas/OrderLine" }
         subtotal: { type: number, format: double }
-        gst: { type: number, format: double, description: "Demo only: flat illustrative rate, label clearly in the UI" }
+        gst: { type: number, format: double, description: "Always 0.00 until GST is implemented; no tax calculation is performed" }
+        tax_status: { type: string, enum: [not_implemented], description: "GST-ready for future work; this invoice does not calculate GST" }
+        tax_note: { type: string, description: "Display this note wherever invoice tax is shown" }
         total: { type: number, format: double }
         status: { type: string, enum: [unpaid, paid] }
 
