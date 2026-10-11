@@ -169,3 +169,16 @@ def test_role_rules_still_apply():
     second = "https://user.phone.email/user_second123456.json"
     r = c.post("/auth/phone-email/verify", json={"user_json_url": second, "role": "retailer"})
     assert r.status_code == 401  # same phone, other role
+
+
+def test_demo_otp_is_an_exact_list_not_a_number_range():
+    c = client(settings(**ON))
+    # inside the old +91900000 prefix, but not one of the seeded demo numbers
+    near = c.post("/auth/otp/verify", json={"phone": "+919000012345", "otp": "123456"})
+    assert near.status_code == 401
+    assert c.post("/auth/otp/verify", json={"phone": "+919000000101", "otp": "123456", "role": "supplier"}).status_code == 200
+
+
+def test_empty_demo_list_switches_demo_logins_off():
+    c = client(settings(**ON, demo_phones=""))
+    assert c.post("/auth/otp/verify", json={"phone": "+919000000002", "otp": "123456"}).status_code == 401

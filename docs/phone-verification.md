@@ -5,7 +5,7 @@ Two modes, chosen by one setting on the API: `OTP_PROVIDER`.
 | Mode | What it does | Use for |
 |---|---|---|
 | `demo` (default) | The fixed `DEMO_OTP` logs in any number. | local development, the pitch demo |
-| `phone_email` | Real SMS verification through [phone.email](https://www.phone.email). The demo OTP then works **only** for the fictional demo numbers (`+91900000…`, so the demo shops stay loginable). | pilots, real shopkeepers |
+| `phone_email` | Real SMS verification through [phone.email](https://www.phone.email). The demo OTP then works **only** for the fictional demo numbers (an exact list of the seeded demo numbers, `DEMO_PHONES`, so the demo shops stay loginable). | pilots, real shopkeepers |
 
 ## Why phone.email, and the limits
 - India is supported. **1000 free SMS a month for the first 6 months** (per their pricing page), then about
@@ -38,7 +38,7 @@ The client never sends a phone number that the server trusts; the number always 
    OTP_PROVIDER=phone_email
    PHONE_EMAIL_CLIENT_ID=<client id>
    ```
-   Optional: `PHONE_EMAIL_HOSTS` (comma separated), `DEMO_PHONE_PREFIX` (default `+91900000`).
+   Optional: `PHONE_EMAIL_HOSTS` (comma separated), `DEMO_PHONES` (comma separated; default is the 11 seeded demo numbers). **Set `DEMO_PHONES=` (empty) before a real pilot** to switch the demo logins off completely; while it is set, anyone who knows `DEMO_OTP` can sign in as those demo shops.
 4. In the phone.email dashboard, add your app's origins to the allowed domains (the deployed web app, and
    `https://localhost` for the Android app) if it asks for them.
 

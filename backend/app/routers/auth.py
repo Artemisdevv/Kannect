@@ -120,7 +120,7 @@ def request_otp(_: OTPRequest) -> None:
 
 
 def _is_demo_phone(phone: str, settings: Settings) -> bool:
-    return bool(settings.demo_phone_prefix) and phone.startswith(settings.demo_phone_prefix)
+    return phone in settings.demo_phone_set
 
 
 def _start_session(db: Session, settings: Settings, phone: str, role: AuthRole) -> dict[str, Any]:
