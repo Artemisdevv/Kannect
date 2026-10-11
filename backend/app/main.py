@@ -1,13 +1,22 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import errors
-from app.config import get_settings
+from app.config import get_settings, validate_runtime_settings
 from app.routers import health
 
 API_PREFIX = "/api/v1"
 
-app = FastAPI(title="KadaNet API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    validate_runtime_settings(get_settings())
+    yield
+
+
+app = FastAPI(title="KadaNet API", version="0.1.0", lifespan=lifespan)
 errors.install(app)
 
 app.add_middleware(

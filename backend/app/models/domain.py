@@ -50,6 +50,7 @@ class Shop(Base):
     bills: Mapped[list[Bill]] = relationship(back_populates="shop")
 
     __table_args__ = (
+        UniqueConstraint("phone", name="uq_shop_phone"),
         CheckConstraint("language IN ('ml', 'en')", name="ck_shop_language"),
         CheckConstraint(
             "shop_type IS NULL OR shop_type IN "

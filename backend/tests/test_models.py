@@ -54,6 +54,15 @@ def test_idempotency_keys_are_scoped_to_shop():
         assert expected_columns in unique_column_sets
 
 
+def test_shop_phone_is_unique_for_owner_resolution():
+    constraints = Base.metadata.tables["shop"].constraints
+    assert any(
+        isinstance(constraint, UniqueConstraint)
+        and tuple(column.name for column in constraint.columns) == ("phone",)
+        for constraint in constraints
+    )
+
+
 def test_stock_events_reference_a_shop_product_pair():
     constraints = Base.metadata.tables["stock_event"].foreign_key_constraints
     pair_fk = next(

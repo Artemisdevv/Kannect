@@ -17,7 +17,9 @@ def install(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
     async def http_exc(_: Request, exc: HTTPException):
         code = _CODES.get(exc.status_code, "internal")
-        return JSONResponse(_body(code, str(exc.detail)), status_code=exc.status_code)
+        return JSONResponse(
+            _body(code, str(exc.detail)), status_code=exc.status_code, headers=exc.headers
+        )
 
     @app.exception_handler(RequestValidationError)
     async def validation_exc(_: Request, exc: RequestValidationError):
