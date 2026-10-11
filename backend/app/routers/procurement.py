@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.auth import AuthenticatedOwner, require_retailer
 from app.db import get_db
 from app.models import (
-    OrderTracking,
     Product,
     Shop,
     ShopProduct,
@@ -158,6 +157,46 @@ def reorder_suggestions(
     shop = db.get(Shop, shop_id)
     rows = _load_shop_products(db, shop_id)
 
+    # Load supplier options and recent sales in batches so query count does not
+    # grow linearly with the number of low-stock products.
+    week_ago = datetime.now(UTC) - timedelta(days=7)
+    supplier_by_product: dict[UUID, list[SupplierProduct]] = {}
+    sold_by_product: dict[UUID, int] = {}
+    if rows and shop is not None and shop.location is not None:
+        product_ids = [row.product_id for row in rows]
+        supplier_rows = db.scalars(
+            select(SupplierProduct)
+            .join(Supplier, SupplierProduct.supplier_id == Supplier.id)
+            .where(
+                SupplierProduct.product_id.in_(product_ids),
+                SupplierProduct.available.is_(True),
+                Supplier.location.is_not(None),
+                func.ST_DWithin(
+                    cast(Supplier.location, Geography(srid=4326)),
+                    cast(shop.location, Geography(srid=4326)),
+                    Supplier.delivery_radius_m,
+                ),
+            )
+            .options(
+                joinedload(SupplierProduct.supplier),
+                joinedload(SupplierProduct.product),
+            )
+        ).all()
+        for supplier_row in supplier_rows:
+            supplier_by_product.setdefault(supplier_row.product_id, []).append(supplier_row)
+
+        sales = db.execute(
+            select(StockEvent.product_id, func.sum(StockEvent.quantity))
+            .where(
+                StockEvent.shop_id == shop_id,
+                StockEvent.product_id.in_(product_ids),
+                StockEvent.type == "sale",
+                StockEvent.created_at >= week_ago,
+            )
+            .group_by(StockEvent.product_id)
+        ).all()
+        sold_by_product = {product_id: int(quantity or 0) for product_id, quantity in sales}
+
     # Find products that are low or out of stock
     low_items = []
     for row in rows:
@@ -165,40 +204,8 @@ def reorder_suggestions(
         st = stock_status(qty, row.low_threshold)
         if st in ("low", "out"):
             # Find suppliers for this product that serve this shop's area
-            supplier_rows = []
-            if shop is not None and shop.location is not None:
-                supplier_rows = db.scalars(
-                    select(SupplierProduct)
-                    .join(Supplier, SupplierProduct.supplier_id == Supplier.id)
-                    .join(Shop, Shop.id == shop_id)
-                    .where(
-                        SupplierProduct.product_id == row.product_id,
-                        SupplierProduct.available.is_(True),
-                        Supplier.location.is_not(None),
-                        Shop.location.is_not(None),
-                        func.ST_DWithin(
-                            cast(Supplier.location, Geography(srid=4326)),
-                            cast(Shop.location, Geography(srid=4326)),
-                            Supplier.delivery_radius_m,
-                        ),
-                    )
-                    .options(
-                        joinedload(SupplierProduct.supplier),
-                        joinedload(SupplierProduct.product),
-                    )
-                ).all()
-
-            # Calculate recent sales (last 7 days) for reason string
-            week_ago = datetime.now(UTC) - timedelta(days=7)
-            sold_qty = db.scalar(
-                select(func.sum(StockEvent.quantity))
-                .where(
-                    StockEvent.shop_id == shop_id,
-                    StockEvent.product_id == row.product_id,
-                    StockEvent.type == "sale",
-                    StockEvent.created_at >= week_ago,
-                )
-            ) or 0
+            supplier_rows = supplier_by_product.get(row.product_id, [])
+            sold_qty = sold_by_product.get(row.product_id, 0)
 
             # Restock toward the low-stock threshold plus about two weeks of recent sales.
             threshold = row.low_threshold
@@ -282,7 +289,6 @@ def receive_order(
     if unknown:
         raise HTTPException(status_code=400, detail=f"Product {min(unknown)} not in this order")
 
-    changed = False
     for product_id, quantity in received_items.items():
         client_id = uuid5(NAMESPACE_URL, f"kannect:receive:{order.id}:{product_id}")
         existing = db.scalar(
@@ -315,8 +321,12 @@ def receive_order(
             shop_product = ShopProduct(
                 shop_id=shop_id,
                 product_id=product_id,
-                price=product.mrp or supplier_product.price / supplier_product.pack_size,
-                cost_price=supplier_product.price / supplier_product.pack_size,
+                price=product.mrp or _price_per_base_unit(
+                    supplier_product.price, supplier_product.pack_size, product.unit
+                ),
+                cost_price=_price_per_base_unit(
+                    supplier_product.price, supplier_product.pack_size, product.unit
+                ),
                 low_threshold=default_low_threshold(product.unit),
                 needs_recount=False,
                 pinned=False,
@@ -334,13 +344,11 @@ def receive_order(
                 count_source="owner_exact",
             )
         )
-        changed = True
-
-    # The order is already marked delivered by the supplier; this event records
-    # the retailer's stock receipt and is written atomically with the stock events.
-    if changed:
-        order.tracking.append(
-            OrderTracking(order_id=order.id, status="delivered", note="Received into stock")
-        )
     db.commit()
     return _order_payload(order)
+
+
+def _price_per_base_unit(pack_price: Any, pack_size: int, unit: str) -> Any:
+    """Return price per piece, or per kg for gram-based products."""
+    divisor = pack_size / 1000 if unit == "gram" else pack_size
+    return pack_price / divisor

@@ -35,8 +35,8 @@ from app.models import (
     Product,
     Shop,
     ShopProduct,
-    StarterPackItem,
     StockEvent,
+    StarterPackItem,
     Supplier,
     SupplierOrder,
     SupplierProduct,
@@ -172,6 +172,113 @@ def test_restock_event_path_locks_correctly(world):
               "type": "restock", "quantity": 5},
     )  # fmt: skip
     assert r.status_code == 201, r.text
+
+
+def test_gram_pack_price_is_converted_to_price_per_kg_before_billing(world):
+    supplier_phone = fake_phone()
+    supplier_headers = login(supplier_phone, role="supplier")
+    retailer_headers = login(world["phone_a"])
+    supplier_id = None
+    order_id = None
+    received_client_id = None
+    bill_id = None
+    product_id = uuid.uuid4()
+    with SessionLocal() as db:
+        product = Product(
+            id=product_id,
+            barcode=f"IR{uuid.uuid4().hex[:12]}",
+            name=f"Itest Rice {world['tag']}",
+            unit="gram",
+            category="grocery",
+            mrp=None,
+            is_active=True,
+        )
+        db.add(product)
+        db.commit()
+
+    try:
+        profile = client.post(
+            "/api/v1/supplier",
+            headers=supplier_headers,
+            json={"name": "Itest Rice Supplier", "location": NEAR},
+        )
+        assert profile.status_code == 201, profile.text
+        supplier_id = profile.json()["id"]
+        listed = client.post(
+            "/api/v1/supplier/products",
+            headers=supplier_headers,
+            json={"product_id": str(product_id), "price": 1200, "pack_size": 25000},
+        )
+        assert listed.status_code == 201, listed.text
+
+        order_response = client.post(
+            "/api/v1/shop/orders",
+            headers=retailer_headers,
+            json={
+                "client_id": str(uuid.uuid4()),
+                "supplier_id": supplier_id,
+                "items": [{"product_id": str(product_id), "packs": 1}],
+            },
+        )
+        assert order_response.status_code == 201, order_response.text
+        order_id = order_response.json()["id"]
+        for status in ("accepted", "dispatched", "delivered"):
+            transition = client.post(
+                f"/api/v1/supplier/orders/{order_id}/status",
+                headers=supplier_headers,
+                json={"status": status},
+            )
+            assert transition.status_code == 200, transition.text
+
+        received = client.post(
+            f"/api/v1/shop/orders/{order_id}/receive", headers=retailer_headers
+        )
+        assert received.status_code == 200, received.text
+        assert [event["status"] for event in received.json()["tracking"]].count("delivered") == 1
+        received_client_id = uuid.uuid5(
+            uuid.NAMESPACE_URL, f"kannect:receive:{order_id}:{product_id}"
+        )
+
+        bill = client.post(
+            "/api/v1/shop/bills",
+            headers=retailer_headers,
+            json={
+                "client_id": str(uuid.uuid4()),
+                "payment_mode": "cash",
+                "items": [{"product_id": str(product_id), "quantity": 2000}],
+            },
+        )
+        assert bill.status_code == 201, bill.text
+        bill_id = bill.json()["id"]
+        assert bill.json()["items"][0]["price"] == 48.0
+        assert bill.json()["items"][0]["line_total"] == 96.0
+        assert bill.json()["total"] == 96.0
+    finally:
+        with SessionLocal() as db:
+            if received_client_id is not None:
+                db.execute(delete(StockEvent).where(StockEvent.client_id == received_client_id))
+            if order_id is not None:
+                db.execute(delete(Invoice).where(Invoice.order_id == order_id))
+                db.execute(delete(OrderTracking).where(OrderTracking.order_id == order_id))
+                db.execute(delete(OrderLine).where(OrderLine.order_id == order_id))
+                db.execute(delete(SupplierOrder).where(SupplierOrder.id == order_id))
+
+            bill_ids = [uuid.UUID(bill_id)] if bill_id is not None else []
+            db.execute(delete(BillLine).where(BillLine.bill_id.in_(bill_ids)))
+            db.execute(delete(Bill).where(Bill.id.in_(bill_ids)))
+            db.execute(delete(ShopProduct).where(ShopProduct.product_id == product_id))
+            db.execute(delete(SupplierProduct).where(SupplierProduct.product_id == product_id))
+            db.execute(delete(Product).where(Product.id == product_id))
+            if supplier_id is not None:
+                supplier = db.get(Supplier, uuid.UUID(supplier_id))
+                if supplier is not None:
+                    db.delete(supplier)
+            db.execute(delete(OwnerIdentity).where(OwnerIdentity.phone == supplier_phone))
+            db.commit()
+        if order_id is None and supplier_id is None:
+            with SessionLocal() as db:
+                db.execute(delete(Product).where(Product.id == product_id))
+                db.commit()
 
 
 def test_supplier_profile_and_wholesale_catalogue_round_trip(world):

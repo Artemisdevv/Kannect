@@ -155,6 +155,7 @@ def test_bulk_add_maps_levels_to_unit_quantities_thresholds_and_count_sources():
 
 
 def test_bill_line_rounds_gram_price_per_kilogram_to_cents():
+    assert _line_total(Decimal("48.00"), 2000, "gram") == Decimal("96.00")
     assert _line_total(Decimal("199.99"), 250, "gram") == Decimal("50.00")
     assert _line_total(Decimal("12.50"), 3, "piece") == Decimal("37.50")
 
