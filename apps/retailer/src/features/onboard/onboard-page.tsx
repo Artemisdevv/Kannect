@@ -1,28 +1,33 @@
+import { useNavigate } from "@tanstack/react-router";
 import { Camera } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { ApiError, shelfPhoto } from "@/api";
+import { ApiError, createProduct, shelfPhoto } from "@/api";
 import { Shell } from "@/components/kannect/shell";
 import { Button } from "@/components/ui/button";
 import { useAddProductsBulk, useRecount } from "@/features/queries";
 import { formatQty, newId } from "@/lib/format";
-import { useNavigate } from "@tanstack/react-router";
+import { tidy } from "@/lib/validation";
 
 type Result = Awaited<ReturnType<typeof shelfPhoto>>;
 type Detection = NonNullable<Result["detections"]>[number];
 type Level = "plenty" | "some" | "few" | "none";
+type Unit = "piece" | "gram";
+
+type Option = { id: string; label: string; unit: Unit };
 
 type Row = {
   key: string;
-  label: string;
-  productId: string;
-  unit: string;
+  seen: string; // what the model read, shown as a caption
   loose: boolean;
   include: boolean;
   level: Level;
   price: string;
   priceHint: string;
+  options: Option[]; // catalogue products it might be
+  pick: number; // index into options, or -1 for "something else: add as a new product"
+  draft: { name: string; brand: string; size: string }; // used when pick is -1
   inShop: boolean;
   currentQty: number | null;
   currentStatus: string | null;
@@ -35,25 +40,41 @@ const LEVELS: [Level, string][] = [
   ["none", "None"],
 ];
 
+const optionOf = (p: { id?: string; name?: string; brand?: string | null; size?: string | null; unit?: string }) => ({
+  id: p.id as string,
+  label: [p.brand, p.name, p.size].filter(Boolean).join(" "),
+  unit: (p.unit === "gram" ? "gram" : "piece") as Unit,
+});
+
+/** One row per thing the model read. Unreadable guesses with no brand are dropped (counted instead). */
 function toRow(d: Detection, i: number): Row | null {
-  if (!d.match?.id) return null; // unmatched items need a barcode scan (Billing, or Stock)
+  const read = d.read ?? {};
+  const name = tidy(read.name ?? "");
+  const brand = tidy(read.brand ?? "");
+  if (!d.match && d.readable === false && !brand) return null;
+  if (!d.match && !(d.alternatives?.length) && !name && !brand) return null;
+
+  const options = (d.match ? [d.match, ...(d.alternatives ?? [])] : (d.alternatives ?? [])).map(optionOf);
   const level = (d.suggested_level as Level | undefined) ?? "some";
   return {
-    key: `${d.match.id}-${i}`,
-    label: d.match.name ?? d.label ?? "",
-    productId: d.match.id,
-    unit: d.match.unit ?? "piece",
+    key: `${i}`,
+    seen: d.label ?? [brand, name].filter(Boolean).join(" "),
     loose: Boolean(d.loose),
-    include: !d.uncertain,
+    include: d.readable !== false && !d.uncertain,
     level,
     price: d.suggested_price != null ? String(d.suggested_price) : "",
     priceHint:
       d.price_source === "mrp" ? "printed price" : d.price_source === "nearby_median" ? "typical nearby" : "",
+    options,
+    pick: options.length ? 0 : -1,
+    draft: { name: name || tidy(d.label ?? ""), brand, size: tidy(read.size ?? "") },
     inShop: Boolean(d.in_shop),
     currentQty: d.current_quantity ?? null,
     currentStatus: d.current_status ?? null,
   };
 }
+
+const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback);
 
 export function OnboardPage() {
   const navigate = useNavigate();
@@ -62,32 +83,23 @@ export function OnboardPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [thorough, setThorough] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [rows, setRows] = useState<Row[] | null>(null);
-  const [needScan, setNeedScan] = useState<string[]>([]);
+  const [dropped, setDropped] = useState(0);
 
   const read = async () => {
     setBusy(true);
     try {
       const res = await shelfPhoto(files, thorough);
       const detections = res.detections ?? [];
-      const seen = new Set<string>();
-      const next: Row[] = [];
-      detections.forEach((d, i) => {
-        const row = toRow(d, i);
-        if (row && !seen.has(row.productId)) {
-          seen.add(row.productId);
-          next.push(row);
-        }
-      });
+      const next = detections.map(toRow).filter((r): r is Row => r !== null);
       setRows(next);
-      setNeedScan(
-        detections.filter((d) => !d.match && d.label && d.needs_scan).map((d) => d.label as string),
-      );
+      setDropped(detections.length - next.length);
       if (res.image_quality && res.image_quality !== "good") {
         toast.warning(`The photo looks ${String(res.image_quality).replace("_", " ")}. Retake it for better results.`);
       }
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not read the photo.");
+      toast.error(errorText(e, "Could not read the photo."));
     } finally {
       setBusy(false);
     }
@@ -95,22 +107,56 @@ export function OnboardPage() {
 
   const patch = (key: string, p: Partial<Row>) =>
     setRows((rs) => rs?.map((r) => (r.key === key ? { ...r, ...p } : r)) ?? null);
+  const patchDraft = (key: string, p: Partial<Row["draft"]>) =>
+    setRows((rs) => rs?.map((r) => (r.key === key ? { ...r, draft: { ...r.draft, ...p } } : r)) ?? null);
+
+  const chosen = (rows ?? []).filter((r) => r.include);
 
   const save = async () => {
     if (!rows) return;
-    const chosen = rows.filter((r) => r.include);
-    const fresh = chosen.filter((r) => !r.inShop);
-    const existing = chosen.filter((r) => r.inShop);
-    if (fresh.some((r) => !(Number(r.price) > 0))) {
-      toast.error("Add a price for each new product.");
+    const problems = chosen.filter(
+      (r) => (r.pick === -1 && tidy(r.draft.name).length < 2) || (!r.inShop && !(Number(r.price) > 0)),
+    );
+    if (problems.length) {
+      toast.error("Each ticked item needs a name and a price. Untick the ones you don't want.");
       return;
     }
+    setSaving(true);
     try {
+      // 1. Items the catalogue did not have become new shared products, once the owner has confirmed.
+      const resolved: { row: Row; productId: string }[] = [];
+      let reused = 0;
+      for (const row of chosen) {
+        if (row.pick >= 0) {
+          resolved.push({ row, productId: row.options[row.pick]!.id });
+          continue;
+        }
+        const made = await createProduct({
+          name: tidy(row.draft.name),
+          unit: row.loose ? "gram" : "piece",
+          ...(tidy(row.draft.brand) ? { brand: tidy(row.draft.brand) } : {}),
+          ...(tidy(row.draft.size) ? { size: tidy(row.draft.size) } : {}),
+        });
+        // A near-identical product already exists: use it instead of creating a duplicate.
+        if (made.created) resolved.push({ row, productId: made.product.id as string });
+        else if (made.similar[0]) {
+          reused++;
+          resolved.push({ row, productId: made.similar[0].id as string });
+        }
+      }
+
+      // 2. One entry per product, then save: new to this shop -> add, already stocked -> recount.
+      const unique = new Map<string, Row>();
+      resolved.forEach(({ row, productId }) => unique.has(productId) || unique.set(productId, row));
+      const entries = [...unique.entries()];
+      const fresh = entries.filter(([, r]) => !r.inShop);
+      const existing = entries.filter(([, r]) => r.inShop);
+
       if (fresh.length) {
         await addBulk.mutateAsync({
-          items: fresh.map((r) => ({
-            product_id: r.productId,
-            price: Number(r.price),
+          items: fresh.map(([productId, r]) => ({
+            product_id: productId,
+            price: Number(r.price) > 0 ? Number(r.price) : 1,
             stock_level: r.level,
             count_source: "photo_estimate" as const,
           })),
@@ -118,18 +164,23 @@ export function OnboardPage() {
       }
       if (existing.length) {
         await recount.mutateAsync({
-          items: existing.map((r) => ({
+          items: existing.map(([productId, r]) => ({
             client_id: newId(),
-            product_id: r.productId,
+            product_id: productId,
             stock_level: r.level,
             count_source: "photo_estimate" as const,
           })),
         });
       }
-      toast.success(`Saved ${chosen.length} product${chosen.length === 1 ? "" : "s"}`);
+      toast.success(
+        `Saved ${entries.length} product${entries.length === 1 ? "" : "s"}` +
+          (reused ? ` (${reused} matched existing products)` : ""),
+      );
       await navigate({ to: "/stock" });
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not save.");
+      toast.error(errorText(e, "Could not save. Nothing was lost, try again."));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -141,8 +192,8 @@ export function OnboardPage() {
       {!rows && (
         <div className="space-y-4 mt-3">
           <p className="text-sm text-muted-foreground">
-            Take clear photos of your shelves, up to 6. We read the labels and suggest your products.
-            You confirm before anything is saved.
+            Take clear photos of your shelves, up to 6. We guess what each product is, and you confirm
+            before anything is saved.
           </p>
           <label className="list-surface flex items-center gap-3 p-4 cursor-pointer">
             <Camera />
@@ -171,8 +222,9 @@ export function OnboardPage() {
       {rows && (
         <div className="space-y-3 mt-3">
           <p className="text-sm text-muted-foreground">
-            {rows.length} product{rows.length === 1 ? "" : "s"} found. Untick anything wrong, fix the amounts and
-            prices, then save.
+            {rows.length === 0
+              ? "We couldn't read any products. Try a closer, brighter photo."
+              : `We found ${rows.length} item${rows.length === 1 ? "" : "s"}. Untick anything wrong, correct the names and add prices.`}
           </p>
           <div className="list-surface">
             {rows.map((r) => (
@@ -180,46 +232,87 @@ export function OnboardPage() {
                 <label className="flex items-start gap-3">
                   <input type="checkbox" className="mt-1" checked={r.include} onChange={(e) => patch(r.key, { include: e.target.checked })} />
                   <span className="min-w-0">
-                    <span className="product-name block">{r.label}</span>
+                    <span className="product-name block">
+                      {r.pick >= 0 ? r.options[r.pick]?.label : tidy(`${r.draft.brand} ${r.draft.name} ${r.draft.size}`)}
+                    </span>
+                    <span className="product-sub block">
+                      {r.pick >= 0 && r.options.length > 0 && r.seen !== r.options[r.pick]?.label ? `Read as: ${r.seen}` : r.pick === -1 ? "New to our catalogue: you can correct it below" : ""}
+                    </span>
                     {r.inShop && (
                       <span className="product-sub block">
-                        In your shop: {formatQty(r.currentQty, r.unit)} ({r.currentStatus}). Saving will recount it from this photo.
+                        Already in your shop: {formatQty(r.currentQty, r.options[0]?.unit)} ({r.currentStatus}). Saving recounts it from this photo.
                       </span>
                     )}
                   </span>
                 </label>
+
                 {r.include && (
-                  <div className="flex flex-wrap gap-2 items-center">
-                    {LEVELS.map(([value, name]) => (
-                      <Button key={value} size="sm" variant={r.level === value ? "secondary" : "ghost"} onClick={() => patch(r.key, { level: value })}>
-                        {name}
-                      </Button>
-                    ))}
-                    {!r.inShop && (
-                      <input
-                        className="page-search max-w-40"
-                        aria-label={`Price for ${r.label}`}
-                        inputMode="decimal"
-                        placeholder={r.unit === "gram" ? "₹ per kg" : "₹ price"}
-                        value={r.price}
-                        onChange={(e) => patch(r.key, { price: e.target.value })}
-                      />
+                  <div className="space-y-2 pl-7">
+                    {r.options.length > 0 && (
+                      <div className="space-y-1">
+                        {r.options.length > 1 || r.pick === -1 ? (
+                          <p className="text-xs text-muted-foreground">Which one is it?</p>
+                        ) : null}
+                        {(r.options.length > 1 || r.pick === -1 ? r.options : []).map((o, idx) => (
+                          <label key={o.id} className="flex items-center gap-2 text-sm">
+                            <input type="radio" name={`pick-${r.key}`} checked={r.pick === idx} onChange={() => patch(r.key, { pick: idx })} />
+                            {o.label}
+                          </label>
+                        ))}
+                        {(r.options.length > 1 || r.pick === -1) && (
+                          <label className="flex items-center gap-2 text-sm">
+                            <input type="radio" name={`pick-${r.key}`} checked={r.pick === -1} onChange={() => patch(r.key, { pick: -1 })} />
+                            None of these, add as a new product
+                          </label>
+                        )}
+                        {r.options.length === 1 && r.pick === 0 && (
+                          <Button size="sm" variant="ghost" className="px-0 h-auto text-xs" onClick={() => patch(r.key, { pick: -1 })}>
+                            Not right? Add as a different product
+                          </Button>
+                        )}
+                      </div>
                     )}
-                    {!r.inShop && r.priceHint && <span className="text-xs text-muted-foreground">{r.priceHint}</span>}
+
+                    {r.pick === -1 && (
+                      <div className="space-y-2">
+                        <input className="page-search" aria-label="Product name" placeholder="Product name" maxLength={255} value={r.draft.name} onChange={(e) => patchDraft(r.key, { name: e.target.value })} />
+                        <div className="flex gap-2">
+                          <input className="page-search min-w-0" aria-label="Brand" placeholder="Brand" maxLength={100} value={r.draft.brand} onChange={(e) => patchDraft(r.key, { brand: e.target.value })} />
+                          <input className="page-search min-w-0" aria-label="Size" placeholder="Size" maxLength={40} value={r.draft.size} onChange={(e) => patchDraft(r.key, { size: e.target.value })} />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {LEVELS.map(([value, name]) => (
+                        <Button key={value} size="sm" variant={r.level === value ? "secondary" : "ghost"} onClick={() => patch(r.key, { level: value })}>
+                          {name}
+                        </Button>
+                      ))}
+                      {!r.inShop && (
+                        <input
+                          className="page-search max-w-40"
+                          aria-label={`Price for ${r.seen}`}
+                          inputMode="decimal"
+                          placeholder={r.loose || r.options[r.pick]?.unit === "gram" ? "₹ per kg" : "₹ price"}
+                          value={r.price}
+                          onChange={(e) => patch(r.key, { price: e.target.value })}
+                        />
+                      )}
+                      {!r.inShop && r.priceHint && <span className="text-xs text-muted-foreground">{r.priceHint}</span>}
+                    </div>
                   </div>
                 )}
               </div>
             ))}
           </div>
-          {needScan.length > 0 && (
+          {dropped > 0 && (
             <p className="text-xs text-muted-foreground">
-              Not in our catalogue yet, add these by scanning their barcode in Billing or Stock:{" "}
-              {[...new Set(needScan)].slice(0, 12).join(", ")}
-              {needScan.length > 12 ? "…" : ""}
+              {dropped} blurry or unclear item{dropped === 1 ? " was" : "s were"} left out. Add those by scanning their barcode in Billing or Stock.
             </p>
           )}
-          <Button className="w-full" disabled={addBulk.isPending || recount.isPending} onClick={() => void save()}>
-            {addBulk.isPending || recount.isPending ? "Saving…" : "Save to my shop"}
+          <Button className="w-full" disabled={saving || chosen.length === 0} onClick={() => void save()}>
+            {saving ? "Saving…" : `Save ${chosen.length} to my shop`}
           </Button>
           <Button variant="ghost" className="w-full" onClick={() => setRows(null)}>
             Start over
