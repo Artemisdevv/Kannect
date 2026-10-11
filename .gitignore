@@ -14,3 +14,4 @@ data/harvest.log
 ml/.venv/
 ml/cache/
 ml/out/
+ml/index.log
