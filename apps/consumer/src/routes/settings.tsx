@@ -4,6 +4,7 @@ import { Download, MapPin, ShieldCheck, ShoppingBag, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { useShopper } from '@/components/shopper-shell';
 import { isNativeApp } from '@/lib/native';
+import { LanguageSelector, t, useLocale } from '@/lib/i18n';
 type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 export const Route = createFileRoute('/settings')({ head: () => ({ meta: [
   { title: 'Privacy & settings — Kannect' }, { name: 'description', content: 'Manage your neighbourhood and learn how Kannect protects your privacy. Install Kannect on your home screen.' },
@@ -11,6 +12,7 @@ export const Route = createFileRoute('/settings')({ head: () => ({ meta: [
   { property: 'og:type', content: 'website' }, { name: 'twitter:card', content: 'summary_large_image' },
 ] }), component: Settings });
 function Settings() {
+  const locale = useLocale();
   const { area, setLocationOpen } = useShopper();
   const [prompt, setPrompt] = useState<InstallPrompt>();
   const [installed, setInstalled] = useState(false);
@@ -23,7 +25,8 @@ function Settings() {
     window.addEventListener('beforeinstallprompt', listener); window.addEventListener('appinstalled', onInstall);
     return () => { window.removeEventListener('beforeinstallprompt', listener); window.removeEventListener('appinstalled', onInstall); };
   }, []);
-  return <main className="app-main"><p className="eyebrow">Make yourself at home</p><h1 className="mt-2">Settings & privacy</h1>
+  return <main className="app-main"><p className="eyebrow">Make yourself at home</p><h1 className="mt-2">{t('Settings & privacy', locale)}</h1>
+    <section className="settings-section"><LanguageSelector /></section>
     <section className="settings-section"><h2 className="flex items-center gap-2"><MapPin size={17} />Your neighbourhood</h2><p>Currently looking around {area}. Location is optional — choosing an area works too.</p><Button variant="secondary" onClick={() => setLocationOpen(true)}>Change area</Button></section>
     {/* the Android app is already installed: only a browser visit can add a shortcut */}
     {!isNativeApp() && <section className="settings-section"><h2 className="flex items-center gap-2"><Download size={17} />Kannect on your home screen</h2><p>Keep your neighbourhood shops just a tap away.</p><Button disabled={installed} onClick={async () => { if (prompt) { await prompt.prompt(); await prompt.userChoice; setPrompt(undefined); } else setGuidance(true); }}>{installed ? <Check /> : <Download />}{installed ? 'Already installed' : 'Add to home screen'}</Button>{guidance && <p className="mt-4" role="status">On Android, open the published app in Chrome and choose “Install app” or “Add to Home screen” from the browser menu. On iPhone, use Safari’s Share menu, then “Add to Home Screen”. Offline access is available only in the published app after an online visit.</p>}</section>}

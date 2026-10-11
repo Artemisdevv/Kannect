@@ -8,6 +8,7 @@ import { ago, inr } from "@/lib/format";
 import { seo } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import type { OrderStatus } from "@/lib/api/types";
+import { t, useLocale } from "@/lib/i18n";
 
 const FILTERS: (OrderStatus | "all")[] = ["all", "new", "accepted", "dispatched", "delivered", "rejected", "cancelled"];
 const URGENCY: Record<OrderStatus, number> = { new: 0, accepted: 1, dispatched: 2, delivered: 3, rejected: 4, cancelled: 5 };
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/orders/")({
 });
 
 function Orders() {
+  const locale = useLocale();
   const { status } = Route.useSearch();
   const orders = useQuery(q.orders);
   const list = (orders.data ?? [])
@@ -32,8 +34,8 @@ function Orders() {
 
   return (
     <>
-      <PageHeader eyebrow="Purchase orders" title="Orders" />
-      <div className="-mx-6 mb-4 flex gap-2 overflow-x-auto px-6 pb-1" role="tablist" aria-label="Filter by status">
+      <PageHeader eyebrow={t("Purchase orders", locale)} title={t("Orders", locale)} />
+      <div className="-mx-6 mb-4 flex gap-2 overflow-x-auto px-6 pb-1" role="tablist" aria-label={t("Filter by status", locale)}>
         {FILTERS.map((f) => {
           const active = (status ?? "all") === f;
           return (
@@ -48,7 +50,7 @@ function Orders() {
                 active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card",
               )}
             >
-              {f === "all" ? "All" : ORDER_LABEL[f]}
+              {f === "all" ? t("All", locale) : t(ORDER_LABEL[f], locale)}
             </Link>
           );
         })}
@@ -58,7 +60,7 @@ function Orders() {
       ) : orders.isError ? (
         <ErrorState error={orders.error} onRetry={() => orders.refetch()} />
       ) : list.length === 0 ? (
-        <EmptyState title="No orders here" body={status ? "No orders with this status right now." : "When retailers order from your catalogue, they'll show up here."} />
+        <EmptyState title={t("No orders here", locale)} body={t(status ? "No orders with this status right now." : "When retailers order from your catalogue, they'll show up here.", locale)} />
       ) : (
         <div className="list-surface">
           {list.map((o) => (

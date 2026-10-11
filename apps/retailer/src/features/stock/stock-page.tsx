@@ -9,11 +9,13 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useRecount, useShopProducts } from "@/features/queries";
 import { ScanDialog } from "@/features/scan/scan-dialog";
 import { formatQty, newId, priceLabel, STATUS_LABEL, statusClass, stepFor } from "@/lib/format";
+import { t, useLocale } from "@/lib/i18n";
 
 const FILTERS = ["All", "Low", "Out", "Review"] as const;
 type Filter = (typeof FILTERS)[number];
 
 export function StockPage() {
+  const locale = useLocale();
   const products = useShopProducts();
   const recount = useRecount();
   const [search, setSearch] = useState("");
@@ -61,41 +63,41 @@ export function StockPage() {
           },
         ],
       });
-      toast.success("Stock updated");
+      toast.success(t("Stock updated", locale));
       setSelected(null);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not update the stock.");
+      toast.error(e instanceof ApiError ? e.message : t("Could not update the stock.", locale));
     }
   };
 
   return (
     <Shell active="Stock">
-      <p className="eyebrow">Your shop</p>
-      <h1>Stock</h1>
+      <p className="eyebrow">{t("Your shop", locale)}</p>
+      <h1>{t("Stock", locale)}</h1>
       <p className="eyebrow">{products.data?.length ?? 0} products · Keep your shelves ready</p>
 
       <div className="flex gap-2 mt-3">
         <input
           className="page-search min-w-0"
-          aria-label="Search stock"
-          placeholder="Search your stock…"
+          aria-label={t("Search stock", locale)}
+          placeholder={t("Search your stock…", locale)}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <Button size="icon" aria-label="Scan to count" onClick={() => setScan(true)}>
+        <Button size="icon" aria-label={t("Scan to count", locale)} onClick={() => setScan(true)}>
           <ScanLine />
         </Button>
       </div>
       <div className="filter-row">
         {FILTERS.map((f) => (
           <Button key={f} variant={filter === f ? "secondary" : "ghost"} onClick={() => setFilter(f)}>
-            {f}
+            {t(f, locale)}
           </Button>
         ))}
       </div>
 
-      {products.isLoading && <p className="text-center text-muted-foreground py-8">Loading…</p>}
-      {products.isError && <p className="text-center text-destructive py-8">Could not load your stock.</p>}
+      {products.isLoading && <p className="text-center text-muted-foreground py-8">{t("Loading…", locale)}</p>}
+      {products.isError && <p className="text-center text-destructive py-8">{t("Could not load your stock.", locale)}</p>}
 
       <div className="list-surface">
         {rows.map((row) => (
@@ -106,14 +108,14 @@ export function StockPage() {
             <div className="min-w-0">
               <div className="product-name">{row.product?.name}</div>
               <div className="product-sub">
-                {row.needs_recount ? "Count needed" : formatQty(row.stock_qty, row.product?.unit)}
-                {row.product?.unit === "gram" ? "" : row.needs_recount ? "" : " left"}
+                {row.needs_recount ? t("Count needed", locale) : formatQty(row.stock_qty, row.product?.unit)}
+                {row.product?.unit === "gram" ? "" : row.needs_recount ? "" : t(" left", locale)}
               </div>
             </div>
             <Button variant="ghost" onClick={() => open(row)} aria-label={`Count ${row.product?.name}`}>
               <span className="flex flex-col items-end gap-1">
                 <span className={`status-pill ${statusClass(row.needs_recount ? "low" : row.stock_status)}`}>
-                  {row.needs_recount ? "Review" : STATUS_LABEL[row.stock_status ?? "in_stock"]}
+                  {row.needs_recount ? t("Review", locale) : t(STATUS_LABEL[row.stock_status ?? "in_stock"], locale)}
                 </span>
                 <span className="text-xs">{priceLabel(row.price, row.product?.unit)}</span>
               </span>
@@ -123,10 +125,10 @@ export function StockPage() {
         ))}
       </div>
       {products.data && rows.length === 0 && (
-        <p className="text-center text-muted-foreground py-8">No products in this view.</p>
+        <p className="text-center text-muted-foreground py-8">{t("No products in this view.", locale)}</p>
       )}
       <p className="text-xs text-muted-foreground mt-3">
-        A count you enter is exact. Unknown quantities stay unknown until you count them.
+        {t("A count you enter is exact. Unknown quantities stay unknown until you count them.", locale)}
       </p>
 
       <Dialog open={selected !== null} onOpenChange={(o) => !o && setSelected(null)}>
@@ -134,12 +136,12 @@ export function StockPage() {
           <DialogTitle>{selected?.product?.name}</DialogTitle>
           <DialogDescription>
             {unknown
-              ? "We don't know how many you have yet. Count the shelf and set the number."
-              : `In stock now: ${formatQty(current, unit)}${unit === "gram" ? "" : " "}. Adjust if the shelf is different.`}
+              ? t("We don't know how many you have yet. Count the shelf and set the number.", locale)
+              : `${t("In stock now: ", locale)}${formatQty(current, unit)}${unit === "gram" ? "" : " "}${t("Adjust if the shelf is different.", locale)}`}
           </DialogDescription>
 
           <div className="flex items-center justify-between gap-3 py-2">
-            <Button variant="outline" size="icon" className="size-14 rounded-full" aria-label="Decrease" disabled={count <= 0} onClick={() => change(-step)}>
+            <Button variant="outline" size="icon" className="size-14 rounded-full" aria-label={t("Decrease", locale)} disabled={count <= 0} onClick={() => change(-step)}>
               <Minus />
             </Button>
             <div className="text-center">
@@ -151,7 +153,7 @@ export function StockPage() {
                 </div>
               )}
             </div>
-            <Button variant="outline" size="icon" className="size-14 rounded-full" aria-label="Increase" onClick={() => change(step)}>
+            <Button variant="outline" size="icon" className="size-14 rounded-full" aria-label={t("Increase", locale)} onClick={() => change(step)}>
               <Plus />
             </Button>
           </div>
@@ -163,17 +165,17 @@ export function StockPage() {
               </Button>
             ))}
             <Button variant="ghost" size="sm" disabled={count === 0} onClick={() => setCount(0)}>
-              Zero
+              {t("Zero", locale)}
             </Button>
           </div>
 
           <Button disabled={recount.isPending} onClick={() => void confirm()}>
-            {recount.isPending ? "Saving…" : unknown ? "Save count" : delta === 0 ? "Count is right" : "Update stock"}
+            {recount.isPending ? t("Saving…", locale) : unknown ? t("Save count", locale) : delta === 0 ? t("Count is right", locale) : t("Update stock", locale)}
           </Button>
         </DialogContent>
       </Dialog>
 
-      <ScanDialog open={scan} onOpenChange={setScan} title="Scan to count" onProduct={open} />
+      <ScanDialog open={scan} onOpenChange={setScan} title={t("Scan to count", locale)} onProduct={open} />
     </Shell>
   );
 }

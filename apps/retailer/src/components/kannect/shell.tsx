@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { usePickups, useShopProducts } from "@/features/queries";
+import { t, useLocale } from "@/lib/i18n";
 
 export function pageHead(title: string, description: string) {
   const full = `${title} · Kannect Retailer`;
@@ -37,6 +38,7 @@ export function useShop() {
 }
 
 export function Shell({ children, active }: { children: ReactNode; active: string }) {
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const shop = useShop();
   const products = useShopProducts();
@@ -83,14 +85,14 @@ export function Shell({ children, active }: { children: ReactNode; active: strin
             aria-current={active === n.label ? "page" : undefined}
           >
             <n.icon />
-            <span>{n.label}</span>
+            <span>{t(n.label, locale)}</span>
           </Link>
         ))}
       </nav>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="mobile-dialog">
-          <DialogTitle>Shop updates</DialogTitle>
-          <DialogDescription>Based on your current stock</DialogDescription>
+          <DialogTitle>{t("Shop updates", locale)}</DialogTitle>
+          <DialogDescription>{t("Based on your current stock", locale)}</DialogDescription>
           {newPickups > 0 && (
             <p className="text-sm">
               <Link to="/pickups" className="underline" onClick={() => setOpen(false)}>
@@ -106,7 +108,7 @@ export function Shell({ children, active }: { children: ReactNode; active: strin
               stock. Open Orders for reorder suggestions.
             </p>
           )}
-          <Button onClick={() => setOpen(false)}>Got it</Button>
+          <Button onClick={() => setOpen(false)}>{t("Got it", locale)}</Button>
         </DialogContent>
       </Dialog>
     </div>

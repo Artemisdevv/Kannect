@@ -7,6 +7,7 @@ import { q } from "@/lib/api/service";
 import { ago, inr } from "@/lib/format";
 import { seo } from "@/lib/seo";
 import type { OrderStatus } from "@/lib/api/types";
+import { t, useLocale } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
   head: () => seo("Today", "Incoming retailer orders, deliveries in progress and quick links for KadaNet suppliers."),
@@ -22,6 +23,7 @@ function Home() {
 }
 
 function HomeBody() {
+  const locale = useLocale();
   const orders = useQuery(q.orders);
   const count = (s: OrderStatus) => orders.data?.filter((o) => o.status === s).length ?? 0;
   const needsAction = orders.data?.filter((o) => o.status === "new") ?? [];
@@ -29,7 +31,7 @@ function HomeBody() {
 
   return (
     <>
-      <PageHeader eyebrow="Supplier overview" title="Today" />
+      <PageHeader eyebrow={t("Supplier overview", locale)} title={t("Today", locale)} />
 
       {orders.isLoading ? (
         <ListSkeleton rows={3} />
@@ -46,14 +48,14 @@ function HomeBody() {
             ].map((m) => (
               <Link key={m.label} to="/orders" search={{ status: m.s as OrderStatus }} className="summary press block">
                 <div className="metric">{m.v}</div>
-                <div className="eyebrow mt-1">{m.label}</div>
+                <div className="eyebrow mt-1">{t(m.label, locale)}</div>
               </Link>
             ))}
           </div>
 
-          <h2 className="section-title mb-3 mt-7">Needs action</h2>
+          <h2 className="section-title mb-3 mt-7">{t("Needs action", locale)}</h2>
           {needsAction.length === 0 ? (
-            <EmptyState title="No new orders" body="New retailer orders will appear here for you to accept or reject." />
+            <EmptyState title={t("No new orders", locale)} body={t("New retailer orders will appear here for you to accept or reject.", locale)} />
           ) : (
             <div className="list-surface">
               {needsAction.map((o) => (
@@ -71,7 +73,7 @@ function HomeBody() {
 
           {recent.length > 0 && (
             <>
-              <h2 className="section-title mb-3 mt-7">Recently completed</h2>
+              <h2 className="section-title mb-3 mt-7">{t("Recently completed", locale)}</h2>
               <div className="list-surface">
                 {recent.map((o) => (
                   <Link key={o.id} to="/orders/$id" params={{ id: o.id }} className="product-row">
@@ -88,18 +90,18 @@ function HomeBody() {
         </>
       )}
 
-      <h2 className="section-title mb-3 mt-7">Shortcuts</h2>
+      <h2 className="section-title mb-3 mt-7">{t("Shortcuts", locale)}</h2>
       <div className="list-surface">
         {[
           { to: "/catalogue", icon: Package, t: "Catalogue & prices", s: "Add products, edit wholesale prices" },
           { to: "/demand", icon: TrendingUp, t: "Area demand", s: "Anonymised demand across shops" },
           { to: "/group-buys", icon: Users, t: "Group buys", s: "Tiered prices for pooled orders" },
-        ].map(({ to, icon: I, t, s }) => (
+        ].map(({ to, icon: I, t: label, s }) => (
           <Link key={to} to={to} className="product-row">
             <div className="product-art"><I className="h-[21px] w-[21px]" aria-hidden /></div>
             <div className="min-w-0 flex-1">
-              <div className="product-name">{t}</div>
-              <div className="product-sub">{s}</div>
+              <div className="product-name">{t(label, locale)}</div>
+              <div className="product-sub">{t(s, locale)}</div>
             </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />
           </Link>

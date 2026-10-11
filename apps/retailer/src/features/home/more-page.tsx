@@ -5,8 +5,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { signOut } from "@/api";
 import { Shell, useShop } from "@/components/kannect/shell";
 import { Button } from "@/components/ui/button";
+import { LanguageSelector, t, useLocale } from "@/lib/i18n";
 
 export function MorePage() {
+  const locale = useLocale();
   const shop = useShop();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -26,7 +28,9 @@ export function MorePage() {
   return (
     <Shell active="More">
       <p className="eyebrow">{shop?.name}</p>
-      <h1>More</h1>
+      <h1>{t("More", locale)}</h1>
+
+      <div className="list-surface mt-4 px-4"><LanguageSelector /></div>
 
       <div className="list-surface mt-4">
         {items.map((item) => (
@@ -35,8 +39,8 @@ export function MorePage() {
               <span className="flex items-center gap-3">
                 <item.icon />
                 <span className="text-left">
-                  {item.label}
-                  <span className="block text-xs text-muted-foreground font-normal">{item.sub}</span>
+                  {t(item.label, locale)}
+                  <span className="block text-xs text-muted-foreground font-normal">{t(item.sub, locale)}</span>
                 </span>
               </span>
               <ChevronRight />

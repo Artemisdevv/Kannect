@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { areas, DEFAULT_AREA, isKnownArea, nearbyShops, searchProducts, type Coordinates, type SearchResponse, type ShopResult } from '@/lib/shopper';
 import { registerAppWorker } from '@/lib/pwa';
+import { t, useLocale } from '@/lib/i18n';
 
 type ShopperContext = {
   area: string; query: string; setQuery: (q: string) => void;
@@ -21,6 +22,7 @@ export function useShopper() {
   return value;
 }
 export function ShopperShell({ children }: { children: ReactNode }) {
+  const locale = useLocale();
   const pathname = useRouterState({ select: state => state.location.pathname });
   const [area, setArea] = useState(DEFAULT_AREA);
   const [query, updateQuery] = useState('');
@@ -108,20 +110,20 @@ export function ShopperShell({ children }: { children: ReactNode }) {
         <Link to="/" className="brand min-w-0" aria-label="Kannect home"><span className="brand-mark"><ShoppingBag /></span><span>Kannect<span className="text-accent-foreground">.</span></span></Link>
         <Button variant="ghost" className="area-button px-2" onClick={() => setLocationOpen(true)} aria-label="Choose your area"><MapPin className="text-accent-foreground" /><span className="min-w-0"><small>Looking around</small><strong className="max-w-32 truncate">{area}</strong></span><ChevronDown className="size-3" /></Button>
       </header>
-      {offline && <div className="offline-banner flex items-center gap-2" role="status"><WifiOff size={15} />You’re offline. Reconnect to check live shop availability.</div>}
+      {offline && <div className="offline-banner flex items-center gap-2" role="status"><WifiOff size={15} />{t('You’re offline. Reconnect to check live shop availability.', locale)}</div>}
       {children}
       <nav className="bottom-nav" aria-label="Main navigation">
-        <Link to="/" className="nav-item" activeOptions={{ exact: true }} activeProps={{ className: 'active' }}><Store /><span>Nearby shops</span></Link>
-        <Link to="/search" className="nav-item nav-search" activeOptions={{ exact: true }} activeProps={{ className: 'active' }} onClick={() => { if (pathname === '/search') resetSearch(); }}><Search /><span>Search</span></Link>
-        <Link to="/reservations" className="nav-item" activeProps={{ className: 'active' }}><HandHelping /><span>Requests</span></Link>
-        <Link to="/settings" className="nav-item" activeOptions={{ exact: true }} activeProps={{ className: 'active' }}><SlidersHorizontal /><span>Settings</span></Link>
+        <Link to="/" className="nav-item" activeOptions={{ exact: true }} activeProps={{ className: 'active' }}><Store /><span>{t('Nearby shops', locale)}</span></Link>
+        <Link to="/search" className="nav-item nav-search" activeOptions={{ exact: true }} activeProps={{ className: 'active' }} onClick={() => { if (pathname === '/search') resetSearch(); }}><Search /><span>{t('Search', locale)}</span></Link>
+        <Link to="/reservations" className="nav-item" activeProps={{ className: 'active' }}><HandHelping /><span>{t('Requests', locale)}</span></Link>
+        <Link to="/settings" className="nav-item" activeOptions={{ exact: true }} activeProps={{ className: 'active' }}><SlidersHorizontal /><span>{t('Settings', locale)}</span></Link>
       </nav>
-      <Dialog open={locationOpen} onOpenChange={setLocationOpen}><DialogContent><DialogHeader><DialogTitle>Your neighbourhood</DialogTitle><DialogDescription>Choose an area, or send your location to find shops nearby. This app does not save your precise coordinates.</DialogDescription></DialogHeader>
-        <Button variant="botanical" onClick={locate} disabled={locating}>{locating ? <Loader2 className="animate-spin" /> : <LocateFixed />}{locating ? 'Finding your location…' : 'Use my location'}</Button>
+      <Dialog open={locationOpen} onOpenChange={setLocationOpen}><DialogContent><DialogHeader><DialogTitle>{t('Your neighbourhood', locale)}</DialogTitle><DialogDescription>{t('Choose an area, or send your location to find shops nearby. This app does not save your precise coordinates.', locale)}</DialogDescription></DialogHeader>
+        <Button variant="botanical" onClick={locate} disabled={locating}>{locating ? <Loader2 className="animate-spin" /> : <LocateFixed />}{locating ? t('Finding your location…', locale) : t('Use my location', locale)}</Button>
         {locationMessage && <p className="text-xs leading-relaxed text-warning" role="alert">{locationMessage}</p>}
-        <p className="text-xs text-muted-foreground">Or choose an area in Kochi</p>
+        <p className="text-xs text-muted-foreground">{t('Or choose an area in Kochi', locale)}</p>
         <div className="grid gap-2">{areas.map(a => <Button key={a} variant={a === area ? 'secondary' : 'outline'} onClick={() => chooseArea(a)}><MapPin />{a}</Button>)}</div>
-        <form className="flex gap-2" onSubmit={e => { e.preventDefault(); chooseArea(manualArea); }}><Input aria-label="Another area" placeholder="Enter another area" value={manualArea} onChange={e => setManualArea(e.target.value)} /><Button type="submit" disabled={!manualArea.trim()}>Choose</Button></form>
+        <form className="flex gap-2" onSubmit={e => { e.preventDefault(); chooseArea(manualArea); }}><Input aria-label={t('Another area', locale)} placeholder={t('Enter another area', locale)} value={manualArea} onChange={e => setManualArea(e.target.value)} /><Button type="submit" disabled={!manualArea.trim()}>{t('Choose', locale)}</Button></form>
       </DialogContent></Dialog>
     </div>
   </Context.Provider>;

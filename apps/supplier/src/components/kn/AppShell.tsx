@@ -7,6 +7,7 @@ import { q } from "@/lib/api/service";
 import { needsProfile } from "@/lib/profile-guard";
 import { IS_DEMO } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
+import { t, useLocale } from "@/lib/i18n";
 
 const NAV = [
   { to: "/orders", label: "Orders", icon: ClipboardList },
@@ -32,6 +33,7 @@ function useOnline() {
 }
 
 export function AppShell({ children, title }: { children: ReactNode; title?: string }) {
+  const locale = useLocale();
   const { ready, session } = useSession();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -52,7 +54,7 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
       <header className="no-print sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 px-6 backdrop-blur">
         <Link to="/" className="flex min-h-12 items-center gap-2 font-bold text-primary">
           <img src="/favicon.png" alt="" width={28} height={28} className="rounded-lg" />
-          <span>KadaNet <span className="font-medium text-muted-foreground">Supplier</span></span>
+            <span>KadaNet <span className="font-medium text-muted-foreground">{t("Supplier", locale)}</span></span>
         </Link>
         {IS_DEMO && (
           <span className="status-pill bg-warning-surface text-warning" title="Sample data, not live activity">
@@ -62,7 +64,7 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
       </header>
       {!online && (
         <div role="status" className="no-print flex items-center gap-2 bg-danger-surface px-6 py-2 text-sm text-destructive">
-          <WifiOff className="h-4 w-4" /> You're offline. Changes can't be saved until you reconnect.
+          <WifiOff className="h-4 w-4" /> {t("You're offline. Changes can't be saved until you reconnect.", locale)}
         </div>
       )}
       <main className="app-main flex-1" aria-label={title}>
@@ -93,7 +95,7 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
               )}
             >
               <Icon className="h-5 w-5" aria-hidden />
-              {label}
+            {t(label, locale)}
             </Link>
           );
         })}

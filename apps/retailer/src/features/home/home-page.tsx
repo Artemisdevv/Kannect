@@ -5,6 +5,7 @@ import { Heading, Shell, useShop } from "@/components/kannect/shell";
 import { Button } from "@/components/ui/button";
 import { useBills, useOrders, usePickups, useShopProducts } from "@/features/queries";
 import { formatQty, rupees, STATUS_LABEL, statusClass } from "@/lib/format";
+import { t, useLocale } from "@/lib/i18n";
 
 const isToday = (iso?: string) => {
   if (!iso) return false;
@@ -14,6 +15,7 @@ const isToday = (iso?: string) => {
 };
 
 export function TodayPage() {
+  const locale = useLocale();
   const shop = useShop();
   const products = useShopProducts();
   const bills = useBills();
@@ -33,14 +35,14 @@ export function TodayPage() {
   return (
     <Shell active="Today">
       <p className="eyebrow">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
-      <h1>{shop?.name ?? "Your shop"}</h1>
+      <h1>{shop?.name ?? t("Your shop", locale)}</h1>
       {shop?.address && <p className="eyebrow">{shop.address}</p>}
 
       {empty && (
         <div className="list-surface p-5 mt-4 space-y-3">
-          <p className="text-sm">Your shop has no products yet. The quickest start is a photo of your shelves.</p>
+          <p className="text-sm">{t("Your shop has no products yet. The quickest start is a photo of your shelves.", locale)}</p>
           <Button asChild>
-            <Link to="/onboard"><Camera /> Set up from a photo</Link>
+            <Link to="/onboard"><Camera /> {t("Set up from a photo", locale)}</Link>
           </Button>
         </div>
       )}
@@ -50,10 +52,10 @@ export function TodayPage() {
           <div className="brand-mark bg-secondary text-primary"><HandHelping size={22} /></div>
           <div className="min-w-0">
             <div className="product-name">
-              {newPickups.length > 0 ? `${newPickups.length} pickup request${newPickups.length === 1 ? "" : "s"} waiting` : "Items held for pickup"}
+              {newPickups.length > 0 ? `${newPickups.length} ${t(newPickups.length === 1 ? "pickup request" : "pickup requests", locale)} ${t("waiting", locale)}` : t("Items held for pickup", locale)}
             </div>
             <div className="product-sub">
-              {newPickups.length > 0 ? "Shoppers want you to set items aside" : `${heldPickups.length} held for a shopper`}
+              {newPickups.length > 0 ? t("Shoppers want you to set items aside", locale) : `${heldPickups.length} ${t("held for a shopper", locale)}`}
               {newPickups.length > 0 && heldPickups.length > 0 ? ` · ${heldPickups.length} held` : ""}
             </div>
           </div>
@@ -63,14 +65,14 @@ export function TodayPage() {
 
       <div className="summary-grid">
         <div className="summary">
-          <div className="summary-top">Today's sales<ArrowUpRight size={17} /></div>
+          <div className="summary-top">{t("Today's sales", locale)}<ArrowUpRight size={17} /></div>
           <div className="summary-value">{rupees(sales)}</div>
-          <div className="summary-note">{todays.length} bill{todays.length === 1 ? "" : "s"} today</div>
+          <div className="summary-note">{todays.length} {t(todays.length === 1 ? "bill" : "bills", locale)} {t("today", locale)}</div>
         </div>
         <div className="summary">
-          <div className="summary-top">Needs attention<Package size={17} /></div>
+          <div className="summary-top">{t("Needs attention", locale)}<Package size={17} /></div>
           <div className="summary-value">
-            {attention.length} <span className="text-sm font-normal text-muted-foreground">items</span>
+            {attention.length} <span className="text-sm font-normal text-muted-foreground">{t("items", locale)}</span>
           </div>
           <div className="summary-note">{low} low stock · {out} out of stock</div>
         </div>
@@ -78,18 +80,18 @@ export function TodayPage() {
 
       <div className="action-grid">
         <Button asChild className="action-tile">
-          <Link to="/billing"><ReceiptText />Create bill</Link>
+          <Link to="/billing"><ReceiptText />{t("Create bill", locale)}</Link>
         </Button>
         <Button asChild variant="outline" className="action-tile">
-          <Link to="/stock"><ScanLine />Update stock</Link>
+          <Link to="/stock"><ScanLine />{t("Update stock", locale)}</Link>
         </Button>
       </div>
 
       {attention.length > 0 && (
         <>
-          <Heading title="Time to restock">
+          <Heading title={t("Time to restock", locale)}>
             <Button variant="link" asChild>
-              <Link to="/stock">View all <ChevronRight /></Link>
+              <Link to="/stock">{t("View all", locale)} <ChevronRight /></Link>
             </Button>
           </Heading>
           <div className="list-surface">
@@ -104,7 +106,7 @@ export function TodayPage() {
               </div>
             ))}
             <Button variant="ghost" className="w-full text-primary" asChild>
-              <Link to="/orders">Review reorder suggestions <ChevronRight /></Link>
+              <Link to="/orders">{t("Review reorder suggestions", locale)} <ChevronRight /></Link>
             </Button>
           </div>
         </>
@@ -112,7 +114,7 @@ export function TodayPage() {
 
       {open && (
         <>
-          <Heading title="Your orders" />
+          <Heading title={t("Your orders", locale)} />
           <Link to="/orders" className="list-surface order-preview">
             <div className="brand-mark bg-secondary text-primary"><Truck size={22} /></div>
             <div className="min-w-0">
