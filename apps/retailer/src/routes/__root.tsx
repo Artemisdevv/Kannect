@@ -1,10 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+import { getShop, isSignedIn } from "@/api";
+import { Toaster } from "@/components/ui/sonner";
 import {
   Outlet,
   Link,
   createRootRouteWithContext,
   useRouter,
   HeadContent,
+  redirect,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
 
@@ -66,6 +70,17 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  // Everything except /login needs a signed-in owner who has a shop.
+  beforeLoad: ({ location }) => {
+    const onLogin = location.pathname === "/login";
+    if (!isSignedIn()) {
+      if (!onLogin) throw redirect({ to: "/login" });
+    } else if (!getShop() && !onLogin) {
+      throw redirect({ to: "/login" }); // signed in but no shop yet: finish setting it up
+    } else if (getShop() && onLogin) {
+      throw redirect({ to: "/" });
+    }
+  },
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
@@ -79,6 +94,7 @@ function RootComponent() {
       <HeadContent />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <Toaster position="top-center" />
     </QueryClientProvider>
   );
 }

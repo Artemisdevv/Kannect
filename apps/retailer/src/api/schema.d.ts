@@ -661,7 +661,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 10-15 items to recount this week (loose items first, flagged conflicts first) */
+        /**
+         * Up to 15 items to recount, ordered by needs_recount, photo estimates, level guesses, then loose items
+         * @description Within each priority, loose gram items precede other products; names break remaining ties.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -1139,6 +1142,15 @@ export interface paths {
                                 suggested_price?: number | null;
                                 /** @enum {string|null} */
                                 price_source?: "mrp" | "nearby_median" | null;
+                                /** @description What the model read from the label, split out. Use it to offer 'add as a new product' when `match` is null; the owner confirms. */
+                                read?: {
+                                    brand?: string;
+                                    name?: string;
+                                    size?: string;
+                                    category?: string;
+                                };
+                                /** @description False when the model was only guessing from shape or colour: do not pre-select these */
+                                readable?: boolean;
                                 /** @description True when the matched product is already in this shop. Onboarding skips it; offer a recount instead (POST /shop/recount). */
                                 in_shop?: boolean;
                                 /** @description The system's count for an in_shop item, in base units */
