@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { api, q } from "@/lib/api/service";
 import { ApiError, IS_DEMO } from "@/lib/api/client";
 import { CataloguePicker } from "@/components/kn/CataloguePicker";
+import { liveListingErrors } from "@/lib/listing-rules";
 import { inr, pack } from "@/lib/format";
 import { seo } from "@/lib/seo";
 import { cn } from "@/lib/utils";
@@ -153,7 +154,7 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
 
   const set = <K extends keyof ProductInput>(k: K, val: ProductInput[K]) => setV((s) => ({ ...s, [k]: val }));
   const submit = () => {
-    const e = validate(v);
+    const e = { ...validate(v), ...(IS_DEMO ? {} : liveListingErrors(v)) };
     setErrors(e);
     if (Object.keys(e).length) return;
     if (product && product.active && !v.active) return setConfirmOff(true);

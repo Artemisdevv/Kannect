@@ -27,7 +27,14 @@ describe("small helpers", () => {
 
 describe("session and profile", () => {
   it("keeps the phone the supplier typed", () => {
-    expect(toSession("+919000000001", { token: "t", role: "supplier" })).toEqual({ token: "t", role: "supplier", phone: "+919000000001" });
+    expect(toSession("+919000000001", { token: "t", role: "supplier", supplier: { id: "s1" } })).toEqual({ token: "t", role: "supplier", phone: "+919000000001", hasProfile: true });
+  });
+  it("notes when the supplier has not made a profile yet", () => {
+    expect(toSession("+919000000001", { token: "t", role: "supplier", supplier: null }).hasProfile).toBe(false);
+    expect(toSession("+919000000001", { token: "t", role: "supplier" }).hasProfile).toBe(false);
+  });
+  it("sends a captured location with the profile body", () => {
+    expect(toSupplierBody({ location: { lat: 9.9, lng: 76.3 } })).toEqual({ location: { lat: 9.9, lng: 76.3 } });
   });
   it("shows the delivery radius in km and round-trips it", () => {
     const s = toSupplier(as<S["Supplier"]>({ id: "s1", name: "Malabar", contact_name: "Anil", phone: "+91900", address: "Kozhikode", delivery_radius_m: 12000, gstin: null, location: { lat: 11.2, lng: 75.8 } }));

@@ -18,9 +18,10 @@ const ORDER_STATUS: Record<string, OrderStatus> = {
 export const orderStatus = (s?: string): OrderStatus => ORDER_STATUS[s ?? ""] ?? "new";
 const HAS_INVOICE = new Set<OrderStatus>(["accepted", "dispatched", "delivered"]);
 
-export const toSession = (phone: string, r: { token: string; role: string }): Session => ({
-  token: r.token, role: r.role, phone,
-});
+export const toSession = (
+  phone: string,
+  r: { token: string; role: string; supplier?: unknown },
+): Session => ({ token: r.token, role: r.role, phone, hasProfile: r.supplier != null });
 
 export function toSupplier(s: S["Supplier"]): Supplier {
   return {

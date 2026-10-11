@@ -17,7 +17,7 @@ export const liveApi = {
     return { sent: true as boolean };
   },
   verifyOtp: async (phone: string, otp: string) =>
-    toSession(phone, await request<{ token: string; role: string }>("POST", "/auth/otp/verify", { phone, otp, role: "supplier" })),
+    toSession(phone, await request<{ token: string; role: string; supplier?: unknown }>("POST", "/auth/otp/verify", { phone, otp, role: "supplier" })),
 
   getSupplier: async () => toSupplier(await request<S["Supplier"]>("GET", "/supplier")),
   createSupplier: async (b: SupplierInput) => toSupplier(await request<S["Supplier"]>("POST", "/supplier", toSupplierBody(b))),

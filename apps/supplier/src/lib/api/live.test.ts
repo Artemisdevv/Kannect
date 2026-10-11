@@ -12,7 +12,7 @@ describe("liveApi", () => {
     const f = vi.fn().mockResolvedValue(json({ token: "t", role: "supplier", shop: null, supplier: null }));
     vi.stubGlobal("fetch", f);
     const { liveApi } = await import("./live");
-    expect(await liveApi.verifyOtp("+919000000001", "123456")).toEqual({ token: "t", role: "supplier", phone: "+919000000001" });
+    expect(await liveApi.verifyOtp("+919000000001", "123456")).toEqual({ token: "t", role: "supplier", phone: "+919000000001", hasProfile: false });
     const sent = f.mock.calls[0]![1] as RequestInit;
     expect(JSON.parse(String(sent.body))).toEqual({ phone: "+919000000001", otp: "123456", role: "supplier" });
   });

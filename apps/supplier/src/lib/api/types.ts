@@ -125,6 +125,8 @@ export interface GroupBuyInput {
 }
 
 export interface Session {
+  /** Live API only: false when this number has no supplier profile yet. */
+  hasProfile?: boolean;
   token: string;
   role: string;
   phone: string;

@@ -66,6 +66,19 @@ function Profile() {
     },
   });
 
+  const locate = useMutation({
+    mutationFn: async () => {
+      const location = await currentLocation();
+      if (!location) throw new ApiError("validation", "Couldn't read your location. Allow location access and try again.");
+      return api.updateSupplier({ location });
+    },
+    onSuccess: (s) => {
+      qc.setQueryData(q.supplier.queryKey, s);
+      toast.success("Location saved");
+    },
+    onError: (e) => toast.error(errorText(e)),
+  });
+
   if (sup.isLoading) return <ListSkeleton rows={3} />;
   if (sup.isError && !missing) return <ErrorState error={sup.error} onRetry={() => sup.refetch()} />;
 
@@ -86,6 +99,18 @@ function Profile() {
         <p role="status" className="mb-4 rounded-[18px] bg-warning-surface px-4 py-2 text-sm text-warning">
           ● Unsaved changes to {changed.length} field{changed.length > 1 ? "s" : ""}
         </p>
+      )}
+      {!IS_DEMO && !missing && sup.data && (
+        <div className="mb-4 rounded-[18px] bg-card px-4 py-3 text-sm">
+          {sup.data.location ? (
+            <p>Location saved. Retailers near you can find you.</p>
+          ) : (
+            <p className="text-warning">No location saved yet. Retailers can't find you and Demand stays empty until you add it.</p>
+          )}
+          <Button type="button" variant="outline" className="mt-2 w-full" disabled={locate.isPending} onClick={() => locate.mutate()}>
+            {locate.isPending && <Loader2 className="animate-spin" />} {sup.data.location ? "Update from this device" : "Use my current location"}
+          </Button>
+        </div>
       )}
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); submit(); }}>
         {FIELDS.map((f) => (
