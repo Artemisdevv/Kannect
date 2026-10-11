@@ -1,18 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import type { components } from "@/api/schema";
 import { textElement } from "@/lib/safe-dom";
 import "leaflet/dist/leaflet.css";
 
-type Location = components["schemas"]["Location"];
+// The API may send a place with no coordinates (null), so accept that and check it before use.
+type Location = { lat: number | null; lng: number | null };
+type Point = { lat: number; lng: number };
 
 export type RouteEndpoint = {
   label: string;
-  location: Location | undefined;
+  location: Location | null | undefined;
 };
 
-function validLocation(location: Location | undefined): location is Location {
+function validLocation(location: Location | null | undefined): location is Point {
   return (
     location !== undefined &&
+    location !== null &&
+    location.lat !== null &&
+    location.lng !== null &&
     Number.isFinite(location.lat) &&
     Number.isFinite(location.lng) &&
     location.lat >= -90 &&

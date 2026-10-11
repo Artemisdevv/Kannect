@@ -1,9 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRight, Camera, ChevronRight, Package, ReceiptText, ScanLine, Truck } from "lucide-react";
+import { ArrowUpRight, Camera, ChevronRight, HandHelping, Package, ReceiptText, ScanLine, Truck } from "lucide-react";
 
 import { Heading, Shell, useShop } from "@/components/kannect/shell";
 import { Button } from "@/components/ui/button";
-import { useBills, useOrders, useShopProducts } from "@/features/queries";
+import { useBills, useOrders, usePickups, useShopProducts } from "@/features/queries";
 import { formatQty, rupees, STATUS_LABEL, statusClass } from "@/lib/format";
 
 const isToday = (iso?: string) => {
@@ -18,6 +18,9 @@ export function TodayPage() {
   const products = useShopProducts();
   const bills = useBills();
   const orders = useOrders();
+  const pickups = usePickups();
+  const newPickups = (pickups.data ?? []).filter((r) => r.status === "requested");
+  const heldPickups = (pickups.data ?? []).filter((r) => r.status === "accepted");
 
   const todays = (bills.data ?? []).filter((b) => isToday(b.created_at));
   const sales = todays.reduce((sum, b) => sum + (b.total ?? 0), 0);
@@ -40,6 +43,22 @@ export function TodayPage() {
             <Link to="/onboard"><Camera /> Set up from a photo</Link>
           </Button>
         </div>
+      )}
+
+      {(newPickups.length > 0 || heldPickups.length > 0) && (
+        <Link to="/pickups" className="list-surface order-preview mt-4" style={{ background: "var(--accent)" }}>
+          <div className="brand-mark bg-secondary text-primary"><HandHelping size={22} /></div>
+          <div className="min-w-0">
+            <div className="product-name">
+              {newPickups.length > 0 ? `${newPickups.length} pickup request${newPickups.length === 1 ? "" : "s"} waiting` : "Items held for pickup"}
+            </div>
+            <div className="product-sub">
+              {newPickups.length > 0 ? "Shoppers want you to set items aside" : `${heldPickups.length} held for a shopper`}
+              {newPickups.length > 0 && heldPickups.length > 0 ? ` · ${heldPickups.length} held` : ""}
+            </div>
+          </div>
+          <ChevronRight />
+        </Link>
       )}
 
       <div className="summary-grid">

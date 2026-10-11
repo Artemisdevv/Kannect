@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useRouterState } from '@tanstack/react-router';
-import { ShoppingBag, MapPin, ChevronDown, Search, Store, SlidersHorizontal, LocateFixed, WifiOff, Loader2 } from 'lucide-react';
+import { ShoppingBag, MapPin, ChevronDown, Search, Store, SlidersHorizontal, LocateFixed, WifiOff, Loader2, HandHelping } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -113,6 +113,7 @@ export function ShopperShell({ children }: { children: ReactNode }) {
       <nav className="bottom-nav" aria-label="Main navigation">
         <Link to="/" className="nav-item" activeOptions={{ exact: true }} activeProps={{ className: 'active' }}><Store /><span>Nearby shops</span></Link>
         <Link to="/search" className="nav-item nav-search" activeOptions={{ exact: true }} activeProps={{ className: 'active' }} onClick={() => { if (pathname === '/search') resetSearch(); }}><Search /><span>Search</span></Link>
+        <Link to="/reservations" className="nav-item" activeProps={{ className: 'active' }}><HandHelping /><span>Requests</span></Link>
         <Link to="/settings" className="nav-item" activeOptions={{ exact: true }} activeProps={{ className: 'active' }}><SlidersHorizontal /><span>Settings</span></Link>
       </nav>
       <Dialog open={locationOpen} onOpenChange={setLocationOpen}><DialogContent><DialogHeader><DialogTitle>Your neighbourhood</DialogTitle><DialogDescription>Choose an area, or send your location to find shops nearby. This app does not save your precise coordinates.</DialogDescription></DialogHeader>

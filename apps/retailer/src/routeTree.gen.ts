@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as MoreRouteImport } from './routes/more'
 import { Route as OnboardRouteImport } from './routes/onboard'
 import { Route as OrdersRouteImport } from './routes/orders'
+import { Route as PickupsRouteImport } from './routes/pickups'
 import { Route as StockRouteImport } from './routes/stock'
 
 const IndexRoute = IndexRouteImport.update({
@@ -47,6 +48,11 @@ const OrdersRoute = OrdersRouteImport.update({
   path: '/orders',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PickupsRoute = PickupsRouteImport.update({
+  id: '/pickups',
+  path: '/pickups',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StockRoute = StockRouteImport.update({
   id: '/stock',
   path: '/stock',
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/more': typeof MoreRoute
   '/onboard': typeof OnboardRoute
   '/orders': typeof OrdersRoute
+  '/pickups': typeof PickupsRoute
   '/stock': typeof StockRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/more': typeof MoreRoute
   '/onboard': typeof OnboardRoute
   '/orders': typeof OrdersRoute
+  '/pickups': typeof PickupsRoute
   '/stock': typeof StockRoute
 }
 export interface FileRoutesById {
@@ -79,14 +87,30 @@ export interface FileRoutesById {
   '/more': typeof MoreRoute
   '/onboard': typeof OnboardRoute
   '/orders': typeof OrdersRoute
+  '/pickups': typeof PickupsRoute
   '/stock': typeof StockRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/billing' | '/login' | '/more' | '/onboard' | '/orders' | '/stock'
+    | '/'
+    | '/billing'
+    | '/login'
+    | '/more'
+    | '/onboard'
+    | '/orders'
+    | '/pickups'
+    | '/stock'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/billing' | '/login' | '/more' | '/onboard' | '/orders' | '/stock'
+  to:
+    | '/'
+    | '/billing'
+    | '/login'
+    | '/more'
+    | '/onboard'
+    | '/orders'
+    | '/pickups'
+    | '/stock'
   id:
     | '__root__'
     | '/'
@@ -95,6 +119,7 @@ export interface FileRouteTypes {
     | '/more'
     | '/onboard'
     | '/orders'
+    | '/pickups'
     | '/stock'
   fileRoutesById: FileRoutesById
 }
@@ -105,6 +130,7 @@ export interface RootRouteChildren {
   MoreRoute: typeof MoreRoute
   OnboardRoute: typeof OnboardRoute
   OrdersRoute: typeof OrdersRoute
+  PickupsRoute: typeof PickupsRoute
   StockRoute: typeof StockRoute
 }
 
@@ -152,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pickups': {
+      id: '/pickups'
+      path: '/pickups'
+      fullPath: '/pickups'
+      preLoaderRoute: typeof PickupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/stock': {
       id: '/stock'
       path: '/stock'
@@ -169,6 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   MoreRoute: MoreRoute,
   OnboardRoute: OnboardRoute,
   OrdersRoute: OrdersRoute,
+  PickupsRoute: PickupsRoute,
   StockRoute: StockRoute,
 }
 export const routeTree = rootRouteImport

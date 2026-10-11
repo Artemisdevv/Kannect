@@ -63,7 +63,7 @@ describe('browsing and shop page', () => {
     fetchMock.mockResolvedValueOnce(json({ shop, products: [{ product: { id: 'p1', name: 'Tomato' }, price: 40, stock_status: 'low' }] }));
     const page = await getShopPage('s1');
     expect(page.shop.name).toBe('Sreeram Stores');
-    expect(page.products).toEqual([{ productId: 'p1', name: 'Tomato', price: 40, status: 'low' }]);
+    expect(page.products).toEqual([{ productId: 'p1', name: 'Tomato', unit: 'piece', price: 40, status: 'low' }]);
   });
 
   it('referral is null when nobody nearby has it', async () => {

@@ -81,7 +81,7 @@
 .local-note h3 { font-size:13px; }
 .local-note p { font-size:11px; margin-top:5px; line-height:1.6; }
 .trust-note { display:flex; gap:8px; align-items:flex-start; justify-content:center; font-size:10px; color:var(--muted-foreground); margin-top:24px; line-height:1.6; }
-.bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:min(100%,760px); display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; padding:9px 22px max(10px,var(--sab)); border-top:1px solid var(--border); background:var(--background); z-index:30; }
+.bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:min(100%,760px); display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; padding:9px 14px max(10px,var(--sab)); border-top:1px solid var(--border); background:var(--background); z-index:30; }
 .nav-item { min-height:54px; padding:6px 8px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:5px; color:var(--muted-foreground); font-size:10px; border-radius:18px; }
 .nav-item svg { width:21px; height:21px; stroke-width:1.7; }
 .nav-item.active { background:var(--secondary); color:var(--primary); font-weight:700; }

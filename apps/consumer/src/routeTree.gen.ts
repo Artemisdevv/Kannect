@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ReservationsIndexRouteImport } from './routes/reservations.index'
+import { Route as ReservationsReservationIdRouteImport } from './routes/reservations.$reservationId'
 import { Route as ShopsShopIdRouteImport } from './routes/shops.$shopId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +31,17 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReservationsIndexRoute = ReservationsIndexRouteImport.update({
+  id: '/reservations/',
+  path: '/reservations/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReservationsReservationIdRoute =
+  ReservationsReservationIdRouteImport.update({
+    id: '/reservations/$reservationId',
+    path: '/reservations/$reservationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ShopsShopIdRoute = ShopsShopIdRouteImport.update({
   id: '/shops/$shopId',
   path: '/shops/$shopId',
@@ -39,34 +52,61 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
+  '/reservations/$reservationId': typeof ReservationsReservationIdRoute
   '/shops/$shopId': typeof ShopsShopIdRoute
+  '/reservations/': typeof ReservationsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
+  '/reservations/$reservationId': typeof ReservationsReservationIdRoute
   '/shops/$shopId': typeof ShopsShopIdRoute
+  '/reservations': typeof ReservationsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
+  '/reservations/$reservationId': typeof ReservationsReservationIdRoute
   '/shops/$shopId': typeof ShopsShopIdRoute
+  '/reservations/': typeof ReservationsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/search' | '/settings' | '/shops/$shopId'
+  fullPaths:
+    | '/'
+    | '/search'
+    | '/settings'
+    | '/reservations/$reservationId'
+    | '/shops/$shopId'
+    | '/reservations/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/search' | '/settings' | '/shops/$shopId'
-  id: '__root__' | '/' | '/search' | '/settings' | '/shops/$shopId'
+  to:
+    | '/'
+    | '/search'
+    | '/settings'
+    | '/reservations/$reservationId'
+    | '/shops/$shopId'
+    | '/reservations'
+  id:
+    | '__root__'
+    | '/'
+    | '/search'
+    | '/settings'
+    | '/reservations/$reservationId'
+    | '/shops/$shopId'
+    | '/reservations/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRoute
+  ReservationsReservationIdRoute: typeof ReservationsReservationIdRoute
   ShopsShopIdRoute: typeof ShopsShopIdRoute
+  ReservationsIndexRoute: typeof ReservationsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -92,6 +132,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reservations/': {
+      id: '/reservations/'
+      path: '/reservations'
+      fullPath: '/reservations/'
+      preLoaderRoute: typeof ReservationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reservations/$reservationId': {
+      id: '/reservations/$reservationId'
+      path: '/reservations/$reservationId'
+      fullPath: '/reservations/$reservationId'
+      preLoaderRoute: typeof ReservationsReservationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/shops/$shopId': {
       id: '/shops/$shopId'
       path: '/shops/$shopId'
@@ -106,7 +160,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SearchRoute: SearchRoute,
   SettingsRoute: SettingsRoute,
+  ReservationsReservationIdRoute: ReservationsReservationIdRoute,
   ShopsShopIdRoute: ShopsShopIdRoute,
+  ReservationsIndexRoute: ReservationsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

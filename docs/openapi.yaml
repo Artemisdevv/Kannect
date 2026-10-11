@@ -373,6 +373,145 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ShopProduct" }
 
+  /reservations:
+    post:
+      tags: [reservations]
+      security: []
+      summary: Reserve items for pickup at one shop (no sign-in, no payment)
+      description: |
+        The shopper gives a name and phone. The shop owner accepts or declines in the retailer app; an
+        accepted request is held for a time window, and stock only drops when the owner hands it over.
+        The response includes `access_token`, a secret the shopper's device keeps and sends in the
+        `X-Reservation-Token` header to read or cancel this request. Quantities are base units (pieces, or grams for loose goods). Resending the same
+        `client_id` returns the same reservation (200). Limits: 10 lines, 20 pieces or 10 kg per line, 3
+        open requests per phone per shop. The phone is not verified.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReservationInput" }
+      responses:
+        "201":
+          description: Created (200 when the same client_id was already sent)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Reservation" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409":
+          description: Not enough stock ("only N available"), or too many open requests
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /reservations/{reservation_id}:
+    get:
+      tags: [reservations]
+      security: []
+      summary: A shopper's own reservation (needs the secret token)
+      parameters:
+        - { name: reservation_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: X-Reservation-Token, in: header, required: true, schema: { type: string }, description: "The access_token from POST /reservations. A header, not a URL parameter, so it stays out of server logs." }
+      responses:
+        "200":
+          description: OK. `status` may be `expired` (accepted, but the hold ran out).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Reservation" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /reservations/{reservation_id}/cancel:
+    post:
+      tags: [reservations]
+      security: []
+      summary: Shopper cancels a request that is still open
+      parameters:
+        - { name: reservation_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: X-Reservation-Token, in: header, required: true, schema: { type: string }, description: "The access_token from POST /reservations. A header, not a URL parameter, so it stays out of server logs." }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Reservation" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /shop/reservations:
+    get:
+      tags: [reservations]
+      summary: This shop's pickup requests, newest requests first
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [open, requested, accepted, declined, cancelled, collected, expired] } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Reservation" }
+
+  /shop/reservations/{reservation_id}/accept:
+    post:
+      tags: [reservations]
+      summary: Accept a request and hold the items for a while
+      parameters:
+        - { name: reservation_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hold_minutes: { type: integer, minimum: 15, maximum: 1440, default: 120 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Reservation" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /shop/reservations/{reservation_id}/decline:
+    post:
+      tags: [reservations]
+      summary: Decline a request, with an optional reason the shopper sees
+      parameters:
+        - { name: reservation_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 200 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Reservation" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /shop/reservations/{reservation_id}/collect:
+    post:
+      tags: [reservations]
+      summary: The shopper picked it up. Sells it through normal billing (stock drops, e-bill exists).
+      parameters:
+        - { name: reservation_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: payment_mode, in: query, schema: { type: string, enum: [cash, upi, card, other], default: cash } }
+      responses:
+        "200":
+          description: OK. Includes `bill_id` and `share_url`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Reservation" }
+        "409": { $ref: "#/components/responses/Error" }
+
   /shop/recount:
     post:
       tags: [shop]
@@ -1442,6 +1581,54 @@ components:
           type: integer
           description: "restock: units added (>0). correction: the counted absolute quantity."
         created_at: { type: string, format: date-time }
+
+    ReservationInput:
+      type: object
+      required: [client_id, shop_id, customer_name, customer_phone, items]
+      properties:
+        client_id: { type: string, format: uuid, description: "Generated by the app; makes a retry safe" }
+        shop_id: { type: string, format: uuid }
+        customer_name: { type: string, minLength: 2, maxLength: 80 }
+        customer_phone: { type: string, description: "10-digit Indian mobile (or +country number). Not verified." }
+        note: { type: string, maxLength: 300, nullable: true }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            type: object
+            required: [product_id, quantity]
+            properties:
+              product_id: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1, description: "Base units: pieces, or grams for loose goods" }
+
+    Reservation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [requested, accepted, declined, cancelled, collected, expired] }
+        access_token: { type: string, description: "Only in the response to POST /reservations" }
+        shop: { $ref: "#/components/schemas/PublicShop" }
+        customer_name: { type: string }
+        customer_phone: { type: string }
+        note: { type: string, nullable: true }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              product_id: { type: string, format: uuid }
+              name: { type: string }
+              unit: { type: string, enum: [piece, gram] }
+              quantity: { type: integer }
+              unit_price: { type: number, format: double, description: "Per piece, or per kg for gram items" }
+              line_total: { type: number, format: double }
+        total: { type: number, format: double }
+        hold_until: { type: string, format: date-time, nullable: true }
+        decline_reason: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        bill_id: { type: string, format: uuid, nullable: true, description: "Owner view only, once collected" }
+        share_url: { type: string, nullable: true, description: "E-bill link, only in the response to collect" }
 
     SearchResult:
       type: object
