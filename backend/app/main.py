@@ -16,6 +16,7 @@ from app.routers import (
     orders,
     procurement,
     recount,
+    reservations,
     search,
     shop,
     supplier,
@@ -50,6 +51,8 @@ app.include_router(auth.config_router, prefix=API_PREFIX)
 app.include_router(catalogue.router, prefix=API_PREFIX)
 app.include_router(shop.router, prefix=API_PREFIX)
 app.include_router(recount.router, prefix=API_PREFIX)
+app.include_router(reservations.public_router, prefix=API_PREFIX)
+app.include_router(reservations.shop_router, prefix=API_PREFIX)
 app.include_router(supplier.router, prefix=API_PREFIX)
 app.include_router(procurement.router, prefix=API_PREFIX)
 app.include_router(orders.shop_router, prefix=API_PREFIX)
