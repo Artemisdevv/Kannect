@@ -165,7 +165,11 @@ export function invoicePhoto(image: Blob) {
 
 /** A recorded Malayalam/English dictation (ogg, mp3, wav, m4a or webm, up to 5 MB). */
 export function voiceBill(audio: Blob) {
-  return postFile<Ok<"/shop/ai/voice-bill", "post">>("/shop/ai/voice-bill", "audio", [audio]);
+  // Browsers tag recordings like "audio/webm;codecs=opus"; the server picks the type from the
+  // file extension, so give it a clean name.
+  const ext = /ogg/.test(audio.type) ? "ogg" : /mp4|aac/.test(audio.type) ? "m4a" : /wav/.test(audio.type) ? "wav" : "webm";
+  const file = audio instanceof File ? audio : new File([audio], `voice.${ext}`, { type: audio.type });
+  return postFile<Ok<"/shop/ai/voice-bill", "post">>("/shop/ai/voice-bill", "audio", [file]);
 }
 
 // ---------- procurement ----------
@@ -185,5 +189,15 @@ export async function listOrders() {
 export async function receiveOrder(orderId: string) {
   return unwrap(
     await api.POST("/shop/orders/{order_id}/receive", { params: { path: { order_id: orderId } } }),
+  );
+}
+
+export async function placeOrder(body: Body<"/shop/orders", "post">) {
+  return unwrap(await api.POST("/shop/orders", { body }));
+}
+
+export async function cancelOrder(orderId: string) {
+  return unwrap(
+    await api.POST("/shop/orders/{order_id}/cancel", { params: { path: { order_id: orderId } } }),
   );
 }

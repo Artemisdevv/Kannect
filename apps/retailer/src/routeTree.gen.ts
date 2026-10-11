@@ -11,7 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BillingRouteImport } from './routes/billing'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as MoreRouteImport } from './routes/more'
+import { Route as OnboardRouteImport } from './routes/onboard'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as StockRouteImport } from './routes/stock'
 
@@ -25,9 +27,19 @@ const BillingRoute = BillingRouteImport.update({
   path: '/billing',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MoreRoute = MoreRouteImport.update({
   id: '/more',
   path: '/more',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardRoute = OnboardRouteImport.update({
+  id: '/onboard',
+  path: '/onboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrdersRoute = OrdersRouteImport.update({
@@ -44,14 +56,18 @@ const StockRoute = StockRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/billing': typeof BillingRoute
+  '/login': typeof LoginRoute
   '/more': typeof MoreRoute
+  '/onboard': typeof OnboardRoute
   '/orders': typeof OrdersRoute
   '/stock': typeof StockRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/billing': typeof BillingRoute
+  '/login': typeof LoginRoute
   '/more': typeof MoreRoute
+  '/onboard': typeof OnboardRoute
   '/orders': typeof OrdersRoute
   '/stock': typeof StockRoute
 }
@@ -59,22 +75,35 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/billing': typeof BillingRoute
+  '/login': typeof LoginRoute
   '/more': typeof MoreRoute
+  '/onboard': typeof OnboardRoute
   '/orders': typeof OrdersRoute
   '/stock': typeof StockRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/billing' | '/more' | '/orders' | '/stock'
+  fullPaths:
+    '/' | '/billing' | '/login' | '/more' | '/onboard' | '/orders' | '/stock'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/billing' | '/more' | '/orders' | '/stock'
-  id: '__root__' | '/' | '/billing' | '/more' | '/orders' | '/stock'
+  to: '/' | '/billing' | '/login' | '/more' | '/onboard' | '/orders' | '/stock'
+  id:
+    | '__root__'
+    | '/'
+    | '/billing'
+    | '/login'
+    | '/more'
+    | '/onboard'
+    | '/orders'
+    | '/stock'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BillingRoute: typeof BillingRoute
+  LoginRoute: typeof LoginRoute
   MoreRoute: typeof MoreRoute
+  OnboardRoute: typeof OnboardRoute
   OrdersRoute: typeof OrdersRoute
   StockRoute: typeof StockRoute
 }
@@ -95,11 +124,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BillingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/more': {
       id: '/more'
       path: '/more'
       fullPath: '/more'
       preLoaderRoute: typeof MoreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboard': {
+      id: '/onboard'
+      path: '/onboard'
+      fullPath: '/onboard'
+      preLoaderRoute: typeof OnboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orders': {
@@ -122,7 +165,9 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BillingRoute: BillingRoute,
+  LoginRoute: LoginRoute,
   MoreRoute: MoreRoute,
+  OnboardRoute: OnboardRoute,
   OrdersRoute: OrdersRoute,
   StockRoute: StockRoute,
 }

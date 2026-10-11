@@ -18,3 +18,5 @@ ml/index.log
 
 # frontend build output
 apps/*/dist/
+
+apps/*/.tanstack/

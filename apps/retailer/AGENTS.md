@@ -9,7 +9,7 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 
-## KadaNet architecture
-- Keep shared retailer screen UI in `src/components/kadanet` and define a leaf route for each bottom-navigation destination, so screens have independent URLs and metadata.
+## Kannect architecture
+- Keep shared retailer screen UI in `src/components/kannect` and define a leaf route for each bottom-navigation destination, so screens have independent URLs and metadata.
 - Keep the current experience explicitly demo-only and in memory until an API contract is provided; UI confirmations must never claim live persistence or synchronization.
 - Define retailer visual styling through semantic tokens in `src/styles.css` and use shadcn controls with at least 48px touch targets.
