@@ -11,6 +11,7 @@ on:
     paths:
       - "apps/retailer/**"
       - "apps/consumer/**"
+      - "apps/supplier/**"
       - ".github/workflows/android.yml"
 
 jobs:
@@ -19,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [retailer, consumer]
+        app: [retailer, consumer, supplier]
     defaults:
       run:
         working-directory: apps/${{ matrix.app }}

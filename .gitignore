@@ -20,3 +20,6 @@ ml/index.log
 apps/*/dist/
 
 apps/*/.tanstack/
+
+apps/*/.output/
+apps/*/.wrangler/
