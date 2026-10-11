@@ -24,9 +24,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
+      # Render deploys main by itself when auto-deploy is on. This job is the explicit, checked
+      # alternative and only runs when its secrets exist (Settings > Environments > production).
+      - name: Check for Render secrets
+        id: secrets
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          RENDER_SERVICE_URL: ${{ secrets.RENDER_SERVICE_URL }}
+        run: |
+          if [ -n "$RENDER_API_KEY" ] && [ -n "$RENDER_SERVICE_ID" ] && [ -n "$RENDER_SERVICE_URL" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping: RENDER_API_KEY / RENDER_SERVICE_ID / RENDER_SERVICE_URL are not set in the production environment. Render auto-deploys main on its own."
+          fi
+
       # Calls Render's API directly instead of a third-party action, so the API key is only ever
       # given to Render, and the secrets reach the script as environment variables.
       - name: Deploy to Render and wait until it is live
+        if: steps.secrets.outputs.configured == 'true'
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
@@ -53,6 +70,7 @@ jobs:
           echo "Timed out waiting for the deploy"; exit 1
 
       - name: Verify deployment
+        if: steps.secrets.outputs.configured == 'true'
         env:
           RENDER_SERVICE_URL: ${{ secrets.RENDER_SERVICE_URL }}
         run: |
