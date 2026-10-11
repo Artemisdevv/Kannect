@@ -10,7 +10,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useShopProducts } from "@/features/queries";
+import { usePickups, useShopProducts } from "@/features/queries";
 
 export function pageHead(title: string, description: string) {
   const full = `${title} · Kannect Retailer`;
@@ -40,6 +40,7 @@ export function Shell({ children, active }: { children: ReactNode; active: strin
   const [open, setOpen] = useState(false);
   const shop = useShop();
   const products = useShopProducts();
+  const newPickups = (usePickups().data ?? []).filter((r) => r.status === "requested").length;
   const needAttention = (products.data ?? []).filter(
     (p) => p.stock_status === "low" || p.stock_status === "out",
   );
@@ -64,7 +65,7 @@ export function Shell({ children, active }: { children: ReactNode; active: strin
           onClick={() => setOpen(true)}
         >
           <Bell size={21} />
-          {needAttention.length > 0 && (
+          {(needAttention.length > 0 || newPickups > 0) && (
             <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full bg-destructive" />
           )}
         </Button>
@@ -90,6 +91,13 @@ export function Shell({ children, active }: { children: ReactNode; active: strin
         <DialogContent className="mobile-dialog">
           <DialogTitle>Shop updates</DialogTitle>
           <DialogDescription>Based on your current stock</DialogDescription>
+          {newPickups > 0 && (
+            <p className="text-sm">
+              <Link to="/pickups" className="underline" onClick={() => setOpen(false)}>
+                {newPickups} pickup request{newPickups === 1 ? "" : "s"} waiting
+              </Link>
+            </p>
+          )}
           {needAttention.length === 0 ? (
             <p className="text-sm">Nothing needs restocking right now.</p>
           ) : (

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Camera, ChevronRight, ClipboardCheck, LogOut } from "lucide-react";
+import { Camera, ChevronRight, ClipboardCheck, HandHelping, LogOut } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { signOut } from "@/api";
@@ -18,6 +18,7 @@ export function MorePage() {
   };
 
   const items = [
+    { to: "/pickups" as const, icon: HandHelping, label: "Pickup requests", sub: "Shoppers asking you to set items aside" },
     { to: "/onboard" as const, icon: Camera, label: "Set up from a shelf photo", sub: "Add many products at once" },
     { to: "/stock" as const, icon: ClipboardCheck, label: "Weekly recount", sub: "Check and update your counts" },
   ];

@@ -2,12 +2,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  acceptReservation,
   addShopProductsBulk,
+  collectReservation,
   createBill,
   createShop,
+  declineReservation,
   getMyShop,
   listBills,
   listOrders,
+  listReservations,
   listShopProducts,
   receiveOrder,
   recount,
@@ -22,6 +26,7 @@ export const keys = {
   orders: ["shop", "orders"] as const,
   reorder: ["shop", "reorder"] as const,
   recountSuggestions: ["shop", "recount-suggestions"] as const,
+  pickups: ["shop", "pickups"] as const,
 };
 
 export function useShopProducts() {
@@ -97,3 +102,34 @@ export function useCreateShop() {
 }
 
 export { getMyShop };
+
+// ---------- pickup requests ----------
+
+/** New requests arrive while the owner is busy, so look again every 30 seconds and when the app regains focus. */
+export function usePickups() {
+  return useQuery({
+    queryKey: keys.pickups,
+    queryFn: async () => (await listReservations()).items ?? [],
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function usePickupActions() {
+  const qc = useQueryClient();
+  const refresh = useRefreshStock();
+  const done = async () => {
+    await qc.invalidateQueries({ queryKey: keys.pickups });
+  };
+  return {
+    accept: useMutation({ mutationFn: (v: { id: string; holdMinutes?: number }) => acceptReservation(v.id, v.holdMinutes), onSuccess: done }),
+    decline: useMutation({ mutationFn: (v: { id: string; reason?: string }) => declineReservation(v.id, v.reason), onSuccess: done }),
+    collect: useMutation({
+      mutationFn: (v: { id: string; paymentMode?: "cash" | "upi" | "card" | "other" }) => collectReservation(v.id, v.paymentMode),
+      onSuccess: async () => {
+        await done();
+        await refresh(); // handing it over made a bill: stock and sales changed
+      },
+    }),
+  };
+}

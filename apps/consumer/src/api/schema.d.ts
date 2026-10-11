@@ -161,7 +161,7 @@ export interface paths {
          *     `user_json_url`. Send it here. The server accepts only https URLs on the configured
          *     phone.email host, fetches the verified number itself, and issues the same token as
          *     /auth/otp/verify. Each result URL works once. When this mode is on, the demo OTP only
-         *     works for the fictional demo numbers (+91900000...).
+         *     works only for the seeded demo numbers (the DEMO_PHONES list).
          */
         post: {
             parameters: {
@@ -687,6 +687,322 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reservations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reserve items for pickup at one shop (no sign-in, no payment)
+         * @description The shopper gives a name and phone. The shop owner accepts or declines in the retailer app; an
+         *     accepted request is held for a time window, and stock only drops when the owner hands it over.
+         *     The response includes `access_token`, a secret the shopper's device keeps and sends in the
+         *     `X-Reservation-Token` header to read or cancel this request. Quantities are base units (pieces, or grams for loose goods). Resending the same
+         *     `client_id` returns the same reservation (200). Limits: 10 lines, 20 pieces or 10 kg per line, 3
+         *     open requests per phone per shop. The phone is not verified.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReservationInput"];
+                };
+            };
+            responses: {
+                /** @description Created (200 when the same client_id was already sent) */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Reservation"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                /** @description Not enough stock ("only N available"), or too many open requests */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reservations/{reservation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A shopper's own reservation (needs the secret token) */
+        get: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description The access_token from POST /reservations. A header, not a URL parameter, so it stays out of server logs. */
+                    "X-Reservation-Token": string;
+                };
+                path: {
+                    reservation_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK. `status` may be `expired` (accepted, but the hold ran out). */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Reservation"];
+                    };
+                };
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reservations/{reservation_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Shopper cancels a request that is still open */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description The access_token from POST /reservations. A header, not a URL parameter, so it stays out of server logs. */
+                    "X-Reservation-Token": string;
+                };
+                path: {
+                    reservation_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Reservation"];
+                    };
+                };
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shop/reservations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** This shop's pickup requests, newest requests first */
+        get: {
+            parameters: {
+                query?: {
+                    status?: "open" | "requested" | "accepted" | "declined" | "cancelled" | "collected" | "expired";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items?: components["schemas"]["Reservation"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shop/reservations/{reservation_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept a request and hold the items for a while */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    reservation_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @default 120 */
+                        hold_minutes?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Reservation"];
+                    };
+                };
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shop/reservations/{reservation_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline a request, with an optional reason the shopper sees */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    reservation_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        reason?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Reservation"];
+                    };
+                };
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shop/reservations/{reservation_id}/collect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The shopper picked it up. Sells it through normal billing (stock drops, e-bill exists). */
+        post: {
+            parameters: {
+                query?: {
+                    payment_mode?: "cash" | "upi" | "card" | "other";
+                };
+                header?: never;
+                path: {
+                    reservation_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK. Includes `bill_id` and `share_url`. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Reservation"];
+                    };
+                };
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/shop/recount": {
         parameters: {
             query?: never;
@@ -699,7 +1015,8 @@ export interface paths {
         /**
          * Set stock for products the shop already has, from an exact count or a photo/level estimate
          * @description Writes an absolute `correction` per item with its `count_source`. Send `quantity` with
-         *     `owner_exact`, or `stock_level` (plenty/some/few/none) with `photo_estimate` or `level_guess`.
+         *     `owner_exact` (typed or scanned) or `photo_estimate` (read from a photo, confirmed by the owner), or
+         *     `stock_level` (plenty/some/few/none) with `photo_estimate` or `level_guess`.
          *     An estimate that lands in the same stock band as the current count is skipped (`unchanged`),
          *     so a photo never overwrites a good exact count with a rougher number; one that disagrees
          *     (the photo shows few, the system says 40) is applied. `client_id` makes retries safe.
@@ -2551,6 +2868,66 @@ export interface components {
             quantity: number;
             /** Format: date-time */
             created_at?: string;
+        };
+        ReservationInput: {
+            /**
+             * Format: uuid
+             * @description Generated by the app; makes a retry safe
+             */
+            client_id: string;
+            /** Format: uuid */
+            shop_id: string;
+            customer_name: string;
+            /** @description 10-digit Indian mobile (or +country number). Not verified. */
+            customer_phone: string;
+            note?: string | null;
+            items: {
+                /** Format: uuid */
+                product_id: string;
+                /** @description Base units: pieces, or grams for loose goods */
+                quantity: number;
+            }[];
+        };
+        Reservation: {
+            /** Format: uuid */
+            id?: string;
+            /** @enum {string} */
+            status?: "requested" | "accepted" | "declined" | "cancelled" | "collected" | "expired";
+            /** @description Only in the response to POST /reservations */
+            access_token?: string;
+            shop?: components["schemas"]["PublicShop"];
+            customer_name?: string;
+            customer_phone?: string;
+            note?: string | null;
+            items?: {
+                /** Format: uuid */
+                product_id?: string;
+                name?: string;
+                /** @enum {string} */
+                unit?: "piece" | "gram";
+                quantity?: number;
+                /**
+                 * Format: double
+                 * @description Per piece, or per kg for gram items
+                 */
+                unit_price?: number;
+                /** Format: double */
+                line_total?: number;
+            }[];
+            /** Format: double */
+            total?: number;
+            /** Format: date-time */
+            hold_until?: string | null;
+            decline_reason?: string | null;
+            /** Format: date-time */
+            created_at?: string;
+            /**
+             * Format: uuid
+             * @description Owner view only, once collected
+             */
+            bill_id?: string | null;
+            /** @description E-bill link, only in the response to collect */
+            share_url?: string | null;
         };
         SearchResult: {
             shop?: components["schemas"]["PublicShop"];

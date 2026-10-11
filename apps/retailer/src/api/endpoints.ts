@@ -219,3 +219,38 @@ export async function signInWithPhoneEmail(userJsonUrl: string) {
   setSession({ token: data.token as string, shop: (data.shop as never) ?? null });
   return data;
 }
+
+// ---------- pickup requests from shoppers ----------
+
+export type Reservation = components["schemas"]["Reservation"];
+
+export async function listReservations(status?: "open" | "requested" | "accepted" | "declined" | "cancelled" | "collected" | "expired") {
+  return unwrap(await api.GET("/shop/reservations", { params: { query: status ? { status } : {} } }));
+}
+
+export async function acceptReservation(id: string, holdMinutes?: number) {
+  return unwrap(
+    await api.POST("/shop/reservations/{reservation_id}/accept", {
+      params: { path: { reservation_id: id } },
+      body: holdMinutes ? { hold_minutes: holdMinutes } : {},
+    }),
+  );
+}
+
+export async function declineReservation(id: string, reason?: string) {
+  return unwrap(
+    await api.POST("/shop/reservations/{reservation_id}/decline", {
+      params: { path: { reservation_id: id } },
+      body: reason ? { reason } : {},
+    }),
+  );
+}
+
+/** The shopper picked it up: sells it through normal billing. */
+export async function collectReservation(id: string, paymentMode: "cash" | "upi" | "card" | "other" = "cash") {
+  return unwrap(
+    await api.POST("/shop/reservations/{reservation_id}/collect", {
+      params: { path: { reservation_id: id }, query: { payment_mode: paymentMode } },
+    }),
+  );
+}
