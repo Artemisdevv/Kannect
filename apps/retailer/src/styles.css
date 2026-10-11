@@ -1,0 +1,86 @@
+@import "tailwindcss" source(none);
+@import "tw-animate-css";
+@source "../src";
+@custom-variant dark (&:is(.dark *));
+@theme inline {
+ --font-sans: 'Google Sans Flex', 'Noto Sans Malayalam', Arial, sans-serif;
+ --color-background: var(--background); --color-foreground: var(--foreground);
+ --color-card: var(--card); --color-card-foreground: var(--foreground);
+ --color-popover: var(--card); --color-popover-foreground: var(--foreground);
+ --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground);
+ --color-secondary: var(--secondary); --color-secondary-foreground: var(--secondary-foreground);
+ --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground);
+ --color-accent: var(--accent); --color-accent-foreground: var(--accent-foreground);
+ --color-destructive: var(--destructive); --color-destructive-foreground: var(--card);
+ --color-border: var(--border); --color-input: var(--border); --color-ring: var(--primary);
+ --color-primary-hover: var(--primary-hover); --color-success: var(--success); --color-warning: var(--warning); --color-warning-surface: var(--warning-surface);
+ --radius-sm: 10px; --radius-md: 18px; --radius-lg: 28px; --radius-xl: 34px; --radius-2xl: 42px;
+}
+:root {
+ --background:#FFFAF0; --foreground:#292316; --card:#F8EFE3; --elevated:#FFFFFF;
+ --primary:#633B13; --primary-hover:#4E2E0F; --primary-foreground:#FFFAF0;
+ --secondary:#F1E3D0; --secondary-foreground:#633B13;
+ --accent:#E6EEE3; --accent-foreground:#456440; --success:#668D5E;
+ --muted:#F1E3D0; --muted-foreground:#6E6455; --border:#E8D9C4;
+ --destructive:#A33B32; --warning:#87561A; --warning-surface:#F7E9D2; --danger-surface:#F6E1DD; --border:#EFE4D4;
+ --shadow-soft:0 1px 2px rgb(41 35 22 / 4%), 0 4px 14px rgb(99 59 19 / 6%);
+}
+@layer base { * { border-color: var(--border); letter-spacing: 0; } body { margin:0; background:var(--background); color:var(--foreground); font-family:var(--font-sans); } button, a, input { -webkit-tap-highlight-color: transparent; } button { touch-action:manipulation; } }
+.app-shell { max-width: 760px; min-height:100dvh; margin:0 auto; background:var(--background); }
+.app-header { height:64px; padding:0 24px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; border-bottom:1px solid var(--border); background:var(--card); }
+.brand { display:flex; align-items:center; gap:9px; font-size:20px; font-weight:750; }
+.brand-mark { display:grid; place-items:center; width:34px; height:34px; border-radius:14px; background:var(--primary); color:var(--primary-foreground); }
+.brand-caption { font-size:9.5px; font-weight:500; text-transform:uppercase; color:var(--muted-foreground); margin-top:0; }
+.app-main { padding:20px 24px 112px; }
+.eyebrow { color:var(--muted-foreground); font-size:12.5px; }
+h1 { font-size:25px; line-height:1.25; font-weight:750; margin:4px 0; }
+.section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:24px 0 10px; }
+.section-heading h2 { font-size:15px; font-weight:700; }
+.status-pill { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; border-radius:999px; padding:4px 10px; background:var(--accent); color:var(--accent-foreground); }
+.status-pill.warning { background:var(--warning-surface); color:var(--warning); }
+.status-pill.danger { color:var(--destructive); background:var(--warning-surface); }
+.summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:16px 0 14px; }
+.summary { border:1px solid var(--border); background:var(--card); border-radius:28px; padding:16px 18px; box-shadow:var(--shadow-soft); }
+.summary-top { display:flex; align-items:center; justify-content:space-between; color:var(--muted-foreground); font-size:11.5px; }
+.summary-value { font-size:25px; font-weight:700; margin:5px 0 3px; }
+.summary-note { color:var(--muted-foreground); font-size:10.5px; }
+.action-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.action-grid .action-tile { min-height:80px; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:8px; padding:14px 18px; font-size:14px; border-radius:26px; }
+.action-tile svg { width:22px; height:22px; }
+.list-surface { border:1px solid var(--border); border-radius:32px; background:var(--card); overflow:hidden; }
+.product-row { display:grid; grid-template-columns:40px minmax(0,1fr) auto; align-items:center; gap:12px; padding:12px 18px; border-bottom:1px solid var(--border); }
+.product-row:last-child { border-bottom:0; }
+.product-art { width:40px; height:40px; display:grid; place-items:center; background:var(--muted); border-radius:18px; font-size:22px; }
+.product-art svg { width:21px; height:21px; }
+.product-name { font-size:12.5px; font-weight:650; line-height:1.4; }
+.product-sub { font-size:10.5px; color:var(--muted-foreground); margin-top:2px; }
+.order-preview { display:grid; grid-template-columns:38px minmax(0,1fr) auto; gap:12px; align-items:center; padding:14px 18px; }
+.group-banner { background:var(--accent); border-radius:32px; padding:16px 18px; display:grid; grid-template-columns:minmax(0,1fr) 112px; gap:12px; overflow:hidden; }
+.group-banner img { width:112px; height:88px; object-fit:cover; border-radius:22px; align-self:center; }
+.group-banner h3 { font-size:15px; font-weight:700; margin:6px 0 4px; }
+.bottom-nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:min(100%,760px); padding:6px 12px max(8px,env(safe-area-inset-bottom)); background:var(--card); border-top:1px solid var(--border); border-radius:30px 30px 0 0; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); z-index:30; }
+.nav-item { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; min-height:52px; color:var(--muted-foreground); font-size:9.5px; text-decoration:none; border-radius:20px; }
+.nav-item svg { width:21px; height:21px; }
+.nav-item.active { color:var(--primary); background:var(--secondary); font-weight:700; }
+.demo-footer { text-align:center; color:var(--muted-foreground); font-size:10px; margin-top:24px; display:flex; justify-content:center; gap:6px; align-items:center; }
+.page-search { width:100%; min-height:48px; border:1px solid var(--border); border-radius:999px; padding:10px 18px; background:var(--card); font-size:13.5px; }
+.filter-row { display:flex; gap:8px; margin:12px 0; }
+.filter-row button { border-radius:999px; }
+.mobile-dialog { width:calc(100% - 28px); max-height:85dvh; overflow:auto; border-radius:32px; }
+.mobile-dialog > button { min-width:48px; min-height:48px; right:6px; top:6px; }
+.quantity-controls { display:flex; align-items:center; gap:8px; }
+@media(min-width:800px) { body { background:var(--muted); } .app-shell { border-left:1px solid var(--border); border-right:1px solid var(--border); } .app-main { padding-left:40px; padding-right:40px; } .app-header { padding:0 40px; } }
+@media(max-width:380px) { .app-main { padding-left:16px; padding-right:16px; } .app-header { padding:0 16px; } .product-row { padding:10px 14px; gap:10px; } .group-banner { grid-template-columns:minmax(0,1fr) 88px; } .group-banner img { width:88px; } h1 { font-size:23px; } }
+@media(prefers-reduced-motion:reduce) { *, *::before, *::after { animation:none!important; transition:none!important; } }
+
+.summary,.list-surface,.action-tile,.product-row,.nav-item,button{transition:transform 160ms ease,background-color 160ms ease,color 160ms ease,box-shadow 160ms ease,border-color 160ms ease}
+button:active:not(:disabled),.nav-item:active,.action-tile:active{transform:scale(.97)}
+.product-row:hover{background:color-mix(in srgb,var(--secondary) 45%,transparent)}
+.summary{background:var(--elevated)}
+.summary-value{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.status-pill.danger{background:var(--danger-surface);color:var(--destructive)}
+.nav-item.active{background:var(--secondary);color:var(--primary)}
+.mobile-dialog{background:var(--elevated)}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+@keyframes kn-fade-up{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.app-main>*{animation:kn-fade-up 220ms ease both}
