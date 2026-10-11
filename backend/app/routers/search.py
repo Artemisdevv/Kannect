@@ -1,7 +1,8 @@
 """Public shopper endpoints: nearby search, out-of-stock referral, shop page.
 
-No auth. Never exposes exact stock counts, only in_stock / low / out. Owner-facing numbers stay on
-the retailer endpoints.
+No auth. Search results show only in_stock / low / out. The shop page also says how many can be
+reserved right now (stock minus what other live requests hold, capped per line), so a shopper
+cannot ask for more than exists. Owner-facing numbers stay on the retailer endpoints.
 """
 
 from decimal import Decimal
@@ -13,6 +14,8 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.routers.reservations import MAX_GRAMS, MAX_PIECES
+from app.services.holds import HOLDING_SQL, REQUEST_TTL_MINUTES
 from app.services.stock_sql import STATUS_SQL, STOCK_CTE
 
 router = APIRouter(tags=["search"])
@@ -230,7 +233,14 @@ def shop_page(
     if shop is None:
         raise HTTPException(status_code=404, detail="Shop not found")
 
-    params: dict[str, Any] = {"shop_id": shop_id, "lat": shop["lat"] or 0, "lng": shop["lng"] or 0}
+    params: dict[str, Any] = {
+        "shop_id": shop_id,
+        "lat": shop["lat"] or 0,
+        "lng": shop["lng"] or 0,
+        "request_ttl": REQUEST_TTL_MINUTES,
+        "max_pieces": MAX_PIECES,
+        "max_grams": MAX_GRAMS,
+    }
     word_filters = []
     for i, token in enumerate(_tokens(q or "")):
         params[f"t{i}"] = f"%{token}%"
@@ -238,10 +248,20 @@ def shop_page(
     extra = ("AND " + " AND ".join(word_filters)) if word_filters else ""
     sql = f"""
     WITH {STOCK_CTE}
-    SELECT {COLUMNS}
+    SELECT {COLUMNS},
+      GREATEST(0, LEAST(
+        st.qty - COALESCE(h.held, 0),
+        CASE WHEN p.unit = 'gram' THEN :max_grams ELSE :max_pieces END
+      ))::integer AS reservable
     FROM stock st
     JOIN shop s ON s.id = st.shop_id
     JOIN product p ON p.id = st.product_id
+    LEFT JOIN (
+      SELECT rl.product_id, SUM(rl.quantity) AS held
+      FROM reservation_line rl JOIN reservation r ON r.id = rl.reservation_id
+      WHERE r.shop_id = :shop_id AND {HOLDING_SQL}
+      GROUP BY rl.product_id
+    ) h ON h.product_id = st.product_id
     WHERE st.shop_id = :shop_id AND p.is_active {extra}
     ORDER BY p.category NULLS LAST, p.name
     """
@@ -259,6 +279,7 @@ def shop_page(
                 "product": _product(r),
                 "price": float(r["price"]) if r["price"] is not None else None,
                 "stock_status": r["status"],
+                "reservable": r["reservable"],
             }
             for r in rows
         ],

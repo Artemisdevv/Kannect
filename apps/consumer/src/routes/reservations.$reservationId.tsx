@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
+import { useEffect } from 'react';
 import { ArrowLeft, Loader2, MapPin, Phone, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { qtyLabel } from '@/components/reserve-dialog';
 import { STATUS_LABEL, statusMessage, tone } from '@/lib/reservation-text';
-import { cancelReservation, fetchReservation, isOpen, savedReservation } from '@/lib/reservations';
+import { cancelReservation, endedWithoutPickup, fetchReservation, isOpen, noteClosed, savedReservation } from '@/lib/reservations';
 import { rupees } from '@/lib/shopper';
 
 export const Route = createFileRoute('/reservations/$reservationId')({
@@ -31,6 +32,9 @@ function ReservationPage() {
     mutationFn: () => cancelReservation(reservationId, saved!.token),
     onSuccess: (r) => qc.setQueryData(['reservation', reservationId], r),
   });
+
+  const status = query.data?.status;
+  useEffect(() => { if (endedWithoutPickup(status)) noteClosed(reservationId); }, [status, reservationId]);
 
   const back = (
     <Button variant="ghost" asChild className="-ml-4">

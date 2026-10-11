@@ -768,7 +768,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description OK. `status` may be `expired` (accepted, but the hold ran out). */
+                /** @description OK. `status` may be `expired` (accepted but the hold ran out, or the shop did not answer within 10 minutes). */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1474,7 +1474,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Public shop page (name, location, phone, products with status only) */
+        /** Public shop page (name, location, phone, products with status and how many can be reserved) */
         get: {
             parameters: {
                 query?: {
@@ -1501,6 +1501,8 @@ export interface paths {
                                 /** Format: double */
                                 price?: number | null;
                                 stock_status?: components["schemas"]["StockStatus"];
+                                /** @description Most a shopper can reserve now, in base units (pieces or grams): stock minus what other live requests hold, capped at the per-line limit (20 pieces, 10 kg). */
+                                reservable?: number;
                             }[];
                         };
                     };
