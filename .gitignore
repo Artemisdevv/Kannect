@@ -11,3 +11,6 @@ data/*.jpg
 data/*.png
 data/out/
 data/harvest.log
+ml/.venv/
+ml/cache/
+ml/out/
