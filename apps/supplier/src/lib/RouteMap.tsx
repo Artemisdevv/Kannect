@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { textElement } from "@/lib/safe-dom";
 import "leaflet/dist/leaflet.css";
 
 // The API may send a place with no coordinates (null), so accept that and check it before use.
 type Location = { lat: number | null; lng: number | null };
 type Point = { lat: number; lng: number };
+
+function tooltipText(value: string) {
+  const element = document.createElement("span");
+  element.textContent = value;
+  return element;
+}
 
 export type RouteEndpoint = {
   label: string;
@@ -52,7 +57,7 @@ export function RouteMap({ supplier, shop }: { supplier: RouteEndpoint; shop: Ro
         fillColor: "#633b13",
         fillOpacity: 1,
       })
-        .bindTooltip(textElement(supplier.label))
+        .bindTooltip(tooltipText(supplier.label))
         .addTo(endpoints);
       L.circleMarker(shopPoint, {
         radius: 8,
@@ -61,7 +66,7 @@ export function RouteMap({ supplier, shop }: { supplier: RouteEndpoint; shop: Ro
         fillColor: "#18834b",
         fillOpacity: 1,
       })
-        .bindTooltip(textElement(shop.label))
+        .bindTooltip(tooltipText(shop.label))
         .addTo(endpoints);
 
       const route = L.polyline([supplierPoint, shopPoint], {

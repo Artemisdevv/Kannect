@@ -30,6 +30,7 @@ const ACTION: Record<OrderStatus, { label: string; body: string; destructive?: b
   dispatched: { label: "Confirm dispatch", body: "Mark this order as dispatched only once goods have left your warehouse." },
   delivered: { label: "Mark delivered", body: "Mark delivered only when the retailer has received the goods." },
   new: { label: "", body: "" },
+  cancelled: { label: "", body: "" },
 };
 
 function OrderDetail() {
@@ -40,6 +41,12 @@ function OrderDetail() {
   const [pending, setPending] = useState<OrderStatus | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
   const order = orders.data?.find((o) => o.id === id);
+  const tracking = order?.tracking
+    .filter((event) => Number.isFinite(Date.parse(event.at)))
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at)) ?? [];
+  const latestEta = [...tracking]
+    .filter((event) => event.eta && Number.isFinite(Date.parse(event.eta)))
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0]?.eta;
 
   const mut = useMutation({
     mutationFn: (s: OrderStatus) => api.setOrderStatus(id, s),
@@ -103,7 +110,7 @@ function OrderDetail() {
             <div className="min-w-0 flex-1">
               <div className="product-name">{i.name}</div>
               <div className="product-sub">
-                <span className="rounded bg-muted px-1">{i.sku}</span> · {inr(i.unitPrice)} per {pack(i.packSize, i.unit)} pack
+                {i.sku && <><span className="rounded bg-muted px-1">{i.sku}</span> · </>}{inr(i.unitPrice)} per {pack(i.packSize, i.unit)} pack
               </div>
             </div>
             <div className="text-right">
@@ -125,16 +132,18 @@ function OrderDetail() {
       )}
 
       <h2 className="section-title mb-3 mt-7">Tracking</h2>
-      {order.tracking.length === 0 ? (
+      {latestEta && <p className="mb-3 text-sm text-muted-foreground">Expected {dateTime(latestEta)}</p>}
+      {tracking.length === 0 ? (
         <p className="text-sm text-muted-foreground">Tracking updates are not available yet.</p>
       ) : (
         <ol className="list-surface">
-          {[...order.tracking].reverse().map((t, i) => (
+          {[...tracking].reverse().map((t, i) => (
             <li key={i} className="product-row">
               <span className={`h-3 w-3 shrink-0 rounded-full ${i === 0 ? "bg-primary" : "bg-border-strong bg-muted-foreground/40"}`} aria-hidden />
               <div className="min-w-0 flex-1">
                 <div className="product-name">{ORDER_LABEL[t.status]}</div>
                 <div className="product-sub">{dateTime(t.at)}{t.note ? ` · ${t.note}` : ""}</div>
+                {t.eta && Number.isFinite(Date.parse(t.eta)) && <div className="product-sub">ETA: {dateTime(t.eta)}</div>}
               </div>
             </li>
           ))}
@@ -154,14 +163,14 @@ function OrderDetail() {
         />
       )}
 
-      {sup.data && order && (
+      {order && (
         <RouteMap
           supplier={{
-            label: sup.data.businessName,
-            location: sup.data.location
+            label: sup.data?.businessName ?? order.supplier?.name ?? "Supplier",
+            location: sup.data?.location ?? order.supplier?.location
           }}
           shop={{
-            label: `${order.retailer.name} (${order.retailer.area})`,
+            label: order.retailer.area ? `${order.retailer.name} (${order.retailer.area})` : order.retailer.name,
             location: order.retailer.location
           }}
         />

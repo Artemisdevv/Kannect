@@ -1,8 +1,7 @@
-// Shapes used by the supplier app. No OpenAPI contract was found in this repo,
-// so these mirror the routes named in the product brief. Align them with the
-// contract once it is available.
+// Supplier-facing UI models. The API service maps OpenAPI response shapes
+// into these view models.
 
-export type OrderStatus = "new" | "accepted" | "rejected" | "dispatched" | "delivered";
+export type OrderStatus = "new" | "accepted" | "rejected" | "dispatched" | "delivered" | "cancelled";
 
 export interface Supplier {
   id: string;
@@ -15,7 +14,7 @@ export interface Supplier {
   location?: { lat: number; lng: number } | null;
 }
 
-export type SupplierInput = Omit<Supplier, "id" | "phone">;
+export type SupplierInput = Omit<Supplier, "id" | "phone" | "location">;
 
 export interface Product {
   id: string;
@@ -54,12 +53,14 @@ export interface TrackingEvent {
   status: OrderStatus;
   at: string;
   note?: string;
+  eta?: string | null;
 }
 
 export interface Order {
   id: string;
   reference: string;
-  retailer: { name: string; area: string; location?: { lat: number | null; lng: number | null } };
+  supplier?: { name: string; location?: { lat: number; lng: number } | null };
+  retailer: { name: string; area: string; location?: { lat: number; lng: number } | null };
   items: OrderItem[];
   total: number;
   status: OrderStatus;

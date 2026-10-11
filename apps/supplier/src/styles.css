@@ -231,3 +231,30 @@ a {
     background: white;
   }
 }
+
+.order-route {
+  margin-top: 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 14px;
+  background: var(--card);
+}
+.order-route h3 { font-size: 14px; font-weight: 700; }
+.order-route-label, .order-route-warning, .order-route > p {
+  margin-top: 4px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.order-route-map {
+  height: 220px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--muted);
+}
+.order-route-endpoints { display: grid; gap: 6px; margin-top: 10px; font-size: 11px; }
+.order-route-endpoints span { display: flex; align-items: center; gap: 7px; }
+.order-route-endpoints i { width: 10px; height: 10px; border-radius: 50%; background: var(--primary); }
+.order-route-endpoints .shop-point { background: var(--success); }
+.order-route-warning { color: var(--warning); }
+.leaflet-container { font: inherit; }

@@ -59,9 +59,10 @@ const ORDER_TONE: Record<OrderStatus, string> = {
   dispatched: "bg-accent text-accent-foreground",
   delivered: "bg-accent text-accent-foreground",
   rejected: "bg-danger-surface text-destructive",
+  cancelled: "bg-muted text-muted-foreground",
 };
 export const ORDER_LABEL: Record<OrderStatus, string> = {
-  new: "New", accepted: "Accepted", rejected: "Rejected", dispatched: "Dispatched", delivered: "Delivered",
+  new: "New", accepted: "Accepted", rejected: "Rejected", dispatched: "Dispatched", delivered: "Delivered", cancelled: "Cancelled",
 };
 export function OrderPill({ status }: { status: OrderStatus }) {
   return <span className={cn("status-pill", ORDER_TONE[status])}>{status === "delivered" && "✓ "}{ORDER_LABEL[status]}</span>;

@@ -7,6 +7,7 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   dispatched: ["delivered"],
   delivered: [],
   rejected: [],
+  cancelled: [],
 };
 
 export function canTransition(from: OrderStatus, to: OrderStatus) {

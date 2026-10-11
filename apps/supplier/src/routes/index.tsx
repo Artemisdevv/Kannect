@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, MapPin, Package, TrendingUp, Users } from "lucide-react";
+import { ChevronRight, Package, TrendingUp, Users } from "lucide-react";
 import { AppShell, PageHeader } from "@/components/kn/AppShell";
 import { EmptyState, ErrorState, ListSkeleton, OrderPill } from "@/components/kn/states";
 import { q } from "@/lib/api/service";
@@ -94,7 +94,6 @@ function HomeBody() {
           { to: "/catalogue", icon: Package, t: "Catalogue & prices", s: "Add products, edit wholesale prices" },
           { to: "/demand", icon: TrendingUp, t: "Area demand", s: "Anonymised demand across shops" },
           { to: "/group-buys", icon: Users, t: "Group buys", s: "Tiered prices for pooled orders" },
-          { to: "/map", icon: MapPin, t: "Supplier Locations", s: "View warehouse and distribution centers" },
         ].map(({ to, icon: I, t, s }) => (
           <Link key={to} to={to} className="product-row">
             <div className="product-art"><I className="h-[21px] w-[21px]" aria-hidden /></div>

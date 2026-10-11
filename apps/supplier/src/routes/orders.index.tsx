@@ -9,8 +9,8 @@ import { seo } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import type { OrderStatus } from "@/lib/api/types";
 
-const FILTERS: (OrderStatus | "all")[] = ["all", "new", "accepted", "dispatched", "delivered", "rejected"];
-const URGENCY: Record<OrderStatus, number> = { new: 0, accepted: 1, dispatched: 2, delivered: 3, rejected: 4 };
+const FILTERS: (OrderStatus | "all")[] = ["all", "new", "accepted", "dispatched", "delivered", "rejected", "cancelled"];
+const URGENCY: Record<OrderStatus, number> = { new: 0, accepted: 1, dispatched: 2, delivered: 3, rejected: 4, cancelled: 5 };
 
 export const Route = createFileRoute("/orders/")({
   validateSearch: (s: Record<string, unknown>): { status?: OrderStatus } =>
