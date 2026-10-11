@@ -1,5 +1,7 @@
 # Frontend Stack: Prebuilt Components, Lovable-Friendly
 
+Four sites (landing, consumer, retailer, supplier), see [apps.md](./apps.md). All share this stack and one theme.
+
 Rule: **use prebuilt components, do not hand-build UI.** Fast to ship and easy to generate in Lovable.
 
 | Concern | Choice |

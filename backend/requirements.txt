@@ -7,3 +7,5 @@ alembic==1.14.0
 pydantic-settings==2.6.1
 python-multipart==0.0.20
 PyJWT==2.10.1
+google-genai==2.29.0
+pillow==12.3.0
