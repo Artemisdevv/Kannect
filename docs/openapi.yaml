@@ -537,6 +537,14 @@ paths:
         each with a visible-count estimate. Owner confirms (one tap per row), then client calls POST /shop/products/bulk
         with count_source = photo_estimate. Suggest only, never writes stock.
         Counts only cover what is visible from the front, so treat as an estimate, not a precise stock.
+      parameters:
+        - name: thorough
+          in: query
+          schema: { type: boolean, default: true }
+          description: |
+            true (default): after reading the whole photo, re-read four zoomed overlapping tiles to identify
+            small labels (about 5 AI calls per photo, roughly 20 s). Counts still come from the whole-photo read.
+            false: single fast read.
       requestBody:
         required: true
         content:
@@ -575,6 +583,8 @@ paths:
                         visible_count: { type: integer, description: "Facings/units counted in the photo" }
                         suggested_level: { type: string, enum: [plenty, some, few] }
                         confidence: { type: number, minimum: 0, maximum: 1 }
+                        loose: { type: boolean, description: "Unlabelled goods (produce, eggs, sacks). `match` is one of the shop's loose tiles, or null when there is no tile yet. Never needs a barcode scan." }
+                        uncertain: { type: boolean, description: "The model named a brand but could not read the pack clearly. `alternatives` are suggestions to confirm, never an automatic match." }
                         needs_scan: { type: boolean, description: "True when no confident match: UI prompts the owner to scan this item's barcode" }
                   image_quality: { type: string, enum: [good, blurry, too_dark, too_far], description: "Prompt the owner to retake when not good" }
 

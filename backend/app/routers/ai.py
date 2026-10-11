@@ -1,8 +1,9 @@
 """AI suggestion endpoints. They only suggest; the owner confirms before anything is saved."""
 
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -11,7 +12,14 @@ from app.config import Settings, get_settings
 from app.db import get_db
 from app.models import Product
 from app.routers.catalogue import _product_response
-from app.services.catalogue_match import CatalogueIndex, classify, norm
+from app.services.catalogue_match import CatalogueIndex, classify
+from app.services.shelf_pipeline import (
+    is_loose,
+    make_tiles,
+    match_loose,
+    merge_duplicates,
+    merge_with_tiles,
+)
 from app.services.shelf_vision import (
     Detection,
     GeminiShelfVision,
@@ -25,6 +33,7 @@ from app.services.shelf_vision import (
 router = APIRouter(prefix="/shop/ai", tags=["ai"])
 
 MAX_IMAGES = 6
+UNSURE_MIN = 70  # an unread brand only offers catalogue options at least this close
 MAX_BYTES = 10 * 1024 * 1024
 
 
@@ -32,26 +41,15 @@ def get_shelf_vision(settings: Settings = Depends(get_settings)) -> ShelfVision:
     return GeminiShelfVision(settings)
 
 
-def _merge_duplicates(detections: list[Detection]) -> list[Detection]:
-    """Drop unnamed items and merge repeats of one product (models split rows of packs)."""
-    merged: dict[str, Detection] = {}
-    for det in detections:
-        key = norm(f"{det.brand} {det.name} {det.size}")
-        if not key:
-            continue
-        if key in merged:
-            first = merged[key]
-            first.visible_count += max(1, det.visible_count)
-            first.confidence = max(first.confidence, det.confidence)
-            first.readable = first.readable or det.readable
-        else:
-            merged[key] = det.model_copy(update={"visible_count": max(1, det.visible_count)})
-    return list(merged.values())
+_merge_duplicates = merge_duplicates  # kept for scripts that import it from here
+
+TILE_WORKERS = 6
 
 
 @router.post("/shelf-photo")
 def shelf_photo(
     images: list[UploadFile] = File(...),
+    thorough: bool = Query(True, description="Also re-read zoomed tiles to identify small labels"),
     db: Session = Depends(get_db),
     vision: ShelfVision = Depends(get_shelf_vision),
     _: AuthenticatedOwner = Depends(require_retailer),
@@ -70,28 +68,48 @@ def shelf_photo(
             raise HTTPException(status_code=400, detail="Files must be images") from None
 
     quality = worst_quality([image_quality(p) for p in prepared])
-    result = vision.analyze(prepared)
+    whole = vision.analyze(prepared).detections
+    found = whole
+    if thorough:
+        found = merge_with_tiles(whole, _read_tiles(vision, prepared))
 
     products = list(db.scalars(select(Product).where(Product.is_active.is_(True))).all())
-    index = CatalogueIndex(products)
+    index = CatalogueIndex([p for p in products if p.barcode])
+    loose_products = [p for p in products if not p.barcode]
 
     detections: list[dict[str, Any]] = []
-    for det in _merge_duplicates(result.detections):
+    for det in merge_duplicates(found):
         label = " ".join(p for p in (det.brand, det.name, det.size) if p).strip()
         base = {
             "label": label,
             "visible_count": max(1, det.visible_count),
             "suggested_level": suggested_level(det.visible_count),
             "confidence": max(0.0, min(1.0, det.confidence)),
+            "loose": False,
+            "uncertain": False,
         }
-        if det.loose:
-            # Loose goods have no barcode: the app maps them to a picture tile
-            detections.append({**base, "match": None, "alternatives": [], "needs_scan": False})
+        if is_loose(det):
+            # No barcode: map to one of the shop's picture tiles (Tomato, Egg, Matta rice...)
+            tile = match_loose(det, loose_products)
+            detections.append(
+                {**base, "loose": True, "match": _product_response(tile) if tile else None,
+                 "alternatives": [], "needs_scan": False}  # fmt: skip
+            )
             continue
-        if not det.readable:
+        if not det.readable and not det.brand.strip():
+            # Nothing usable (e.g. "small bottles"): the owner scans it
             detections.append({**base, "match": None, "alternatives": [], "needs_scan": True})
             continue
         best, alternatives, needs_scan = classify(index.match(det.brand, det.name, det.size))
+        if not det.readable:
+            # The model named a brand but hedged. Keep the reading as a suggestion to confirm,
+            # never an automatic match, and drop weak guesses.
+            options = [m for m in ([best] if best else []) + alternatives if m.score >= UNSURE_MIN]
+            detections.append(
+                {**base, "uncertain": True, "match": None, "needs_scan": True,
+                 "alternatives": [_product_response(m.product) for m in options]}  # fmt: skip
+            )
+            continue
         detections.append(
             {
                 **base,
@@ -102,3 +120,19 @@ def shelf_photo(
         )
 
     return {"detections": detections, "image_quality": quality}
+
+
+def _read_tiles(vision: ShelfVision, prepared: list[bytes]) -> list[list[Detection]]:
+    """Re-read zoomed tiles of every photo in parallel. Best effort: a failed tile is skipped."""
+    tiles = [t for p in prepared for t in make_tiles(p)]
+
+    def read(tile: bytes) -> list[Detection]:
+        try:
+            return vision.analyze([tile]).detections
+        except Exception:
+            return []
+
+    with ThreadPoolExecutor(max_workers=TILE_WORKERS) as pool:
+        return list(pool.map(read, tiles))
+
+
