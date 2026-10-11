@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError, createProduct, shelfPhoto } from "@/api";
+import { PhotoPicker } from "./photo-picker";
 import { Shell } from "@/components/kannect/shell";
 import { Button } from "@/components/ui/button";
 import { useAddProductsBulk, useRecount } from "@/features/queries";
@@ -197,23 +198,10 @@ export function OnboardPage() {
       {!rows && (
         <div className="space-y-4 mt-3">
           <p className="text-sm text-muted-foreground">
-            Take clear photos of your shelves, up to 6. We guess what each product is, and you confirm
+            Take clear photos of your shelves, up to 6, with the camera or from your gallery. We guess what each product is, and you confirm
             before anything is saved.
           </p>
-          <label className="list-surface flex items-center gap-3 p-4 cursor-pointer">
-            <Camera />
-            <span className="text-sm">
-              {files.length ? `${files.length} photo${files.length === 1 ? "" : "s"} selected` : "Take or choose photos"}
-            </span>
-            <input
-              className="sr-only"
-              type="file"
-              accept="image/*"
-              capture="environment"
-              multiple
-              onChange={(e) => setFiles(Array.from(e.target.files ?? []).slice(0, 6))}
-            />
-          </label>
+          <PhotoPicker files={files} onChange={setFiles} />
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={thorough} onChange={(e) => setThorough(e.target.checked)} />
             Look closely for small labels (slower: about 30 seconds a photo)
