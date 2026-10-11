@@ -1,12 +1,12 @@
-# Kadence Consumer App
+# KadaNet Partner Hub
 
-we're building the consumer app now. keep the kadanet design system specs
+Build the KadaNet Supplier app: a mobile-first, installable PWA for distributors and wholesalers who supply local retailers, following the attached KadaNet Design System Specification and product requirements.
 
 This project was built with [Lovable](https://lovable.dev).
 
 ## Build with Lovable
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/a5f75594-e58e-4397-afb4-5fdeeb4991b8).
+Continue developing this project in the [Lovable editor](https://lovable.dev/projects/8fd95d1d-a2c5-47d3-b7fa-1df0038c8276).
 
 - **Ship faster**: describe what you want to build and Lovable handles the code.
 - **Stay in sync**: every change made in Lovable is committed straight to this repository.
