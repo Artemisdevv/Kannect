@@ -77,7 +77,7 @@ export function ScanDialog({
 
   // Camera runs only while the scan stage is showing.
   useEffect(() => {
-    if (!open || stage.name !== "scan" || !video.current) return;
+    if (!open || stage.name !== "scan" || !video.current || getScanner().kind === "native") return;
     let stop: (() => void) | undefined;
     let cancelled = false;
     getScanner()
@@ -92,6 +92,16 @@ export function ScanDialog({
     // of the render in which the stage became "scan".
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, stage.name]);
+
+  // On Android the OS scanner opens full screen after a tap, then hands back the code.
+  const openNative = async () => {
+    try {
+      const code = await getScanner().scanOnce?.();
+      if (code) await handleCode(code);
+    } catch {
+      toast.error("Could not open the scanner. Allow camera access, or type the number.");
+    }
+  };
 
   useEffect(() => {
     if (open) {
@@ -115,7 +125,11 @@ export function ScanDialog({
 
         {stage.name === "scan" && (
           <>
-            {cameraError ? (
+            {getScanner().kind === "native" ? (
+              <Button className="w-full h-14" onClick={() => void openNative()}>
+                <ScanLine /> Open camera scanner
+              </Button>
+            ) : cameraError ? (
               <p className="text-sm text-muted-foreground">
                 The camera isn't available here. Type the number printed under the barcode.
               </p>

@@ -11,9 +11,15 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "gen:api": "openapi-typescript ../../docs/openapi.yaml -o src/api/schema.d.ts"
+    "gen:api": "openapi-typescript ../../docs/openapi.yaml -o src/api/schema.d.ts",
+    "android:sync": "vite build && cap sync android",
+    "android:open": "cap open android",
+    "android:apk": "bun run android:sync && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
+    "@capacitor-mlkit/barcode-scanning": "^8.2.1",
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -68,6 +74,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/vite": "^4.2.1",
     "@testing-library/jest-dom": "^6.6.0",
@@ -76,7 +83,6 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.2.0",
-    "vite-plugin-pwa": "^2.0.0",
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",
@@ -89,6 +95,7 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
     "vite": "8.1.5",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^4.1.10"
   }
 }
