@@ -301,3 +301,55 @@ def test_supplier_token_cannot_access_retailer_catalogue_routes():
     )
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "unauthorized"
+
+
+def test_create_product_rejects_near_duplicate_with_candidates():
+    existing = _product(barcode="8901023010484", name="Cinthol soap", brand="Godrej", size="100g")
+    session = FakeSession(products=[existing])
+    response = _client(session).post(
+        "/api/v1/catalogue/products",
+        headers=AUTH_HEADERS,
+        json={"barcode": "8901023099999", "name": "Cinthol Soap", "brand": "Godrej",
+              "size": "100 g", "unit": "piece"},
+    )  # fmt: skip
+    assert response.status_code == 409
+    body = response.json()["error"]
+    assert body["code"] == "similar_product"
+    assert body["candidates"][0]["barcode"] == "8901023010484"
+    assert session.commits == 0
+
+
+def test_create_product_allow_similar_creates_anyway():
+    existing = _product(name="Cinthol soap", brand="Godrej", size="100g")
+    session = FakeSession(products=[existing])
+    response = _client(session).post(
+        "/api/v1/catalogue/products",
+        headers=AUTH_HEADERS,
+        json={"barcode": "8901023099999", "name": "Cinthol soap", "brand": "Godrej",
+              "size": "100g", "unit": "piece", "allow_similar": True},
+    )  # fmt: skip
+    assert response.status_code == 201
+    assert session.commits == 1
+    assert not hasattr(session.added[0], "allow_similar")
+
+
+def test_create_product_different_size_is_not_a_duplicate():
+    existing = _product(name="Cinthol soap", brand="Godrej", size="100g")
+    session = FakeSession(products=[existing])
+    response = _client(session).post(
+        "/api/v1/catalogue/products",
+        headers=AUTH_HEADERS,
+        json={"barcode": "8901023099999", "name": "Cinthol soap", "brand": "Godrej",
+              "size": "150g", "unit": "piece"},
+    )  # fmt: skip
+    assert response.status_code == 201
+
+
+@pytest.mark.parametrize("barcode", ["abc123456", "123", "12345678901234567"])
+def test_create_product_rejects_malformed_barcode(barcode):
+    response = _client(FakeSession()).post(
+        "/api/v1/catalogue/products",
+        headers=AUTH_HEADERS,
+        json={"barcode": barcode, "name": "X", "unit": "piece"},
+    )
+    assert response.status_code == 400

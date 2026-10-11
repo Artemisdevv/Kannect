@@ -161,13 +161,20 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/ProductInput" }
+            schema:
+              allOf:
+                - { $ref: "#/components/schemas/ProductInput" }
+                - type: object
+                  properties:
+                    allow_similar: { type: boolean, default: false, description: "Create even if a near duplicate exists (a different variant). Barcode must be 6 to 14 digits when given." }
       responses:
         "201":
           description: Created
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Product" }
+        "409":
+          description: Barcode already exists, or a similar product exists (code `similar_product`, with `candidates` to use instead)
 
   /catalogue/starter-packs:
     get:
