@@ -106,6 +106,12 @@ def shelf_photo(
             "confidence": max(0.0, min(1.0, det.confidence)),
             "loose": False,
             "uncertain": False,
+            # What the model read, split out, so the app can offer "add this as a new product"
+            # for items the catalogue does not have (confirmed by the owner, never automatic).
+            "read": {
+                "brand": det.brand, "name": det.name, "size": det.size, "category": det.category,
+            },
+            "readable": det.readable,
         }
         if is_loose(det):
             # No barcode: map to one of the shop's picture tiles (Tomato, Egg, Matta rice...)
