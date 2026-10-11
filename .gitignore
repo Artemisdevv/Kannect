@@ -5,3 +5,9 @@ __pycache__/
 .ruff_cache/
 .venv/
 node_modules/
+data/seed/off_candidates.jsonl
+data/*.jpeg
+data/*.jpg
+data/*.png
+data/out/
+data/harvest.log

@@ -4,6 +4,8 @@ Stack (per `winning_solution.md`): PWA + Capacitor (Android), React + Vite + Tai
 
 API contract: [`api-contract.md`](./api-contract.md) and [`openapi.yaml`](./openapi.yaml). Everyone builds against it concurrently.
 
+> **Scope update:** three PWAs (consumer, retailer, supplier) plus a landing page with install buttons, and a full supplier side (catalogue, orders, tracking, invoices, demand, group buys). See [apps.md](./apps.md). Shreyas owns all four frontends on Lovable; backend supplier APIs are Aswin (orders, catalogue) and Adnan (demand, group buys).
+
 ## Ownership at a glance
 
 | Person | Area | Owns |

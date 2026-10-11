@@ -35,6 +35,9 @@ Source of truth: [`openapi.yaml`](./openapi.yaml). This page is the quick read.
 | Billing | `POST/GET /shop/bills`, `GET /shop/bills/{id}` | Aswin |
 | Offline sync | `POST /shop/sync` | Aswin |
 | Export | `GET /shop/export` | Aswin |
+| Retailer to supplier | `GET /suppliers`, `GET /suppliers/{id}/products`, `GET /shop/reorder-suggestions`, `POST/GET /shop/orders`, `POST /shop/orders/{id}/cancel|receive`, `GET /shop/orders/{id}/invoice`, `GET /group-buys`, `POST /group-buys/{id}/join` | Aswin |
+| Supplier app | `POST/GET/PATCH /supplier`, `GET/POST /supplier/products`, `PATCH /supplier/products/{id}`, `GET /supplier/orders`, `POST /supplier/orders/{id}/status`, `GET /supplier/orders/{id}/invoice` | Aswin |
+| Supplier insight | `GET /supplier/demand`, `GET/POST /supplier/group-buys` | Adnan |
 | Shopper search | `GET /search`, `GET /search/referral`, `GET /shops/{id}` | Adnan |
 | E-bill | `GET /ebills/{id}` + HTML page `/b/{id}` | Adnan |
 | AI onboarding | `POST /shop/ai/shelf-photo` (headline demo feature) | Adnan |
@@ -54,3 +57,30 @@ Source of truth: [`openapi.yaml`](./openapi.yaml). This page is the quick read.
 4. `GET /search?q=soap&lat&lng` -> shops with status, nearest first.
 5. Shop runs out -> `GET /search/referral?shop_id&product_id` -> next shop.
 6. `GET /shop/export` -> data download.
+
+## Decisions
+
+Settled between Aswin and Adnan. Change via PR, same as the spec.
+
+### Auth tokens (JWT)
+- Algorithm **HS256**, signed with `JWT_SECRET`. Always decode with `algorithms=["HS256"]` pinned (rejects `alg: none`).
+- Claims: `sub` = owner phone in E.164 (`+919876543210`), `role` = `retailer` or `supplier`, `iss` = `kadanet`, `typ` = `access`, `iat`, `exp` (`JWT_EXPIRE_MINUTES`, default 7 days). No refresh token for the hackathon.
+- **No `shop_id` in the token.** A new owner has no shop yet (`verify` returns `shop: null`). The auth dependency resolves the shop from the phone on each request, so creating the shop never requires re-issuing the token. One phone owns one shop for the pilot, so the shop's owner phone must be unique.
+- The API refuses to start with `JWT_SECRET=change-me` outside local development.
+
+### Inactive catalogue products
+- Barcode lookup, catalogue name search and public search exclude `is_active = false`.
+- If an inactive product has `merged_into_id`, follow the chain and return the active product, so old scans keep working.
+- A shop's own `GET /shop/products` still lists products it already has, flagged inactive, so history stays visible.
+- Bills and stock events keep their references and snapshots. Billing an inactive product with no merge target returns `409 conflict`.
+- Products are never hard-deleted (`ON DELETE RESTRICT`).
+
+### Starter packs
+- **Data owner: Adnan (#39).** Curated JSON at `data/seed/packs/<shop_type>.json`. Each item: `barcode` (null for loose goods), `name`, `name_ml`, `brand`, `size`, `category`, `unit`, `mrp`, `image_url`, `mrp_source` (`verified` or `demo`). Adnan also supplies the loader that upserts catalogue products and pack membership.
+- **Schema and endpoints owner: Aswin (#37).** Membership table (for example `starter_pack_item(shop_type, product_id, position)`), `GET /catalogue/starter-packs` and `POST /shop/products/bulk`. Build against a few fixture rows until real packs land.
+- First packs: `grocery` and `provision`.
+
+### Apps and hostnames
+- Three PWAs (consumer, retailer, supplier) plus a landing page, each on its own host. See [apps.md](./apps.md).
+- Retailer endpoints require role `retailer`, `/supplier/*` requires role `supplier`, `/search`, `/shops/:id`, `/ebills/:id` are public.
+- One role per phone for the pilot. The auth dependency resolves the shop (retailer) or supplier (supplier) from the phone.
