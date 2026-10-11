@@ -10,7 +10,7 @@ from app.auth import create_access_token
 from app.config import Settings, get_settings
 from app.db import get_db
 from app.errors import install
-from app.models import Product, Shop
+from app.models import OwnerIdentity, Product, Shop, Supplier
 from app.routers.catalogue import router
 
 TEST_SETTINGS = Settings(app_env="test", jwt_secret="catalogue-test-secret")
@@ -57,6 +57,7 @@ class FakeSession:
         shop=None,
         duplicate=None,
         commit_error=None,
+        role="retailer",
     ):
         self.barcode_product = barcode_product
         self.products = products or []
@@ -64,6 +65,7 @@ class FakeSession:
         self.shop = shop
         self.duplicate = duplicate
         self.commit_error = commit_error
+        self.role = role
         self.statements = []
         self.added = []
         self.commits = 0
@@ -74,6 +76,8 @@ class FakeSession:
         entity = statement.column_descriptions[0].get("entity")
         if entity is Shop:
             return self.shop
+        if entity is Supplier:
+            return None
         if entity is Product:
             if statement.column_descriptions[0]["name"] == "Product":
                 return self.barcode_product
@@ -81,6 +85,8 @@ class FakeSession:
         return self.duplicate.id if self.duplicate else None
 
     def get(self, model, key):
+        if model is OwnerIdentity:
+            return OwnerIdentity(phone=key, role=self.role)
         assert model is Product
         return self.by_id.get(key)
 
@@ -282,4 +288,16 @@ def test_create_product_handles_concurrent_duplicate_barcode():
 def test_catalogue_requires_valid_bearer_token(headers, method, path, kwargs):
     response = getattr(_client(FakeSession()), method)(path, headers=headers, **kwargs)
     assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthorized"
+
+
+def test_supplier_token_cannot_access_retailer_catalogue_routes():
+    token = create_access_token(OWNER_PHONE, TEST_SETTINGS, role="supplier")
+    supplier_headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    response = _client(FakeSession(role="supplier")).get(
+        "/api/v1/catalogue/products?q=soap", headers=supplier_headers
+    )
+    assert response.status_code == 403
     assert response.json()["error"]["code"] == "unauthorized"

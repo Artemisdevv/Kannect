@@ -5,7 +5,13 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-_CODES = {400: "invalid_request", 401: "unauthorized", 404: "not_found", 409: "conflict"}
+_CODES = {
+    400: "invalid_request",
+    401: "unauthorized",
+    403: "unauthorized",
+    404: "not_found",
+    409: "conflict",
+}
 
 
 def _body(code: str, message: str) -> dict:

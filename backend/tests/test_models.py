@@ -7,9 +7,11 @@ from app.db import Base
 
 def test_domain_models_register_and_relationships_configure():
     configure_mappers()
-    assert len(models.__all__) == 6
+    assert len(models.__all__) == 8
     assert set(Base.metadata.tables) == {
         "shop",
+        "owner_identity",
+        "supplier",
         "product",
         "shop_product",
         "stock_event",

@@ -10,7 +10,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth import AuthenticatedOwner, get_current_owner
+from app.auth import AuthenticatedOwner, require_retailer
 from app.db import get_db
 from app.models import Product
 
@@ -71,7 +71,7 @@ def _active_canonical_product(db: Session, product: Product) -> Product | None:
 def lookup_barcode(
     barcode: str,
     db: Session = Depends(get_db),
-    _: AuthenticatedOwner = Depends(get_current_owner),
+    _: AuthenticatedOwner = Depends(require_retailer),
 ) -> dict[str, Any]:
     product = db.scalar(select(Product).where(Product.barcode == barcode))
     canonical = _active_canonical_product(db, product) if product is not None else None
@@ -84,7 +84,7 @@ def lookup_barcode(
 def list_products(
     q: str = Query(...),
     db: Session = Depends(get_db),
-    _: AuthenticatedOwner = Depends(get_current_owner),
+    _: AuthenticatedOwner = Depends(require_retailer),
 ) -> dict[str, list[dict[str, Any]]]:
     pattern = f"%{q}%"
     statement = (
@@ -103,7 +103,7 @@ def list_products(
 def create_product(
     request: ProductInput,
     db: Session = Depends(get_db),
-    _: AuthenticatedOwner = Depends(get_current_owner),
+    _: AuthenticatedOwner = Depends(require_retailer),
 ) -> dict[str, Any]:
     if request.barcode is not None:
         existing = db.scalar(select(Product.id).where(Product.barcode == request.barcode))

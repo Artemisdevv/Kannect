@@ -61,6 +61,41 @@ class Shop(Base):
     )
 
 
+class OwnerIdentity(Base):
+    """Persist the selected application role before a profile is created."""
+
+    __tablename__ = "owner_identity"
+
+    phone: Mapped[str] = mapped_column(String(32), primary_key=True)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("role IN ('retailer', 'supplier')", name="ck_owner_identity_role"),
+    )
+
+
+class Supplier(Base):
+    __tablename__ = "supplier"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        ID_TYPE, primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()")
+    )
+    name: Mapped[str | None] = mapped_column(String(255))
+    contact_name: Mapped[str | None] = mapped_column(String(255))
+    phone: Mapped[str | None] = mapped_column(String(32))
+    address: Mapped[str | None] = mapped_column(Text)
+    location: Mapped[Any | None] = mapped_column(Geometry("POINT", srid=4326, spatial_index=False))
+    delivery_radius_m: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("10000")
+    )
+    gstin: Mapped[str | None] = mapped_column(String(32))
+
+    __table_args__ = (
+        UniqueConstraint("phone", name="uq_supplier_phone"),
+        Index("ix_supplier_location_gist", "location", postgresql_using="gist"),
+    )
+
+
 class Product(Base):
     __tablename__ = "product"
 

@@ -16,7 +16,7 @@ from app.auth import (
 from app.config import DEFAULT_JWT_SECRET, Settings, get_settings, validate_runtime_settings
 from app.db import get_db
 from app.errors import install
-from app.models import Shop
+from app.models import OwnerIdentity, Shop, Supplier
 
 TEST_SETTINGS = Settings(app_env="test", jwt_secret="test-secret", jwt_expire_minutes=60)
 
@@ -25,6 +25,7 @@ def _claims(**overrides):
     now = datetime.now(timezone.utc)
     claims = {
         "sub": "+919876543210",
+        "role": "retailer",
         "iss": "kadanet",
         "typ": "access",
         "iat": int(now.timestamp()),
@@ -39,6 +40,7 @@ def test_create_and_verify_access_token():
     claims = verify_access_token(token, TEST_SETTINGS)
 
     assert claims["sub"] == "+919876543210"
+    assert claims["role"] == "retailer"
     assert claims["iss"] == "kadanet"
     assert claims["typ"] == "access"
     assert claims["exp"] - claims["iat"] == 60 * 60
@@ -49,6 +51,28 @@ def test_token_creation_requires_e164_phone():
     for phone in ("919876543210", "+0123", "+1234567890123456", "+1 234"):
         with pytest.raises(ValueError):
             create_access_token(phone, TEST_SETTINGS)
+
+
+def test_token_creation_rejects_unsupported_role():
+    with pytest.raises(ValueError, match="Role"):
+        create_access_token("+919876543210", TEST_SETTINGS, role="admin")
+
+
+def test_supplier_access_token_has_supplier_role():
+    token = create_access_token("+919876543210", TEST_SETTINGS, role="supplier")
+    assert verify_access_token(token, TEST_SETTINGS)["role"] == "supplier"
+
+
+@pytest.mark.parametrize("role", [None, "admin", ["retailer"]])
+def test_invalid_or_missing_role_claim_is_rejected(role):
+    claims = _claims()
+    if role is None:
+        claims.pop("role")
+    else:
+        claims["role"] = role
+    token = jwt.encode(claims, TEST_SETTINGS.jwt_secret, algorithm="HS256")
+    with pytest.raises(InvalidAccessToken):
+        verify_access_token(token, TEST_SETTINGS)
 
 
 def test_expired_token_is_rejected():
@@ -91,13 +115,20 @@ def test_unsigned_token_is_rejected():
 
 
 class FakeSession:
-    def __init__(self, shop):
+    def __init__(self, shop=None, supplier=None, identity=None):
         self.shop = shop
+        self.supplier = supplier
+        self.identity = identity or OwnerIdentity(phone="+919876543210", role="retailer")
         self.queries = []
+
+    def get(self, model, key):
+        assert model is OwnerIdentity
+        return self.identity if self.identity.phone == key else None
 
     def scalar(self, statement):
         self.queries.append(statement)
-        return self.shop
+        model = statement.column_descriptions[0].get("entity")
+        return self.shop if model is Shop else self.supplier
 
 
 def _auth_test_app(fake_session):
@@ -112,7 +143,12 @@ def _auth_test_app(fake_session):
 
     @app.get("/private")
     def private(owner: AuthenticatedOwner = Depends(get_current_owner)):
-        return {"phone": owner.phone, "shop_id": str(owner.shop.id) if owner.shop else None}
+        return {
+            "phone": owner.phone,
+            "role": owner.role,
+            "shop_id": str(owner.shop.id) if owner.shop else None,
+            "supplier_id": str(owner.supplier.id) if owner.supplier else None,
+        }
 
     return app
 
@@ -136,8 +172,13 @@ def test_owner_dependency_resolves_shop_by_phone():
         headers={"Authorization": f"Bearer {create_access_token(shop.phone, TEST_SETTINGS)}"},
     )
     assert response.status_code == 200
-    assert response.json() == {"phone": shop.phone, "shop_id": str(shop.id)}
-    assert len(session.queries) == 1
+    assert response.json() == {
+        "phone": shop.phone,
+        "role": "retailer",
+        "shop_id": str(shop.id),
+        "supplier_id": None,
+    }
+    assert len(session.queries) == 2
 
 
 def test_new_owner_token_resolves_without_shop():
@@ -148,8 +189,46 @@ def test_new_owner_token_resolves_without_shop():
         headers={"Authorization": f"Bearer {create_access_token('+919876543210', TEST_SETTINGS)}"},
     )
     assert response.status_code == 200
-    assert response.json() == {"phone": "+919876543210", "shop_id": None}
-    assert len(session.queries) == 1
+    assert response.json() == {
+        "phone": "+919876543210",
+        "role": "retailer",
+        "shop_id": None,
+        "supplier_id": None,
+    }
+    assert len(session.queries) == 2
+
+
+def test_supplier_dependency_resolves_supplier_by_phone():
+    supplier = Supplier(id=uuid.uuid4(), phone="+919876543210", name="Wholesale Co")
+    identity = OwnerIdentity(phone=supplier.phone, role="supplier")
+    session = FakeSession(supplier=supplier, identity=identity)
+    client = TestClient(_auth_test_app(session))
+    response = client.get(
+        "/private",
+        headers={
+            "Authorization": "Bearer "
+            + create_access_token(supplier.phone, TEST_SETTINGS, role="supplier")
+        },
+    )
+    assert response.status_code == 200
+    assert response.json() == {
+        "phone": supplier.phone,
+        "role": "supplier",
+        "shop_id": None,
+        "supplier_id": str(supplier.id),
+    }
+    assert len(session.queries) == 2
+
+
+def test_auth_rejects_phone_registered_for_other_role():
+    supplier = Supplier(id=uuid.uuid4(), phone="+919876543210", name="Wholesale Co")
+    client = TestClient(_auth_test_app(FakeSession(supplier=supplier)))
+    response = client.get(
+        "/private",
+        headers={"Authorization": f"Bearer {create_access_token(supplier.phone, TEST_SETTINGS)}"},
+    )
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthorized"
 
 
 def test_invalid_bearer_token_uses_contract_error():
@@ -157,6 +236,40 @@ def test_invalid_bearer_token_uses_contract_error():
     response = client.get("/private", headers={"Authorization": "Bearer invalid"})
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "unauthorized"
+
+
+def test_role_guard_allows_matching_role_and_rejects_other_role():
+    from app.auth import require_retailer, require_supplier
+
+    app = FastAPI()
+    install(app)
+
+    def override_db():
+        yield FakeSession(
+            None,
+            identity=OwnerIdentity(phone="+919876543210", role="supplier"),
+        )
+
+    app.dependency_overrides[get_db] = override_db
+    app.dependency_overrides[get_settings] = lambda: TEST_SETTINGS
+
+    @app.get("/retailer")
+    def retailer(_owner: AuthenticatedOwner = Depends(require_retailer)):
+        return {"ok": True}
+
+    @app.get("/supplier")
+    def supplier(_owner: AuthenticatedOwner = Depends(require_supplier)):
+        return {"ok": True}
+
+    client = TestClient(app)
+    supplier_token = create_access_token(
+        "+919876543210", TEST_SETTINGS, role="supplier"
+    )
+    denied = client.get("/retailer", headers={"Authorization": f"Bearer {supplier_token}"})
+    allowed = client.get("/supplier", headers={"Authorization": f"Bearer {supplier_token}"})
+    assert denied.status_code == 403
+    assert denied.json()["error"]["code"] == "unauthorized"
+    assert allowed.status_code == 200
 
 
 def test_default_secret_is_allowed_only_for_local_development():
