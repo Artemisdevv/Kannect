@@ -11,3 +11,6 @@ pythonpath = ["."]
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["fastapi.Depends", "fastapi.File", "fastapi.Query"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*" = ["E501"]
