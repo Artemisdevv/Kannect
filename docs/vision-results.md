@@ -10,7 +10,26 @@ Written for the pitch and for Asif's validation questions. **Read the first sect
 | How many photos "matched correctly" | **Not measurable yet** for the same reason. What we can say is how many produced an automatic catalogue match (below). |
 | Confidence score | We have only the model's **self-reported** confidence. It is not calibrated and is unreliable (see below). |
 
-## What we measured (no human labels needed)
+## Update: pipeline after PR #81 (thorough mode, current)
+
+Same 29 photos, run through the real endpoint (`scripts/run_shelf_api.py`, `thorough=true`: whole photo plus 4 zoomed tiles). Mean ~35 s per photo. The tables below this section describe the **old whole-photo pipeline** and are kept as the baseline.
+
+| Measure | Old | Now |
+|---|---|---|
+| Items listed (after merging) | 297 | **499** |
+| Loose goods | 12, 0 mapped to a tile | 18, **4 mapped** |
+| Auto-matched to one catalogue product | 17 | **47** (in 17 of 29 photos) |
+| Shown with alternatives, owner picks | 48 | 85 (including 3 hedged `uncertain`) |
+| Items with a `suggested_price` | n/a | **0** (see below) |
+
+- More items and more auto-matches come mostly from zoomed tiles reading small labels. The old "unreadable" and "no catalogue entry" counts are not directly comparable: the endpoint no longer returns the model's `readable` flag, so those two are not re-measured here.
+- My read of the 47 auto-matches (names only, not human-verified): about 40 look right. The doubtful ones are variant picks: Parle-G matched "Parle g dark biscuits" (twice), Hide & Seek to "Milano choco filled", Good Day to "Butter Jeera", 20-20 to "cashew", Vivel to "Glycerin". So roughly 85% by my judgement, down from 94% on fewer matches. Treat as an estimate.
+- No `suggested_price` appeared because only ~102 catalogue products have an MRP and no other shop stocks these items yet in Supabase. It will fill as shops onboard.
+- Still no precision/recall/F1: nobody has labelled the photos. Asif must label the **regenerated** `data/eval/labeling_sheet.csv` (499 rows, built from this run), not the old 297-row sheet.
+
+## Baseline: old whole-photo pipeline
+
+### What we measured (no human labels needed)
 
 Run on all 29 photos of one small shop, Gemini reading each photo, then matched against the loaded catalogue (11,603 products) with the shipped matching logic.
 
@@ -67,7 +86,7 @@ No analysis here shows lighting or blur as a cause: all 29 photos were sharp and
 
 ## How to get the real numbers (for Asif)
 
-A labelling sheet is ready: `data/eval/labeling_sheet.csv` (one row per item the system read, 297 rows) plus an empty `data/eval/missed_items.csv`.
+A labelling sheet is ready: `data/eval/labeling_sheet.csv` (one row per item the system read, 499 rows) plus an empty `data/eval/missed_items.csv`.
 
 1. Open each photo (file name is in the `image` column) and fill, per row: `read_ok` (y/n: is that product really on the shelf), `match_ok` (y/n, only where a `suggested_product` is shown: same brand and variant), `true_product` when the suggestion is wrong or missing, `notes` for the failure reason.
 2. In `missed_items.csv` add one line per product visible in the photo that has no row.
