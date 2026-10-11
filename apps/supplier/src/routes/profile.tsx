@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, q } from "@/lib/api/service";
-import { ApiError } from "@/lib/api/client";
+import { ApiError, IS_DEMO } from "@/lib/api/client";
+import { currentLocation } from "@/lib/geo";
 import { seo } from "@/lib/seo";
 import type { SupplierInput } from "@/lib/api/types";
 
@@ -28,7 +29,7 @@ const FIELDS: { k: FieldKey; label: string; optional?: boolean }[] = [
   { k: "businessName", label: "Business name" },
   { k: "contactName", label: "Contact person" },
   { k: "address", label: "Address" },
-  { k: "serviceArea", label: "Service area" },
+  { k: "serviceArea", label: IS_DEMO ? "Service area" : "Delivery radius (km)" },
   { k: "gstin", label: "GSTIN", optional: true },
 ];
 
@@ -47,8 +48,11 @@ function Profile() {
   const dirty = changed.length > 0;
 
   const save = useMutation({
-    mutationFn: () => {
-      if (missing) return api.createSupplier(v);
+    mutationFn: async () => {
+      if (missing) {
+        const location = IS_DEMO ? null : await currentLocation();
+        return api.createSupplier(location ? { ...v, location } : v);
+      }
       const patch = Object.fromEntries(changed.map((k) => [k, v[k]]));
       return api.updateSupplier(patch);
     },
@@ -69,6 +73,7 @@ function Profile() {
     const e: Record<string, string> = {};
     FIELDS.forEach((f) => { if (!f.optional && !String(v[f.k] ?? "").trim()) e[f.k] = `Enter ${f.label.toLowerCase()}.`; });
     if (v.gstin && !/^[0-9A-Z]{15}$/.test(v.gstin)) e["gstin"] = "GSTIN should be 15 letters/numbers.";
+    if (!IS_DEMO && v.serviceArea && !(Number(v.serviceArea) > 0)) e["serviceArea"] = "Enter the distance you deliver, in km.";
     setErrors(e);
     if (!Object.keys(e).length) save.mutate();
   }

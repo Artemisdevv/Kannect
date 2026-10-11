@@ -12,11 +12,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { api, q } from "@/lib/api/service";
-import { ApiError } from "@/lib/api/client";
+import { ApiError, IS_DEMO } from "@/lib/api/client";
+import { CataloguePicker } from "@/components/kn/CataloguePicker";
 import { inr, pack } from "@/lib/format";
 import { seo } from "@/lib/seo";
 import { cn } from "@/lib/utils";
-import type { Product, ProductInput } from "@/lib/api/types";
+import type { CatalogueChoice, Product, ProductInput } from "@/lib/api/types";
 
 export const Route = createFileRoute("/catalogue")({
   head: () => seo("Catalogue", "Manage your wholesale products, pack sizes and prices."),
@@ -124,7 +125,14 @@ function validate(v: ProductInput) {
 
 function ProductDialog({ product, onClose }: { product: Product | null; onClose: () => void }) {
   const qc = useQueryClient();
-  const initial: ProductInput = product ? { ...product } : EMPTY;
+  const live = !IS_DEMO;
+  const [choice, setChoice] = useState<CatalogueChoice | null>(null);
+  const locked = live; // the API only edits price, pack size, minimum order and availability
+  const initial: ProductInput = product
+    ? { ...product }
+    : choice
+      ? { ...EMPTY, sku: choice.sku, name: choice.name, category: choice.category, unit: choice.unit, catalogueId: choice.id }
+      : EMPTY;
   const [v, setV] = useState<ProductInput>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmOff, setConfirmOff] = useState(false);
@@ -160,6 +168,7 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
         value={String(v[k])}
         aria-invalid={!!errors[k]}
         aria-describedby={errors[k] ? `e-${k}` : undefined}
+        disabled={locked && (k === "name" || k === "sku" || k === "category" || k === "unit")}
         onChange={(e) => set(k, (props.type === "number" ? Number(e.target.value) : e.target.value) as never)}
         {...props}
       />
@@ -176,6 +185,17 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
             {dirty ? <span className="font-medium text-warning">● Unsaved changes</span> : product ? "Saved values shown." : "Price is per pack. Retailers order in packs."}
           </DialogDescription>
         </DialogHeader>
+        {live && !product && !choice ? (
+          <div className="space-y-3">
+            <CataloguePicker
+              onPick={(c) => {
+                setChoice(c);
+                setV({ ...EMPTY, sku: c.sku, name: c.name, category: c.category, unit: c.unit, catalogueId: c.id });
+              }}
+            />
+            <Button type="button" variant="outline" className="w-full" onClick={onClose}>Cancel</Button>
+          </div>
+        ) : (
         <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); submit(); }}>
           {field("name", "Product name")}
           <div className="grid grid-cols-2 gap-3">
@@ -204,6 +224,7 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
             </Button>
           </div>
         </form>
+        )}
         <ConfirmDialog
           open={confirmOff}
           onOpenChange={setConfirmOff}

@@ -37,17 +37,21 @@ function Demand() {
       ) : (
         <div className="list-surface">
           {demand.data.map((d) => (
-            <div key={d.productName + d.packSize} className="product-row">
+            <div key={d.productName + d.unit + d.packSize} className="product-row">
               <div className="product-art"><TrendingUp className="h-[21px] w-[21px]" aria-hidden /></div>
               <div className="min-w-0 flex-1">
                 <div className="product-name">{d.productName}</div>
                 <div className="product-sub">
-                  {d.category} · {pack(d.packSize, d.unit)} packs · {d.period}
+                  {d.shopsTotal !== undefined ? d.category : `${d.category} · ${pack(d.packSize, d.unit)} packs · ${d.period}`}
                 </div>
               </div>
               <div className="text-right">
-                <div className="product-name tabular">{d.totalPacks} packs</div>
-                <Pill tone="neutral">{shopBand(d.shopCount)}</Pill>
+                {d.shopsTotal !== undefined ? (
+                  <div className="product-name tabular">{d.shopCount} of {d.shopsTotal} shops</div>
+                ) : (
+                  <div className="product-name tabular">{d.totalPacks} packs</div>
+                )}
+                <Pill tone="neutral">{d.shopsTotal !== undefined ? "low or out of stock" : shopBand(d.shopCount)}</Pill>
               </div>
             </div>
           ))}
