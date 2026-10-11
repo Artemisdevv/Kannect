@@ -84,3 +84,24 @@ button:active:not(:disabled),.nav-item:active,.action-tile:active{transform:scal
 :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 @keyframes kn-fade-up{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .app-main>*{animation:kn-fade-up 220ms ease both}
+
+/* phone.email "Sign in with Phone" button.
+   The widget injects <button id="btn_ph_login"> with inline styles (green, square, 220px), so
+   these rules use !important to make it match the app's own primary buttons. */
+.pe_signin_button { width: 100%; }
+.pe_signin_button:empty { min-height: 56px; border-radius: 999px; background: var(--secondary); animation: kn-pulse 1.2s ease-in-out infinite; }
+@keyframes kn-pulse { 50% { opacity: .55; } }
+.pe_signin_button #btn_ph_login {
+  width: 100% !important; min-height: 56px !important; gap: 10px !important;
+  padding: 14px 22px !important; border-radius: 999px !important;
+  background-color: var(--primary) !important; color: var(--primary-foreground) !important;
+  font-family: inherit !important; font-size: 15px !important; font-weight: 650 !important;
+  box-shadow: var(--shadow-soft) !important;
+  transition: transform 160ms ease, background-color 160ms ease !important;
+}
+.pe_signin_button #btn_ph_login:hover { background-color: var(--primary-hover) !important; }
+.pe_signin_button #btn_ph_login:active { transform: scale(.97); }
+.pe_signin_button #btn_ph_login:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.pe_signin_button #btn_ph_login_svg { margin-right: 0 !important; flex: none; }
+.pe_signin_button #btn_ph_login_svg_path { fill: currentColor !important; }
+.pe_signin_button #btn_ph_login_text { color: inherit !important; }
