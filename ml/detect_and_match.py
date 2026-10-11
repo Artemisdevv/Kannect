@@ -29,6 +29,11 @@ EMB_MODEL = "google/siglip-base-patch16-224"
 QUERIES = ["a packaged product", "a box", "a bottle", "a pouch", "a packet", "a tube"]
 
 
+def as_tensor(x):
+    """transformers 5 returns an output object, older versions a tensor."""
+    return x if isinstance(x, torch.Tensor) else x.pooler_output
+
+
 def load_images(folder: Path, limit: int) -> list[Path]:
     paths = sorted(p for p in folder.iterdir() if p.suffix.lower() in {".jpg", ".jpeg", ".png"})
     return paths[:limit] if limit else paths
@@ -39,7 +44,7 @@ def detect(det, dproc, img: Image.Image, dev: str, thr: float, iou: float, min_f
     inputs = dproc(text=[QUERIES], images=img, return_tensors="pt").to(dev)
     out = det(**inputs)
     side = max(img.size)  # OWLv2 pads to a square; boxes are relative to it
-    res = dproc.post_process_object_detection(out, threshold=thr, target_sizes=torch.tensor([(side, side)]).to(dev))[0]
+    res = dproc.post_process_grounded_object_detection(out, threshold=thr, target_sizes=[(side, side)])[0]
     boxes, scores = res["boxes"], res["scores"]
     w, h = img.size
     boxes[:, [0, 2]] = boxes[:, [0, 2]].clamp(0, w)
@@ -56,7 +61,7 @@ def embed_crops(emb, eproc, crops: list[Image.Image], dev: str) -> np.ndarray:
     out = []
     for i in range(0, len(crops), 32):
         inp = eproc(images=crops[i : i + 32], return_tensors="pt").to(dev)
-        e = emb.get_image_features(**inp)
+        e = as_tensor(emb.get_image_features(**inp))
         out.append(torch.nn.functional.normalize(e, dim=-1).cpu().numpy())
     return np.concatenate(out) if out else np.zeros((0, 768), dtype="float32")
 
