@@ -2,15 +2,16 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth import AuthenticatedOwner, require_retailer
 from app.config import Settings, get_settings
 from app.db import get_db
-from app.models import Product
+from app.models import Product, ShopProduct
 from app.routers.catalogue import _product_response
 from app.services.catalogue_match import CatalogueIndex, classify
 from app.services.shelf_pipeline import (
@@ -119,7 +120,38 @@ def shelf_photo(
             }
         )
 
+    _add_suggested_prices(db, detections)
     return {"detections": detections, "image_quality": quality}
+
+
+def _add_suggested_prices(db: Session, detections: list[dict[str, Any]]) -> None:
+    """Pre-fill a price so onboarding from a photo is not a typing job.
+
+    The printed MRP when the catalogue has one, otherwise the typical price other shops charge
+    (median, shown as `nearby_median`). Never invented: null when neither exists.
+    """
+    ids = [UUID(d["match"]["id"]) for d in detections if d.get("match")]
+    medians: dict[UUID, float] = {}
+    if ids:
+        rows = db.execute(
+            select(
+                ShopProduct.product_id,
+                func.percentile_cont(0.5).within_group(ShopProduct.price),
+            )
+            .where(ShopProduct.product_id.in_(ids))
+            .group_by(ShopProduct.product_id)
+        ).all()
+        medians = {pid: float(m) for pid, m in rows}
+    for d in detections:
+        d["suggested_price"], d["price_source"] = None, None
+        if not d.get("match"):
+            continue
+        mrp = d["match"].get("mrp")
+        if mrp is not None:
+            d["suggested_price"], d["price_source"] = mrp, "mrp"
+        elif UUID(d["match"]["id"]) in medians:
+            d["suggested_price"] = round(medians[UUID(d["match"]["id"])], 2)
+            d["price_source"] = "nearby_median"
 
 
 def _read_tiles(vision: ShelfVision, prepared: list[bytes]) -> list[list[Detection]]:

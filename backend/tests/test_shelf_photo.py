@@ -110,10 +110,22 @@ class FakeResult:
         return self.values
 
 
+class MedianResult:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def all(self):
+        return self.rows
+
+
 class FakeSession:
-    def __init__(self, products=None, role="retailer"):
+    def __init__(self, products=None, role="retailer", medians=None):
         self.products = products or []
         self.role = role
+        self.medians = medians or {}  # product id -> typical price charged by other shops
+
+    def execute(self, _statement):
+        return MedianResult(list(self.medians.items()))
 
     def scalar(self, statement):
         entity = statement.column_descriptions[0].get("entity")
@@ -142,11 +154,11 @@ class FakeVision:
         return ShelfResult(detections=self.detections)
 
 
-def client(vision, products=None, role="retailer"):
+def client(vision, products=None, role="retailer", medians=None):
     app = FastAPI()
     install(app)
     app.include_router(router)
-    session = FakeSession(products if products is not None else CATALOGUE, role)
+    session = FakeSession(products if products is not None else CATALOGUE, role, medians)
     app.dependency_overrides[get_db] = lambda: session
     app.dependency_overrides[get_settings] = lambda: TEST_SETTINGS
     app.dependency_overrides[get_shelf_vision] = lambda: vision
@@ -396,3 +408,32 @@ def test_merge_with_tiles_keeps_whole_items_a_tile_could_not_read():
     tile = [Detection(name="Balloons", category="toys_gifts", readable=False, visible_count=5)]
     out = merge_with_tiles(whole, [tile])
     assert [(d.name, d.visible_count) for d in out] == [("Balloons", 20)]
+
+
+# ---------- suggested price ----------
+
+
+def test_suggested_price_prefers_mrp_then_nearby_median_and_never_invents():
+    with_mrp = product("Parle", "Parle-G", "56 g", barcode="8901719101755")
+    with_mrp.mrp = 5
+    no_mrp = product("Haldiram's", "Aloo bhujia", "200 g", barcode="8904004400000")
+    no_price = product("Aachi", "Sambar Powder", "100 g", barcode="8902000000001")
+    dets = [
+        Detection(brand="Parle", name="Parle-G", size="56 g", category="snacks_biscuits"),
+        Detection(brand="Haldiram's", name="Aloo bhujia", size="200 g", category="snacks_biscuits"),
+        Detection(brand="Aachi", name="Sambar Powder", size="100 g", category="oils_spices"),
+    ]
+    c = client(FakeVision(dets), [with_mrp, no_mrp, no_price], medians={no_mrp.id: 52.5})
+    d = by_label(post(c, [photo()], thorough="false").json())
+    parle = d["Parle Parle-G 56 g"]
+    assert (parle["suggested_price"], parle["price_source"]) == (5.0, "mrp")
+    haldirams = d["Haldiram's Aloo bhujia 200 g"]
+    assert (haldirams["suggested_price"], haldirams["price_source"]) == (52.5, "nearby_median")
+    nothing = d["Aachi Sambar Powder 100 g"]
+    assert nothing["suggested_price"] is None and nothing["price_source"] is None
+
+
+def test_unmatched_items_get_no_suggested_price():
+    dets = [Detection(name="Small bottles", category="other", readable=False)]
+    d = post(client(FakeVision(dets)), [photo()], thorough="false").json()["detections"][0]
+    assert d["match"] is None and d["suggested_price"] is None
