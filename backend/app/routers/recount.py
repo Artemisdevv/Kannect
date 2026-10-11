@@ -43,8 +43,8 @@ class RecountItem(BaseModel):
             raise ValueError("Send either quantity or stock_level")
         if self.stock_level == "unknown":
             raise ValueError("stock_level cannot be unknown in a recount")
-        if self.quantity is not None and self.count_source != "owner_exact":
-            raise ValueError("An exact quantity must have count_source owner_exact")
+        if self.quantity is not None and self.count_source == "level_guess":
+            raise ValueError("A counted quantity is owner_exact or photo_estimate, not level_guess")
         if self.stock_level is not None and self.count_source == "owner_exact":
             raise ValueError("A level is an estimate, use photo_estimate or level_guess")
         return self
@@ -55,9 +55,10 @@ class RecountInput(BaseModel):
 
 
 def decide(current_qty: int, threshold: int, item: RecountItem) -> tuple[int, str | None]:
-    """Return (new quantity, skip reason). An estimate that lands in the same stock band as
-    the current figure changes nothing, so a photo never overwrites a good exact count with a
-    rougher number. If the photo disagrees (says low or out), the correction applies."""
+    """Return (new quantity, skip reason). A number the owner has seen and confirmed (typed, scanned
+    or read from a photo and edited) always applies. A blind level guess that lands in the same
+    stock band as the current figure changes nothing, so it never overwrites a good count with a
+    rougher number; if it disagrees (says low or out), the correction applies."""
     if item.quantity is not None:
         return item.quantity, None
     new_qty = rough_stock_quantity(item.stock_level, threshold)

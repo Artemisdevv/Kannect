@@ -54,3 +54,14 @@ export function productSub(row: ShopProduct): string {
 }
 
 export const newId = () => crypto.randomUUID();
+
+/**
+ * Change a cart quantity without ever selling more than the shop has. Returns the new quantity and
+ * whether the stock limit stopped part of the change (so the screen can say so).
+ */
+export function clampToStock(current: number, delta: number, stock: number | null | undefined) {
+  const max = Math.max(0, stock ?? 0);
+  const wanted = current + delta;
+  const next = Math.min(Math.max(0, wanted), max);
+  return { next, max, limited: delta > 0 && wanted > max };
+}

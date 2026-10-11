@@ -39,7 +39,7 @@ def test_estimate_when_system_says_out_but_photo_sees_stock():
         {},  # no figure
         {"quantity": 3, "stock_level": "few", "count_source": "owner_exact"},  # both
         {"stock_level": "unknown", "count_source": "photo_estimate"},
-        {"quantity": 3, "count_source": "photo_estimate"},  # exact figure mislabelled
+        {"quantity": 3, "count_source": "level_guess"},  # a count is never a level guess
         {"stock_level": "few", "count_source": "owner_exact"},  # estimate labelled exact
         {"quantity": -1},
     ],
@@ -47,3 +47,8 @@ def test_estimate_when_system_says_out_but_photo_sees_stock():
 def test_invalid_recount_items_are_rejected(kw):
     with pytest.raises(ValidationError):
         item(**kw)
+
+
+def test_a_photo_count_the_owner_confirmed_applies_even_in_the_same_band():
+    # the photo shows 8, the system says 40: both "in stock", but the owner chose the new number
+    assert decide(40, 5, item(quantity=8, count_source="photo_estimate")) == (8, None)

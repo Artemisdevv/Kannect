@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Camera } from "lucide-react";
+import { Camera, Minus, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -22,7 +22,8 @@ type Row = {
   seen: string; // what the model read, shown as a caption
   loose: boolean;
   include: boolean;
-  level: Level;
+  count: string; // what the owner confirms: pieces, or kilograms for loose goods
+  aiCount: string; // what the photo reader counted (shown so the owner can see the difference)
   price: string;
   priceHint: string;
   options: Option[]; // catalogue products it might be
@@ -33,12 +34,12 @@ type Row = {
   currentStatus: string | null;
 };
 
-const LEVELS: [Level, string][] = [
-  ["plenty", "Plenty"],
-  ["some", "Some"],
-  ["few", "Few"],
-  ["none", "None"],
-];
+// Loose goods are weighed, not counted: start from a typical amount and let the owner weigh it.
+const LOOSE_KG: Record<Level, number> = { plenty: 5, some: 2, few: 0.5, none: 0 };
+
+const isGram = (r: Row) => r.loose || r.options[r.pick]?.unit === "gram";
+const baseQty = (r: Row) => Math.max(0, Math.round(Number(r.count) * (isGram(r) ? 1000 : 1)) || 0);
+const step = (r: Row) => (isGram(r) ? 0.25 : 1);
 
 const optionOf = (p: { id?: string; name?: string; brand?: string | null; size?: string | null; unit?: string }) => ({
   id: p.id as string,
@@ -56,12 +57,16 @@ function toRow(d: Detection, i: number): Row | null {
 
   const options = (d.match ? [d.match, ...(d.alternatives ?? [])] : (d.alternatives ?? [])).map(optionOf);
   const level = (d.suggested_level as Level | undefined) ?? "some";
+  const loose = Boolean(d.loose);
+  const aiCount = loose ? String(LOOSE_KG[level]) : String(Math.max(0, d.visible_count ?? 1));
   return {
     key: `${i}`,
     seen: d.label ?? [brand, name].filter(Boolean).join(" "),
     loose: Boolean(d.loose),
-    include: d.readable !== false && !d.uncertain,
-    level,
+    // Recounting something the shop already has replaces a number it may know better, so that is opt-in.
+    include: d.readable !== false && !d.uncertain && !d.in_shop,
+    count: aiCount,
+    aiCount,
     price: d.suggested_price != null ? String(d.suggested_price) : "",
     priceHint:
       d.price_source === "mrp" ? "printed price" : d.price_source === "nearby_median" ? "typical nearby" : "",
@@ -157,7 +162,7 @@ export function OnboardPage() {
           items: fresh.map(([productId, r]) => ({
             product_id: productId,
             price: Number(r.price) > 0 ? Number(r.price) : 1,
-            stock_level: r.level,
+            opening_stock: baseQty(r),
             count_source: "photo_estimate" as const,
           })),
         });
@@ -167,7 +172,7 @@ export function OnboardPage() {
           items: existing.map(([productId, r]) => ({
             client_id: newId(),
             product_id: productId,
-            stock_level: r.level,
+            quantity: baseQty(r),
             count_source: "photo_estimate" as const,
           })),
         });
@@ -240,7 +245,7 @@ export function OnboardPage() {
                     </span>
                     {r.inShop && (
                       <span className="product-sub block">
-                        Already in your shop: {formatQty(r.currentQty, r.options[0]?.unit)} ({r.currentStatus}). Saving recounts it from this photo.
+                        In your shop now: {formatQty(r.currentQty, r.options[0]?.unit)}. Tick to replace it with the count below.
                       </span>
                     )}
                   </span>
@@ -284,11 +289,22 @@ export function OnboardPage() {
                     )}
 
                     <div className="flex flex-wrap gap-2 items-center">
-                      {LEVELS.map(([value, name]) => (
-                        <Button key={value} size="sm" variant={r.level === value ? "secondary" : "ghost"} onClick={() => patch(r.key, { level: value })}>
-                          {name}
+                      <div className="quantity-controls" aria-label={`Count for ${r.seen}`}>
+                        <Button variant="outline" size="icon" aria-label="Fewer" onClick={() => patch(r.key, { count: String(Math.max(0, (Number(r.count) || 0) - step(r))) })}>
+                          <Minus />
                         </Button>
-                      ))}
+                        <input
+                          className="page-search w-20 text-center"
+                          aria-label="How many"
+                          inputMode="decimal"
+                          value={r.count}
+                          onChange={(e) => patch(r.key, { count: e.target.value.replace(/[^\d.]/g, "") })}
+                        />
+                        <Button variant="outline" size="icon" aria-label="More" onClick={() => patch(r.key, { count: String((Number(r.count) || 0) + step(r)) })}>
+                          <Plus />
+                        </Button>
+                        <span className="text-xs text-muted-foreground">{isGram(r) ? "kg" : "pcs"}</span>
+                      </div>
                       {!r.inShop && (
                         <input
                           className="page-search max-w-40"

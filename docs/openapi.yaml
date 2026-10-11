@@ -379,7 +379,8 @@ paths:
       summary: Set stock for products the shop already has, from an exact count or a photo/level estimate
       description: |
         Writes an absolute `correction` per item with its `count_source`. Send `quantity` with
-        `owner_exact`, or `stock_level` (plenty/some/few/none) with `photo_estimate` or `level_guess`.
+        `owner_exact` (typed or scanned) or `photo_estimate` (read from a photo, confirmed by the owner), or
+        `stock_level` (plenty/some/few/none) with `photo_estimate` or `level_guess`.
         An estimate that lands in the same stock band as the current count is skipped (`unchanged`),
         so a photo never overwrites a good exact count with a rougher number; one that disagrees
         (the photo shows few, the system says 40) is applied. `client_id` makes retries safe.
