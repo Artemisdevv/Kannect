@@ -20,6 +20,7 @@ from app.routers import (
     shop,
     supplier,
     supplier_insight,
+    sync,
 )
 
 API_PREFIX = "/api/v1"
@@ -60,6 +61,7 @@ app.include_router(ebill.page_router)
 app.include_router(supplier_insight.router, prefix=API_PREFIX)
 app.include_router(group_buys.supplier_router, prefix=API_PREFIX)
 app.include_router(group_buys.retailer_router, prefix=API_PREFIX)
+app.include_router(sync.router, prefix=API_PREFIX)
 
 # Add routers here, matching docs/openapi.yaml:
 #   auth, shop, catalogue, billing, sync  (issues #11-#18, #37, #38, #44)

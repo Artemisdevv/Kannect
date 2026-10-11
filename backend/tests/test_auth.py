@@ -278,7 +278,9 @@ def test_default_secret_is_allowed_only_for_local_development():
     validate_runtime_settings(Settings(app_env="production", jwt_secret="non-default-secret"))
 
     with pytest.raises(RuntimeError):
-        validate_runtime_settings(Settings(_env_file=None, jwt_secret=DEFAULT_JWT_SECRET))
+        validate_runtime_settings(
+            Settings(_env_file=None, app_env="production", jwt_secret=DEFAULT_JWT_SECRET)
+        )
 
     with pytest.raises(RuntimeError):
         validate_runtime_settings(Settings(app_env="production", jwt_secret=DEFAULT_JWT_SECRET))
