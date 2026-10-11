@@ -15,7 +15,9 @@ class Settings(BaseSettings):
     app_env: str = "production"
     jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_expire_minutes: int = Field(default=60 * 24 * 7, ge=1)
-    cors_origins: str = "http://localhost:5173,http://localhost:8080"
+    cors_origins: str = (
+        "http://localhost:5173,http://localhost:8080,https://localhost,http://localhost,capacitor://localhost"
+    )  # the last three are the Android app (Capacitor) origins
     demo_otp: str = "123456"
     public_base_url: str = "http://localhost:8000"
     llm_api_key: str = ""

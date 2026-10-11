@@ -1,5 +1,7 @@
 export async function registerAppWorker() {
   if (!("serviceWorker" in navigator)) return;
+  // The Android app bundles its files, so it needs no service worker.
+  if ((window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()) return;
 
   const host = window.location.hostname;
   const previewHost = ["lovableproject.com", "lovableproject-dev.com", "beta.lovable.dev"].some(

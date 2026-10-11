@@ -1,0 +1,43 @@
+name: Android APK
+# Builds a debug APK of each Capacitor app, so it can be installed on a phone without Android Studio.
+# Run manually (Actions tab, "Run workflow") and download the APK from the run's artifacts.
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: API base URL baked into the app
+        default: https://kannect-i9bp.onrender.com/api/v1
+  pull_request:
+    paths:
+      - "apps/retailer/**"
+      - ".github/workflows/android.yml"
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [retailer]
+    defaults:
+      run:
+        working-directory: apps/${{ matrix.app }}
+    env:
+      VITE_API_URL: ${{ inputs.api_url || 'https://kannect-i9bp.onrender.com/api/v1' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run android:sync
+      - run: chmod +x android/gradlew
+      - run: ./gradlew assembleDebug --no-daemon
+        working-directory: apps/${{ matrix.app }}/android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kannect-${{ matrix.app }}-debug-apk
+          path: apps/${{ matrix.app }}/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

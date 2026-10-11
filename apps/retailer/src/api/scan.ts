@@ -4,8 +4,12 @@
 import { BrowserMultiFormatReader } from "@zxing/browser";
 
 export interface Scanner {
-  /** Start scanning into `video`. Calls `onCode` for each decoded code. Returns a stop function. */
+  /** "web": the app shows a <video> and `start` decodes frames. "native": the OS scanner takes over. */
+  kind: "web" | "native";
+  /** Web: start scanning into `video`; calls `onCode` per decoded code. Returns a stop function. */
   start(video: HTMLVideoElement, onCode: (code: string) => void): Promise<() => void>;
+  /** Native: open the OS scanner once (must follow a tap) and resolve with the code, or null if cancelled. */
+  scanOnce?(): Promise<string | null>;
 }
 
 /** Keep only a plausible barcode: 6 to 14 digits (what the catalogue accepts). Otherwise null. */
@@ -15,6 +19,7 @@ export function normalizeBarcode(raw: string): string | null {
 }
 
 const webScanner: Scanner = {
+  kind: "web",
   async start(video, onCode) {
     const reader = new BrowserMultiFormatReader();
     let last = "";
