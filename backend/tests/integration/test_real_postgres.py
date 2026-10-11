@@ -35,6 +35,7 @@ from app.models import (
     Product,
     Shop,
     ShopProduct,
+    StarterPackItem,
     StockEvent,
     Supplier,
     SupplierOrder,
@@ -622,5 +623,68 @@ def test_receive_order_is_partial_and_idempotent(world):
                     )
                     db.delete(supplier)
             db.execute(delete(OwnerIdentity).where(OwnerIdentity.phone == supplier_phone))
+            db.execute(delete(Product).where(Product.id == extra_product_id))
+            db.commit()
+
+
+def test_starter_pack_returns_active_products_in_curated_order(world):
+    retailer_headers = login(world["phone_a"])
+    extra_product_id = uuid.uuid4()
+    with SessionLocal() as db:
+        db.add(
+            Product(
+                id=extra_product_id,
+                barcode=f"SP{uuid.uuid4().hex[:12]}",
+                name=f"Itest Starter Pack {world['tag']}",
+                unit="piece",
+                mrp=12,
+                is_active=True,
+            )
+        )
+        db.add_all(
+            [
+                StarterPackItem(
+                    shop_type="grocery", product_id=extra_product_id, position=500_000
+                ),
+                StarterPackItem(
+                    shop_type="grocery", product_id=world["product"], position=500_001
+                ),
+            ]
+        )
+        db.commit()
+
+    try:
+        response = client.get(
+            "/api/v1/catalogue/starter-packs",
+            headers=retailer_headers,
+            params={"shop_type": "grocery"},
+        )
+        assert response.status_code == 200, response.text
+        items = response.json()["items"]
+        assert [item["id"] for item in items[-2:]] == [
+            str(extra_product_id),
+            str(world["product"]),
+        ]
+        assert items[-2]["mrp"] == 12
+        assert items[-2]["barcode"] is not None
+        assert (
+            client.get(
+                "/api/v1/catalogue/starter-packs",
+                headers=retailer_headers,
+                params={"shop_type": "not-a-shop-type"},
+            ).status_code
+                == 400
+        )
+        assert client.get(
+            "/api/v1/catalogue/starter-packs", params={"shop_type": "grocery"}
+        ).status_code == 401
+    finally:
+        with SessionLocal() as db:
+            db.execute(
+                delete(StarterPackItem).where(
+                    StarterPackItem.shop_type == "grocery",
+                    StarterPackItem.product_id.in_([extra_product_id, world["product"]]),
+                )
+            )
             db.execute(delete(Product).where(Product.id == extra_product_id))
             db.commit()

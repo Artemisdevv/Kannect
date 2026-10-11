@@ -179,7 +179,7 @@ paths:
   /catalogue/starter-packs:
     get:
       tags: [catalogue]
-      summary: Onboarding starter packs. Pre-curated popular Kerala items by shop type, with images and MRP. Owner ticks what they sell.
+      summary: Ordered onboarding catalogue items for a shop type. Pack MRPs are demo values.
       parameters:
         - { name: shop_type, in: query, required: true, schema: { type: string, enum: [grocery, provision, vegetable, stationery, bakery, general] } }
       responses:
@@ -193,6 +193,8 @@ paths:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/Product" }
+        "401": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
 
   /shop/products/bulk:
     post:

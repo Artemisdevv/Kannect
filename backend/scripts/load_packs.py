@@ -8,14 +8,15 @@ For packaged items: sets product.mrp where it is still NULL; with --reprice it o
 (use after editing prices in the pack JSON).
 For loose items (no barcode): inserts a product row if one with that name and no barcode is missing.
 The price in these packs is a DEMO value (see mrp_source in the pack JSON), not a verified MRP.
-Pack membership (which products belong to which shop type) needs the starter_pack_item table from
-issue #37, not created here.
+Applying the packs also refreshes ordered membership in starter_pack_item. Upgrade the database
+before using --apply.
 """
 
 import argparse
 import json
 import sys
 from pathlib import Path
+from uuid import UUID
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -34,13 +35,22 @@ def main() -> None:
 
     packaged: dict[str, dict] = {}
     loose: dict[str, dict] = {}
+    pack_items: dict[str, list[dict]] = {}
     for f in sorted(PACKS.glob("*.json")):
-        for it in json.loads(f.read_text(encoding="utf-8"))["items"]:
+        pack = json.loads(f.read_text(encoding="utf-8"))
+        shop_type = pack["shop_type"]
+        if shop_type in pack_items:
+            raise ValueError(f"Duplicate starter pack for shop type {shop_type}")
+        pack_items[shop_type] = pack["items"]
+        for it in pack["items"]:
             if it["loose"]:
                 loose[it["name"]] = it
             else:
                 packaged[it["barcode"]] = it
-    print(f"packaged products to price: {len(packaged)}   loose items: {len(loose)}")
+    print(
+        f"packaged products to price: {len(packaged)}   loose items: {len(loose)}   "
+        f"pack memberships: {sum(len(items) for items in pack_items.values())}"
+    )
 
     engine = create_engine(get_settings().database_url)
     with engine.begin() as conn:
@@ -92,7 +102,55 @@ def main() -> None:
                 ),
                 {"n": n, "ml": it["name_ml"], "c": it["category"], "u": it["unit"], "m": it["mrp"]},
             )
-        print(f"\npriced {len(to_price)} products, inserted {len(new_loose)} loose items")
+
+        product_ids: dict[tuple[str, str], UUID] = {}
+        products = conn.execute(
+            text(
+                "select id, barcode, name from product "
+                "where barcode = any(:barcodes) "
+                "or (barcode is null and name = any(:loose_names))"
+            ),
+            {"barcodes": list(packaged), "loose_names": list(loose)},
+        )
+        for product_id, barcode, name in products:
+            key = ("barcode", barcode) if barcode is not None else ("name", name)
+            product_ids[key] = product_id
+
+        membership_rows = []
+        for shop_type, items in pack_items.items():
+            identities = [
+                ("name", item["name"])
+                if item["loose"]
+                else ("barcode", item["barcode"])
+                for item in items
+            ]
+            if len(identities) != len(set(identities)):
+                raise ValueError(f"Duplicate product in {shop_type} starter pack")
+            conn.execute(
+                text("delete from starter_pack_item where shop_type = :shop_type"),
+                {"shop_type": shop_type},
+            )
+            for position, identity in enumerate(identities):
+                product_id = product_ids.get(identity)
+                if product_id is None:
+                    raise ValueError(
+                        f"Could not resolve {identity[1]!r} in {shop_type} starter pack"
+                    )
+                membership_rows.append(
+                    {"shop_type": shop_type, "product_id": product_id, "position": position}
+                )
+        if membership_rows:
+            conn.execute(
+                text(
+                    "insert into starter_pack_item (shop_type, product_id, position) "
+                    "values (:shop_type, :product_id, :position)"
+                ),
+                membership_rows,
+            )
+        print(
+            f"\npriced {len(to_price)} products, inserted {len(new_loose)} loose items, "
+            f"loaded {len(membership_rows)} pack memberships"
+        )
 
 
 if __name__ == "__main__":

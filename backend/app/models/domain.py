@@ -139,6 +139,27 @@ class Product(Base):
     )
 
 
+class StarterPackItem(Base):
+    __tablename__ = "starter_pack_item"
+
+    shop_type: Mapped[str] = mapped_column(String(32), primary_key=True)
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        ID_TYPE,
+        ForeignKey("product.id", ondelete="RESTRICT"),
+        primary_key=True,
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "shop_type IN ('grocery', 'provision', 'vegetable', 'stationery', 'bakery', 'general')",
+            name="ck_starter_pack_shop_type",
+        ),
+        CheckConstraint("position >= 0", name="ck_starter_pack_position_nonnegative"),
+        UniqueConstraint("shop_type", "position", name="uq_starter_pack_type_position"),
+    )
+
+
 class ShopProduct(Base):
     __tablename__ = "shop_product"
 

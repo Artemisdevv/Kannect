@@ -13,10 +13,11 @@ from sqlalchemy.orm import Session
 
 from app.auth import AuthenticatedOwner, require_retailer
 from app.db import get_db
-from app.models import Product
+from app.models import Product, StarterPackItem
 from app.services.catalogue_match import STRONG, CatalogueIndex, norm
 
 router = APIRouter(prefix="/catalogue", tags=["catalogue"])
+ShopType = Literal["grocery", "provision", "vegetable", "stationery", "bakery", "general"]
 
 
 class ProductInput(BaseModel):
@@ -103,6 +104,24 @@ def lookup_barcode(
     if canonical is None:
         raise HTTPException(status_code=404, detail="Product not found")
     return _product_response(canonical)
+
+
+@router.get("/starter-packs", response_model=ProductListResponse)
+def list_starter_pack(
+    shop_type: ShopType,
+    db: Session = Depends(get_db),
+    _: AuthenticatedOwner = Depends(require_retailer),
+) -> dict[str, list[dict[str, Any]]]:
+    products = db.scalars(
+        select(Product)
+        .join(StarterPackItem, StarterPackItem.product_id == Product.id)
+        .where(
+            StarterPackItem.shop_type == shop_type,
+            Product.is_active.is_(True),
+        )
+        .order_by(StarterPackItem.position)
+    ).all()
+    return {"items": [_product_response(product) for product in products]}
 
 
 @router.get("/products", response_model=ProductListResponse)
