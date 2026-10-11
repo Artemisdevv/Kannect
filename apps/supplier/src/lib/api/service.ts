@@ -1,7 +1,9 @@
 import { queryOptions } from "@tanstack/react-query";
-import { request } from "./client";
+import { IS_DEMO, request } from "./client";
+import { liveApi, liveSearchCatalogue } from "./live";
 import { safeDemand } from "../rules";
 import type {
+  CatalogueChoice,
   GroupBuy,
   GroupBuyInput,
   Invoice,
@@ -14,7 +16,7 @@ import type {
   SupplierInput,
 } from "./types";
 
-export const api = {
+const demoApi = {
   requestOtp: (phone: string) =>
     request<{ sent: boolean; resendAfterSeconds?: number }>("POST", "/auth/otp/request", { phone }),
   verifyOtp: (phone: string, otp: string) =>
@@ -41,6 +43,10 @@ export const api = {
   listGroupBuys: () => request<GroupBuy[]>("GET", "/supplier/group-buys"),
   createGroupBuy: (b: GroupBuyInput) => request<GroupBuy>("POST", "/supplier/group-buys", b),
 };
+
+export const api: typeof demoApi = IS_DEMO ? demoApi : (liveApi as unknown as typeof demoApi);
+export const searchCatalogue = (text: string): Promise<CatalogueChoice[]> =>
+  IS_DEMO ? Promise.resolve([]) : liveSearchCatalogue(text);
 
 export const q = {
   supplier: queryOptions({ queryKey: ["supplier"], queryFn: api.getSupplier, retry: false }),
