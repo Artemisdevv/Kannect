@@ -1,6 +1,6 @@
 """Evaluate the shelf-photo pipeline against human labels.
 
-Step 1, make a sheet for a human to fill in (needs LLM output from classify_shelves.py):
+Step 1, make a sheet for a human to fill in (built from scripts/run_shelf_api.py responses):
     python scripts/eval_shelf.py sheet
     -> data/eval/labeling_sheet.csv   one row per item the system read
     -> data/eval/missed_items.csv     empty, for items visible in a photo that the system missed
@@ -39,42 +39,35 @@ COLS = ["image", "label", "visible_count", "gemini_confidence", "readable", "sta
 
 
 def make_sheet() -> None:
-    from sqlalchemy import select
+    """Build the sheet from what the real endpoint returned (scripts/run_shelf_api.py)."""
+    api = sorted((ROOT / "out/shelf_api").glob("*.json"))
+    if not api:
+        sys.exit("Run scripts/run_shelf_api.py first: the sheet is built from its responses.")
 
-    from app.db import SessionLocal
-    from app.models import Product
-    from app.routers.ai import _merge_duplicates
-    from app.services.catalogue_match import CatalogueIndex, classify
-    from app.services.shelf_vision import Detection
-
-    recs = [json.loads(line) for line in (ROOT / "out/detections.jsonl").open(encoding="utf-8")]
-    with SessionLocal() as db:
-        products = list(db.scalars(select(Product).where(Product.is_active.is_(True))).all())
-    index = CatalogueIndex(products)
-
-    def name(p: Product) -> str:
-        return f"{p.brand or ''} {p.name} {p.size or ''}".strip()
+    def name(p: dict) -> str:
+        return f"{p.get('brand') or ''} {p['name']} {p.get('size') or ''}".strip()
 
     EVAL.mkdir(parents=True, exist_ok=True)
     with SHEET.open("w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
         w.writerow(COLS)
-        for r in recs:
-            dets = [Detection(**{k: v for k, v in d.items() if k in Detection.model_fields})
-                    for d in r["detections"]]  # fmt: skip
-            for d in _merge_duplicates(dets):
-                label = " ".join(p for p in (d.brand, d.name, d.size) if p)
-                if d.loose:
-                    status, best, alts = "loose", None, []
-                elif not d.readable:
-                    status, best, alts = "unreadable", None, []
+        for path in api:
+            rec = json.loads(path.read_text(encoding="utf-8"))
+            for d in rec["detections"]:
+                if d["loose"]:
+                    status = "loose_tile" if d["match"] else "loose_no_tile"
+                elif d["match"]:
+                    status = "strong"
+                elif d["uncertain"]:
+                    status = "uncertain"
+                elif d["alternatives"]:
+                    status = "weak"
                 else:
-                    best, alts, need = classify(index.match(d.brand, d.name, d.size))
-                    status = "strong" if best else ("weak" if alts else "no_match")
-                shown = [name(a.product) for a in alts] + [""] * 2
-                w.writerow([r["image"], label, d.visible_count, round(d.confidence, 2),
-                            d.readable, status, name(best.product) if best else "",
-                            shown[0], shown[1], "", "", "", ""])  # fmt: skip
+                    status = "no_match" if d["needs_scan"] else "other"
+                alts = [name(a) for a in d["alternatives"]] + ["", ""]
+                w.writerow([rec["image"], d["label"], d["visible_count"], round(d["confidence"], 2),
+                            status != "uncertain", status, name(d["match"]) if d["match"] else "",
+                            alts[0], alts[1], "", "", "", ""])  # fmt: skip
     if not MISSED.exists():
         MISSED.write_text("image,product\n", encoding="utf-8-sig")
     print(f"wrote {SHEET} and {MISSED}")
@@ -106,7 +99,9 @@ def score() -> None:
     ok = [r for r in sugg if r["match_ok"].strip().lower() == "y"]
     print("\nCATALOGUE MATCH (when the app auto-suggests one product)")
     print(f"  match precision  : {rate(len(ok), len(sugg))}")
-    resolvable = [r for r in read_ok if r["status"] in ("strong", "weak", "no_match")]
+    resolvable = [
+        r for r in read_ok if r["status"] in ("strong", "weak", "uncertain", "no_match")
+    ]
     print(f"  auto-matched share of correctly-read packaged items: "
           f"{rate(sum(r['status'] == 'strong' for r in resolvable), len(resolvable))}")
     print(f"  items with no catalogue entry (need a barcode scan): "
