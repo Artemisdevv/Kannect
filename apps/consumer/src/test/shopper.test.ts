@@ -59,11 +59,17 @@ describe('browsing and shop page', () => {
     expect(list[0]?.distanceKm).toBeUndefined();
   });
 
-  it('loads a shop page with product status only', async () => {
-    fetchMock.mockResolvedValueOnce(json({ shop, products: [{ product: { id: 'p1', name: 'Tomato' }, price: 40, stock_status: 'low' }] }));
+  it('loads a shop page with status and how many can be reserved', async () => {
+    fetchMock.mockResolvedValueOnce(json({ shop, products: [
+      { product: { id: 'p1', name: 'Tomato' }, price: 40, stock_status: 'low', reservable: 6 },
+      { product: { id: 'p2', name: 'Rice' }, price: 60, stock_status: 'in_stock' },
+    ] }));
     const page = await getShopPage('s1');
     expect(page.shop.name).toBe('Sreeram Stores');
-    expect(page.products).toEqual([{ productId: 'p1', name: 'Tomato', unit: 'piece', price: 40, status: 'low' }]);
+    expect(page.products).toEqual([
+      { productId: 'p1', name: 'Tomato', unit: 'piece', price: 40, status: 'low', reservable: 6 },
+      { productId: 'p2', name: 'Rice', unit: 'piece', price: 60, status: 'in', reservable: null }, // older server: no count
+    ]);
   });
 
   it('referral is null when nobody nearby has it', async () => {

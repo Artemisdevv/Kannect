@@ -12,8 +12,11 @@ A shopper asks one shop to set items aside and collects them later. **No payment
    and creates the e-bill. Stock never changes before that.
 
 ## Rules worth knowing
-- **A hold is real.** An accepted, unexpired reservation reduces what the next shopper can reserve ("only 7 available"), so
-  two people are never promised the last packet. When the hold runs out it shows as `expired` and frees the stock again.
+- **A hold is real.** A request holds its quantity as soon as it is made, and an accepted one keeps holding until its
+  `hold_until`. Held quantity reduces what the next shopper can reserve ("only 7 available"; the shop page shows this as
+  `reservable`), so two people are never promised the last packet. The shop's own stock count does not change until handover.
+- **Unanswered requests close themselves.** If the shop does not accept or decline within 10 minutes the request shows as
+  `expired` and its hold is released (nothing is stored: the clock just runs out). Same for an accepted request past `hold_until`.
 - **Accepting re-checks stock.** If the count dropped meanwhile the owner gets "only N free now, decline or fix the stock".
 - **Quantities** are base units: pieces, or grams for loose goods (shown as kg). Limits: 10 lines, 20 pieces or 10 kg per line.
 - **Abuse limits** (the phone number is not verified): 3 open requests per phone per shop, 6 per phone overall, 40 pending

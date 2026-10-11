@@ -6,7 +6,7 @@ export const STATUS_LABEL: Record<string, string> = {
   declined: 'Declined',
   cancelled: 'Cancelled',
   collected: 'Picked up',
-  expired: 'Hold ran out',
+  expired: 'Not answered in time',
 };
 
 export function statusMessage(r: Reservation) {
@@ -16,7 +16,7 @@ export function statusMessage(r: Reservation) {
     : '';
   switch (r.status) {
     case 'requested':
-      return `${shop} has your request. They will confirm shortly. You do not need to do anything.`;
+      return `${shop} has your request and these are set aside for you. If they do not answer within 10 minutes it closes by itself.`;
     case 'accepted':
       return `${shop} is holding these for you${until ? ` until ${until}` : ''}. Come by and pay at the shop.`;
     case 'declined':
@@ -28,7 +28,9 @@ export function statusMessage(r: Reservation) {
     case 'collected':
       return 'Picked up. Thank you for shopping local.';
     case 'expired':
-      return `${shop} held these until ${until || 'the time ran out'}. Call them if you are still coming, or reserve again.`;
+      return r.hold_until
+        ? `${shop} held these until ${until}. Call them if you are still coming, or reserve again.`
+        : `${shop} did not answer in time, so the items were released. Call them or try another shop.`;
     default:
       return '';
   }

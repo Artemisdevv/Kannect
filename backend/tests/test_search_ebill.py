@@ -24,7 +24,7 @@ def row(**over):
         "product_id": PRODUCT_ID, "barcode": "8901", "name": "Cinthol soap", "name_ml": None,
         "brand": "Godrej", "size": "100g", "category": "personal_care", "unit": "piece",
         "image_url": None, "mrp": Decimal("45.00"), "price": Decimal("45.00"),
-        "status": "in_stock", "distance_m": 276.0,
+        "status": "in_stock", "distance_m": 276.0, "reservable": 12,
     }  # fmt: skip
     return base | over
 
@@ -223,6 +223,7 @@ def test_shop_page_404_and_shape():
     body = r.json()
     assert body["shop"]["name"] == "Mary"
     assert [p["stock_status"] for p in body["products"]] == ["in_stock", "out"]
+    assert [p["reservable"] for p in body["products"]] == [12, 12]
     assert "qty" not in r.text
 
 

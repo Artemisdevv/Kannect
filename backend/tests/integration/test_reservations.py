@@ -214,3 +214,65 @@ def test_only_the_shops_own_owner_can_act_on_a_reservation(world):
     assert client.post(f"/api/v1/shop/reservations/{rid}/accept", headers=other).status_code == 404
     assert client.post(f"/api/v1/shop/reservations/{rid}/decline", headers=other).status_code == 404
     assert client.get("/api/v1/shop/reservations").status_code == 401  # signed out
+
+
+def reservable(w, product) -> int:
+    page = client.get(f"/api/v1/shops/{w['shop']}").json()
+    return next(p["reservable"] for p in page["products"] if p["product"]["id"] == str(product))
+
+
+def test_a_waiting_request_holds_stock_and_the_shop_page_says_how_many_are_left(world):
+    w, h = world, owner_headers(world["owner"])
+    assert reservable(w, w["biscuit"]) == 10
+    assert reservable(w, w["tomato"]) == 5000
+    r, _ = reserve(w, [(w["biscuit"], 4), (w["tomato"], 1500)])
+    assert r.status_code == 201 and r.json()["status"] == "requested"
+    assert reservable(w, w["biscuit"]) == 6  # held while the shop has not answered
+    assert reservable(w, w["tomato"]) == 3500
+    assert stock_of(w, h, w["biscuit"]) == 10  # the shop's own count only drops at handover
+    over, _ = reserve(w, [(w["biscuit"], 7)], phone_no="9123456789")
+    assert over.status_code == 409 and "only 6 available" in over.json()["error"]["message"]
+
+    cancelled = client.post(
+        f"/api/v1/reservations/{r.json()['id']}/cancel", headers={"X-Reservation-Token": r.json()["access_token"]}
+    )
+    assert cancelled.status_code == 200
+    assert reservable(w, w["biscuit"]) == 10  # released straight away
+
+
+def test_reservable_is_capped_at_the_per_line_limit(world):
+    w = world
+    with SessionLocal() as db:
+        db.add(StockEvent(shop_id=w["shop"], product_id=w["biscuit"], client_id=uuid.uuid4(),
+                          type="restock", quantity=100, count_source="owner_exact"))  # fmt: skip
+        db.commit()
+    assert reservable(w, w["biscuit"]) == 20
+    assert reservable(w, w["tomato"]) == 5000
+
+
+def test_a_request_the_shop_never_answers_expires_and_frees_the_stock(world):
+    w, h = world, owner_headers(world["owner"])
+    r, _ = reserve(w, [(w["biscuit"], 10)])
+    rid, token = r.json()["id"], r.json()["access_token"]
+    assert reservable(w, w["biscuit"]) == 0
+    with SessionLocal() as db:
+        db.execute(update(Reservation).where(Reservation.id == uuid.UUID(rid)).values(created_at=datetime.now(UTC) - timedelta(minutes=11)))
+        db.commit()
+    assert client.get(f"/api/v1/reservations/{rid}", headers={"X-Reservation-Token": token}).json()["status"] == "expired"
+    assert reservable(w, w["biscuit"]) == 10
+    assert reserve(w, [(w["biscuit"], 10)], phone_no="9000033333")[0].status_code == 201
+    # the owner can no longer accept it, and cancelling it changes nothing
+    assert client.post(f"/api/v1/shop/reservations/{rid}/accept", headers=h).status_code == 409
+    assert client.post(f"/api/v1/shop/reservations/{rid}/decline", headers=h).status_code == 409
+    gone = client.post(f"/api/v1/reservations/{rid}/cancel", headers={"X-Reservation-Token": token})
+    assert gone.status_code == 200 and gone.json()["status"] == "expired"
+
+
+def test_expired_requests_do_not_count_toward_the_open_request_limit(world):
+    w = world
+    for _ in range(3):
+        assert reserve(w, [(w["biscuit"], 1)], phone_no="9988776655")[0].status_code == 201
+    with SessionLocal() as db:
+        db.execute(update(Reservation).where(Reservation.shop_id == w["shop"]).values(created_at=datetime.now(UTC) - timedelta(minutes=11)))
+        db.commit()
+    assert reserve(w, [(w["biscuit"], 1)], phone_no="9988776655")[0].status_code == 201

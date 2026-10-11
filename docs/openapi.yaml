@@ -414,7 +414,7 @@ paths:
         - { name: X-Reservation-Token, in: header, required: true, schema: { type: string }, description: "The access_token from POST /reservations. A header, not a URL parameter, so it stays out of server logs." }
       responses:
         "200":
-          description: OK. `status` may be `expired` (accepted, but the hold ran out).
+          description: OK. `status` may be `expired` (accepted but the hold ran out, or the shop did not answer within 10 minutes).
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Reservation" }
@@ -770,7 +770,7 @@ paths:
     get:
       tags: [search]
       security: []
-      summary: Public shop page (name, location, phone, products with status only)
+      summary: Public shop page (name, location, phone, products with status and how many can be reserved)
       parameters:
         - { name: shop_id, in: path, required: true, schema: { type: string } }
         - { name: q, in: query, schema: { type: string } }
@@ -791,6 +791,11 @@ paths:
                         product: { $ref: "#/components/schemas/Product" }
                         price: { type: number, format: double, nullable: true }
                         stock_status: { $ref: "#/components/schemas/StockStatus" }
+                        reservable:
+                          type: integer
+                          description: >-
+                            Most a shopper can reserve now, in base units (pieces or grams): stock minus what
+                            other live requests hold, capped at the per-line limit (20 pieces, 10 kg).
 
   /ebills/{bill_id}:
     get:

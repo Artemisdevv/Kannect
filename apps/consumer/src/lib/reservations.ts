@@ -50,7 +50,7 @@ export const isOpen = (status?: string) => status === 'requested' || status === 
 
 // ---- what this phone remembers (storage can be unavailable: private windows, blocked site data)
 
-export type SavedReservation = { id: string; token: string; shopName: string; at: number };
+export type SavedReservation = { id: string; token: string; shopName: string; at: number; closedAt?: number };
 const LIST_KEY = 'kannect:reservations';
 const CONTACT_KEY = 'kannect:contact';
 
@@ -74,6 +74,22 @@ export const savedReservations = (): SavedReservation[] => read<SavedReservation
 export const savedReservation = (id: string) => savedReservations().find((r) => r.id === id);
 export function saveReservation(entry: SavedReservation) {
   write(LIST_KEY, [entry, ...savedReservations().filter((r) => r.id !== entry.id)].slice(0, 30));
+}
+// A request that ended without a pickup (cancelled, declined, ran out) clears itself from the list
+// shortly after the shopper first sees it, so My requests only shows what still matters.
+export const CLOSED_VISIBLE_MS = 2 * 60 * 1000;
+export const endedWithoutPickup = (status?: string) => status === 'cancelled' || status === 'declined' || status === 'expired';
+export function noteClosed(id: string, now = Date.now()) {
+  const list = savedReservations();
+  if (!list.some((r) => r.id === id && !r.closedAt)) return;
+  write(LIST_KEY, list.map((r) => (r.id === id ? { ...r, closedAt: now } : r)));
+}
+export const visibleReservations = (list: SavedReservation[], now = Date.now()) =>
+  list.filter((r) => !r.closedAt || now - r.closedAt < CLOSED_VISIBLE_MS);
+export function pruneClosed(now = Date.now()) {
+  const list = savedReservations();
+  const kept = visibleReservations(list, now);
+  if (kept.length !== list.length) write(LIST_KEY, kept);
 }
 export const savedContact = () => read<{ name: string; phone: string }>(CONTACT_KEY, { name: '', phone: '' });
 export const saveContact = (contact: { name: string; phone: string }) => write(CONTACT_KEY, contact);

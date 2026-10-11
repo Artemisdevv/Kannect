@@ -130,7 +130,7 @@ export async function nearbyShops(area: string, coordinatesArg?: Coordinates): P
   });
 }
 
-export type ShopPage = { shop: ShopResult; products: { productId: string; name: string; unit: 'piece' | 'gram'; price: number | null; status: StockStatus }[] };
+export type ShopPage = { shop: ShopResult; products: { productId: string; name: string; unit: 'piece' | 'gram'; price: number | null; status: StockStatus; reservable: number | null }[] };
 export async function getShopPage(shopId: string, q?: string): Promise<ShopPage> {
   const data = await call((signal) =>
     api.GET("/shops/{shop_id}", { params: { path: { shop_id: shopId }, query: q ? { q } : {} }, signal }),
@@ -140,7 +140,7 @@ export async function getShopPage(shopId: string, q?: string): Promise<ShopPage>
     products: (data.products ?? []).map((p) => {
       const status = parseStatus(p.stock_status);
       if (!p.product?.id || !status) throw new Error("The server returned incomplete product availability.");
-      return { productId: p.product.id, name: productName(p.product), unit: p.product.unit === 'gram' ? 'gram' as const : 'piece' as const, price: parsePrice(p.price), status };
+      return { productId: p.product.id, name: productName(p.product), unit: p.product.unit === 'gram' ? 'gram' as const : 'piece' as const, price: parsePrice(p.price), status, reservable: typeof p.reservable === 'number' ? Math.max(0, p.reservable) : null };
     }),
   };
 }
