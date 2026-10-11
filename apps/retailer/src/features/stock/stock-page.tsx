@@ -1,4 +1,4 @@
-import { ChevronRight, Package, ScanLine } from "lucide-react";
+import { ChevronRight, Minus, Package, Plus, ScanLine } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useRecount, useShopProducts } from "@/features/queries";
 import { ScanDialog } from "@/features/scan/scan-dialog";
-import { formatQty, newId, priceLabel, STATUS_LABEL, statusClass } from "@/lib/format";
+import { formatQty, newId, priceLabel, STATUS_LABEL, statusClass, stepFor } from "@/lib/format";
 
 const FILTERS = ["All", "Low", "Out", "Review"] as const;
 type Filter = (typeof FILTERS)[number];
@@ -19,7 +19,8 @@ export function StockPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("All");
   const [selected, setSelected] = useState<ShopProduct | null>(null);
-  const [quantity, setQuantity] = useState("");
+  // The count being edited, in base units (pieces, or grams for loose goods).
+  const [count, setCount] = useState(0);
   const [scan, setScan] = useState(false);
   // One id per count: pressing Confirm twice (or retrying) cannot apply it twice.
   const [countId, setCountId] = useState(newId());
@@ -35,25 +36,27 @@ export function StockPage() {
   });
 
   const open = (row: ShopProduct) => {
-    const perKg = row.product?.unit === "gram";
     setSelected(row);
-    setQuantity(row.needs_recount ? "" : String((row.stock_qty ?? 0) / (perKg ? 1000 : 1)));
+    setCount(Math.max(0, row.stock_qty ?? 0)); // start from what the system says is on the shelf
     setCountId(newId());
   };
 
-  const perKg = selected?.product?.unit === "gram";
-  const parsed = Number(quantity);
-  const valid = quantity !== "" && Number.isFinite(parsed) && parsed >= 0;
+  const unit = selected?.product?.unit;
+  const step = stepFor(unit);
+  const current = Math.max(0, selected?.stock_qty ?? 0);
+  const unknown = Boolean(selected?.needs_recount);
+  const delta = count - current;
+  const change = (by: number) => setCount((c) => Math.max(0, c + by));
 
   const confirm = async () => {
-    if (!selected?.product?.id || !valid) return;
+    if (!selected?.product?.id) return;
     try {
       await recount.mutateAsync({
         items: [
           {
             client_id: countId,
             product_id: selected.product.id,
-            quantity: Math.round(parsed * (perKg ? 1000 : 1)),
+            quantity: count,
             count_source: "owner_exact",
           },
         ],
@@ -129,23 +132,43 @@ export function StockPage() {
       <Dialog open={selected !== null} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent className="mobile-dialog">
           <DialogTitle>{selected?.product?.name}</DialogTitle>
-          <DialogDescription>Count what is on the shelf, then confirm.</DialogDescription>
-          <label className="text-sm" htmlFor="stock-count">
-            {perKg ? "Kilograms in stock" : "Quantity in stock"}
-          </label>
-          <input
-            id="stock-count"
-            className="page-search"
-            type="number"
-            min="0"
-            step={perKg ? "0.25" : "1"}
-            inputMode="decimal"
-            placeholder="Enter the count"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-          />
-          <Button disabled={!valid || recount.isPending} onClick={() => void confirm()}>
-            {recount.isPending ? "Saving…" : "Confirm count"}
+          <DialogDescription>
+            {unknown
+              ? "We don't know how many you have yet. Count the shelf and set the number."
+              : `In stock now: ${formatQty(current, unit)}${unit === "gram" ? "" : " "}. Adjust if the shelf is different.`}
+          </DialogDescription>
+
+          <div className="flex items-center justify-between gap-3 py-2">
+            <Button variant="outline" size="icon" className="size-14 rounded-full" aria-label="Decrease" disabled={count <= 0} onClick={() => change(-step)}>
+              <Minus />
+            </Button>
+            <div className="text-center">
+              <div className="text-4xl font-bold tabular-nums">{formatQty(count, unit)}</div>
+              {!unknown && delta !== 0 && (
+                <div className="text-xs text-muted-foreground">
+                  {delta > 0 ? "+" : "−"}
+                  {formatQty(Math.abs(delta), unit)} from {formatQty(current, unit)}
+                </div>
+              )}
+            </div>
+            <Button variant="outline" size="icon" className="size-14 rounded-full" aria-label="Increase" onClick={() => change(step)}>
+              <Plus />
+            </Button>
+          </div>
+
+          <div className="flex gap-2 justify-center">
+            {(unit === "gram" ? [1000, 5000] : [5, 10]).map((n) => (
+              <Button key={n} variant="ghost" size="sm" onClick={() => change(n)}>
+                +{formatQty(n, unit)}
+              </Button>
+            ))}
+            <Button variant="ghost" size="sm" disabled={count === 0} onClick={() => setCount(0)}>
+              Zero
+            </Button>
+          </div>
+
+          <Button disabled={recount.isPending} onClick={() => void confirm()}>
+            {recount.isPending ? "Saving…" : unknown ? "Save count" : delta === 0 ? "Count is right" : "Update stock"}
           </Button>
         </DialogContent>
       </Dialog>
