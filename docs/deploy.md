@@ -2,7 +2,7 @@
 
 The API is one Docker image (`backend/Dockerfile`). It runs unchanged on Render, Fly.io, Railway or Cloud Run: it listens on `$PORT`, trusts the proxy's HTTPS headers, and takes all settings from environment variables. The database is Supabase ([supabase.md](./supabase.md)).
 
-Verified: the image builds, runs with `APP_ENV=production` against the real Supabase database, refuses to start with the default JWT secret, and serves health, PostGIS, search and CORS for Lovable preview domains. A real hosted deploy has **not** been done (needs a hosting account).
+Verified: the image builds, runs with `APP_ENV=production` against the real Supabase database, refuses to start with the default JWT secret, and serves health, PostGIS, search and CORS for Lovable preview domains. **Live deploy:** `https://kannect-i9bp.onrender.com` (Render, Singapore). Checked: `/api/v1/health`, `/api/v1/health/db` (PostGIS), `/docs`, search against the Supabase demo data, and login with the non-default `DEMO_OTP`. Frontends use `VITE_API_URL=https://kannect-i9bp.onrender.com/api/v1`.
 
 ## Render (config is in `render.yaml`)
 1. Render dashboard, New, **Blueprint**, pick this repo. It creates `kannect-api` (Docker, Singapore, free plan).
@@ -10,6 +10,14 @@ Verified: the image builds, runs with `APP_ENV=production` against the real Supa
 3. After the first deploy, copy the service URL (for example `https://kannect-api.onrender.com`) into `PUBLIC_BASE_URL` and redeploy. E-bill links are built from it.
 4. Give the frontends `VITE_API_URL=https://<service>/api/v1`.
 5. Check `https://<service>/api/v1/health/db` shows the PostGIS version and `https://<service>/docs` loads.
+
+## Render, manual web service (what was actually used)
+New, **Web Service**, connect the repo, then:
+- **Language:** Docker. **Branch:** `main`. **Region:** Singapore.
+- **Root Directory: `backend`.** Without it the build fails with `failed to read dockerfile: open Dockerfile: no such file or directory`, because the Dockerfile is at `backend/Dockerfile`, not the repo root. Dockerfile path stays `./Dockerfile`.
+- **Health Check Path:** `/api/v1/health`.
+- Add the environment variables below, deploy, then set `PUBLIC_BASE_URL` to the service URL and redeploy.
+- Render says it has no access to the repo when only cloning over HTTPS; the clone still works.
 
 ## Environment variables
 | Variable | Value |
