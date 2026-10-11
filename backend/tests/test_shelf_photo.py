@@ -230,3 +230,43 @@ def test_unnamed_dropped_and_duplicates_merged():
     assert len(body["detections"]) == 1
     only = body["detections"][0]
     assert only["visible_count"] == 5 and only["confidence"] == 0.9
+
+
+# ---------- precision rules (found by reviewing 41 auto-matches from 29 real photos) ----------
+
+
+def test_bare_brand_never_auto_picks_one_product_of_many():
+    idx = CatalogueIndex(
+        [product("Parle", "Parle-G", "56 g"), product("Parle", "Parle Monaco", "200 g"),
+         product("Parle", "Hide & Seek", "100 g")]  # fmt: skip
+    )
+    best, alts, needs_scan = classify(idx.match("PARLE", "PARLE", ""))
+    assert best is None and needs_scan and alts  # owner picks from the alternatives
+
+
+def test_ambiguous_product_name_is_not_auto_picked():
+    idx = CatalogueIndex(
+        [product("Cadbury", "Oreo", "50 g"), product("Kwality Walls", "Cornetto Oreo Disc", "72 g")]
+    )
+    best, alts, needs_scan = classify(idx.match("Oreo", "Oreo", ""))
+    assert best is None and needs_scan and len(alts) == 2
+
+
+def test_product_name_in_the_brand_field_still_matches_when_unique():
+    idx = CatalogueIndex([product("Parle", "Hide & Seek", "100 g"), product("Parle", "Parle-G")])
+    best, _, needs_scan = classify(idx.match("Hide & Seek", "Hide & Seek", ""))
+    assert best is not None and best.product.name == "Hide & Seek" and not needs_scan
+
+
+def test_one_or_two_letter_brand_cannot_be_trusted():
+    idx = CatalogueIndex([product("Act Ii", "Act II Classic Salted", "40 g")])
+    best, _, needs_scan = classify(idx.match("Z", "Classic", ""))
+    assert best is None and needs_scan
+
+
+def test_tie_prefers_the_closest_whole_string():
+    idx = CatalogueIndex(
+        [product("Parle", "Happy Happy", "31.5 g"), product("Parle", "Parle - G", None)]
+    )
+    best, _, _ = classify(idx.match("Parle", "Parle-G", ""))
+    assert best is not None and best.product.name == "Parle - G"
