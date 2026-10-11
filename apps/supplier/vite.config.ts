@@ -35,6 +35,9 @@ export default defineConfig({
       ],
     },
     plugins: [VitePWA({
+      // TanStack Start writes the client build to .output/public; without this the plugin looked in
+      // dist/, so sw.js was written to the wrong folder (404 once registered) and precached nothing.
+      outDir: ".output/public",
       strategies: "generateSW",
       filename: "sw.js",
       registerType: "autoUpdate",
