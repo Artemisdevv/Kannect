@@ -21,7 +21,7 @@ Two modes, chosen by one setting on the API: `OTP_PROVIDER`.
 2. The owner enters their number and the SMS code inside the phone.email widget.
 3. The widget gives the app a result URL (`user_json_url`). The app sends it to
    `POST /auth/phone-email/verify`.
-4. The server only accepts an `https` URL on an allowed host (`PHONE_EMAIL_HOSTS`, default `user.phone.email`),
+4. The server only accepts an `https` URL on an allowed host (`PHONE_EMAIL_HOSTS`, default `phone.email`: that domain and its subdomains),
    fetches the verified number itself (no redirects, short timeout, size cap), and issues the normal login token.
    Each result URL works once per server instance.
 

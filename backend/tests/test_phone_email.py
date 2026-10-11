@@ -139,6 +139,33 @@ def test_untrusted_result_urls_are_never_fetched(url):
         check_result_url(url, settings(**ON))
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://user.phone.email/user_abcxd123fgbfg43454.json",
+        "https://eu.phone.email/user_abcxd123fgbfg43454.json",
+        "https://phone.email/user_abcxd123fgbfg43454.json",
+        "https://user.phone.email/results/user_abcxd123fgbfg43454.json",
+    ],
+)
+def test_phone_email_domain_and_its_subdomains_are_accepted(url):
+    assert check_result_url(url, settings(**ON)) == url
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://notphone.email/user_abcxd123fgbfg43454.json",
+        "https://phone.email.evil.com/user_abcxd123fgbfg43454.json",
+        "https://user.phone.email/../../etc/passwd.json",
+        "https://user.phone.email/user_abcxd123fgbfg43454",
+    ],
+)
+def test_other_domains_and_odd_paths_are_refused(url):
+    with pytest.raises(HTTPException):
+        check_result_url(url, settings(**ON))
+
+
 def test_good_url_is_normalised():
     assert check_result_url(GOOD + " ", settings(**ON)) == GOOD
 
