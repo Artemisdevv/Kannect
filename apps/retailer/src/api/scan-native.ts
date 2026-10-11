@@ -3,6 +3,7 @@
 // video frames in a WebView. Registered once at startup when running inside the Android app.
 import { BarcodeFormat, BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
 
+import { playScanBeep } from "./beep";
 import { normalizeBarcode, registerNativeScanner, type Scanner } from "./scan";
 
 const FORMATS = [BarcodeFormat.Ean13, BarcodeFormat.Ean8, BarcodeFormat.UpcA, BarcodeFormat.UpcE, BarcodeFormat.Code128];
@@ -18,7 +19,9 @@ const nativeScanner: Scanner = {
     if (!available) await BarcodeScanner.installGoogleBarcodeScannerModule();
     const { barcodes } = await BarcodeScanner.scan({ formats: FORMATS });
     const raw = barcodes[0]?.rawValue;
-    return raw ? normalizeBarcode(raw) : null;
+    const code = raw ? normalizeBarcode(raw) : null;
+    if (code) playScanBeep();
+    return code;
   },
 };
 

@@ -3,6 +3,8 @@
 // and screens do not change.
 import { BrowserMultiFormatReader } from "@zxing/browser";
 
+import { playScanBeep } from "./beep";
+
 export interface Scanner {
   /** "web": the app shows a <video> and `start` decodes frames. "native": the OS scanner takes over. */
   kind: "web" | "native";
@@ -28,6 +30,7 @@ const webScanner: Scanner = {
       // the camera reports the same code every frame: only pass a code on when it changes
       if (code && code !== last) {
         last = code;
+        playScanBeep();
         onCode(code);
       }
     });
