@@ -1,0 +1,1 @@
+{"name":"KadaNet","short_name":"KadaNet","description":"Find everyday items at nearby local shops.","start_url":"/","display":"standalone","background_color":"#FFFAF0","theme_color":"#FFFAF0","lang":"en","scope":"/","id":"/","icons":[{"src":"/icon-192.png","sizes":"192x192","type":"image/png"},{"src":"/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]}
