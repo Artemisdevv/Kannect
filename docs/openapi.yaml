@@ -614,11 +614,44 @@ paths:
                     type: array
                     items:
                       type: object
+                      description: |
+                        One invoice line. `quantity` is in the product's base unit (pieces, or grams for loose goods),
+                        converted from what was billed (cartons x pieces per carton, dozens, bags x weight). Suggest only:
+                        the owner confirms, then the app posts a restock to /shop/stock-events.
                       properties:
-                        raw_text: { type: string }
+                        raw_text: { type: string, description: "The line as printed" }
                         product: { type: object, nullable: true, allOf: [{ $ref: "#/components/schemas/Product" }] }
-                        quantity: { type: integer }
+                        alternatives:
+                          type: array
+                          description: "Weaker catalogue matches for a one-tap swap"
+                          items: { $ref: "#/components/schemas/Product" }
+                        quantity: { type: integer, description: "Base units" }
+                        unit: { $ref: "#/components/schemas/Unit" }
+                        cost_price: { type: number, format: double, nullable: true, description: "Per piece, or per kg for gram items, from the printed line total; null if not printed" }
+                        billed:
+                          type: object
+                          description: "What the invoice said, so the app can recompute if the owner picks another product"
+                          properties:
+                            quantity: { type: number }
+                            unit: { type: string, enum: [piece, pack, carton, dozen, kg, g, litre, ml, unknown] }
+                            units_per_pack: { type: integer, nullable: true }
+                            pack_weight_g: { type: integer, nullable: true }
+                            unit_price: { type: number, nullable: true }
+                            line_total: { type: number, nullable: true }
                         confidence: { type: number, minimum: 0, maximum: 1 }
+                        needs_scan: { type: boolean, description: "No confident catalogue match: scan the barcode" }
+                        needs_check: { type: boolean, description: "A guess was involved (unit, pieces per carton) or the line was hard to read" }
+                        note: { type: string, nullable: true, description: "Why needs_check is set, shown beside the line" }
+                  invoice:
+                    type: object
+                    properties:
+                      supplier_name: { type: string, nullable: true }
+                      number: { type: string, nullable: true }
+                      date: { type: string, nullable: true }
+                      lines_total: { type: number, nullable: true }
+                      invoice_total: { type: number, nullable: true }
+                      possible_misread: { type: boolean, nullable: true, description: "True when the lines add up to far less/more than the printed total" }
+                  image_quality: { type: string, enum: [good, blurry, too_dark, too_far] }
 
   /shop/ai/voice-bill:
     post:
