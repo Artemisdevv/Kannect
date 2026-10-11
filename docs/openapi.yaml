@@ -1,0 +1,799 @@
+openapi: 3.0.3
+info:
+  title: KadaNet API
+  version: 0.1.0
+  description: |
+    Contract shared by frontend (Shreyas) and backend (Aswin, Adnan).
+    Change via PR + notify the team. Human-readable overview: api-contract.md.
+servers:
+  - url: http://localhost:8000/api/v1
+    description: local
+  - url: https://TBD.example.com/api/v1
+    description: demo (Adnan owns deploy)
+
+tags:
+  - name: auth
+    description: "Owner: Aswin"
+  - name: shop
+    description: "Owner: Aswin"
+  - name: catalogue
+    description: "Owner: Aswin"
+  - name: billing
+    description: "Owner: Aswin"
+  - name: sync
+    description: "Owner: Aswin"
+  - name: search
+    description: "Owner: Adnan (public, no auth)"
+  - name: ebill
+    description: "Owner: Adnan"
+  - name: ai
+    description: "Owner: Adnan (nice-to-have)"
+
+security:
+  - bearer: []
+
+paths:
+  /auth/otp/request:
+    post:
+      tags: [auth]
+      security: []
+      summary: Send OTP (demo stub always accepts 123456)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string, example: "+919876543210" }
+      responses:
+        "204": { description: OTP sent }
+        "400": { $ref: "#/components/responses/Error" }
+
+  /auth/otp/verify:
+    post:
+      tags: [auth]
+      security: []
+      summary: Verify OTP, returns JWT. `shop` is null for a new owner (call POST /shop next).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, otp]
+              properties:
+                phone: { type: string }
+                otp: { type: string, example: "123456" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  shop: { allOf: [{ $ref: "#/components/schemas/Shop" }], nullable: true }
+        "401": { $ref: "#/components/responses/Error" }
+
+  /shop:
+    post:
+      tags: [shop]
+      summary: Create the owner's shop
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShopInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Shop" }
+    get:
+      tags: [shop]
+      summary: Get own shop
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Shop" }
+    patch:
+      tags: [shop]
+      summary: Update own shop
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShopInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Shop" }
+
+  /catalogue/barcode/{barcode}:
+    get:
+      tags: [catalogue]
+      summary: Lookup shared product by barcode (404 if unknown; client then calls POST /catalogue/products)
+      parameters:
+        - { name: barcode, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /catalogue/products:
+    get:
+      tags: [catalogue]
+      summary: Search shared catalogue by name (for manual add)
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Product" }
+    post:
+      tags: [catalogue]
+      summary: Create shared product (first scan of an unknown barcode, or loose item with no barcode)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProductInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+
+  /catalogue/starter-packs:
+    get:
+      tags: [catalogue]
+      summary: Onboarding starter packs. Pre-curated popular Kerala items by shop type, with images and MRP. Owner ticks what they sell.
+      parameters:
+        - { name: shop_type, in: query, required: true, schema: { type: string, enum: [grocery, provision, vegetable, stationery, bakery, general] } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Product" }
+
+  /shop/products/bulk:
+    post:
+      tags: [shop]
+      summary: |
+        Add many products in one call (starter pack, invoice confirm, rapid scan session).
+        Each line needs only a product and a rough stock level. Price defaults to the product's MRP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [product_id]
+                    properties:
+                      product_id: { type: string }
+                      price: { type: number, format: double, description: "Defaults to product mrp" }
+                      stock_level:
+                        type: string
+                        enum: [plenty, some, few, none, unknown]
+                        description: "Rough level, server maps to default quantities and low_threshold. Use opening_stock for exact."
+                      opening_stock: { type: integer, description: "Exact base units; wins over stock_level" }
+                      count_source:
+                        type: string
+                        enum: [owner_exact, photo_estimate, level_guess]
+                        default: level_guess
+                        description: "How the number was obtained. Stored on the stock event so accuracy can be audited and photo estimates recounted first."
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/ShopProduct" }
+
+  /shop/products:
+    get:
+      tags: [shop]
+      summary: List this shop's products with stock
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/StockStatus" } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/ShopProduct" }
+    post:
+      tags: [shop]
+      summary: Add a catalogue product to this shop (optionally with opening stock)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id, price]
+              properties:
+                product_id: { type: string }
+                price: { type: number, format: double, description: "Per price_unit of the product" }
+                cost_price: { type: number, format: double }
+                opening_stock: { type: integer, description: "Base units (pieces or grams)" }
+                low_threshold: { type: integer, description: "Base units; below this = low" }
+                pinned: { type: boolean, description: "Show as a tile (loose items)" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShopProduct" }
+
+  /shop/products/{product_id}:
+    patch:
+      tags: [shop]
+      summary: Update price, threshold, pin
+      parameters:
+        - { name: product_id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                price: { type: number, format: double }
+                cost_price: { type: number, format: double }
+                low_threshold: { type: integer }
+                pinned: { type: boolean }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShopProduct" }
+
+  /shop/stock-events:
+    post:
+      tags: [shop]
+      summary: Record restock or correction (recount). Sales go through /shop/bills.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StockEventInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShopProduct" }
+
+  /shop/recount-suggestions:
+    get:
+      tags: [shop]
+      summary: 10-15 items to recount this week (loose items first, flagged conflicts first)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/ShopProduct" }
+
+  /shop/bills:
+    post:
+      tags: [billing]
+      summary: |
+        Create bill; writes sale stock events in one transaction. Idempotent on client_id.
+        If a product is not yet in this shop, it is auto-added (price from the line, stock unknown) so billing never blocks on onboarding.
+        Stock may go negative; the product is then flagged needs_recount.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BillInput" }
+      responses:
+        "201":
+          description: Created (200 with same body if client_id already seen)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bill" }
+    get:
+      tags: [billing]
+      summary: List bills, newest first
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Bill" }
+                  next_cursor: { type: string, nullable: true }
+
+  /shop/bills/{bill_id}:
+    get:
+      tags: [billing]
+      parameters:
+        - { name: bill_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bill" }
+
+  /shop/sync:
+    post:
+      tags: [sync]
+      summary: Upload everything queued offline in one batch. Per-item results; never all-or-nothing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bills:
+                  type: array
+                  items: { $ref: "#/components/schemas/BillInput" }
+                stock_events:
+                  type: array
+                  items: { $ref: "#/components/schemas/StockEventInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bills:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        client_id: { type: string }
+                        status: { type: string, enum: [created, duplicate, rejected] }
+                        bill: { $ref: "#/components/schemas/Bill" }
+                        error: { type: string, nullable: true }
+                  stock_events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        client_id: { type: string }
+                        status: { type: string, enum: [created, duplicate, rejected] }
+                        error: { type: string, nullable: true }
+                  flagged_for_recount:
+                    type: array
+                    description: Products whose stock went negative after merge (two devices sold the last item)
+                    items: { type: string }
+
+  /shop/export:
+    get:
+      tags: [shop]
+      summary: Export all shop data (no lock-in)
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [json, csv], default: json } }
+      responses:
+        "200":
+          description: File download
+          content:
+            application/json: {}
+            text/csv: {}
+
+  /search:
+    get:
+      tags: [search]
+      security: []
+      summary: Nearby shops that stock an item. Sorted by distance. Never exposes exact counts.
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, example: soap } }
+        - { name: lat, in: query, required: true, schema: { type: number } }
+        - { name: lng, in: query, required: true, schema: { type: number } }
+        - { name: radius_m, in: query, schema: { type: integer, default: 2000 } }
+        - { name: include_out, in: query, schema: { type: boolean, default: false } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items: { $ref: "#/components/schemas/SearchResult" }
+
+  /search/referral:
+    get:
+      tags: [search]
+      security: []
+      summary: Nearest other shop with the product in stock (use when selected shop is out)
+      parameters:
+        - { name: shop_id, in: query, required: true, schema: { type: string } }
+        - { name: product_id, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK (referral is null if nobody nearby has it)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  referral:
+                    allOf: [{ $ref: "#/components/schemas/SearchResult" }]
+                    nullable: true
+
+  /shops/{shop_id}:
+    get:
+      tags: [search]
+      security: []
+      summary: Public shop page (name, location, phone, products with status only)
+      parameters:
+        - { name: shop_id, in: path, required: true, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  shop: { $ref: "#/components/schemas/PublicShop" }
+                  products:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        product: { $ref: "#/components/schemas/Product" }
+                        price: { type: number, format: double }
+                        stock_status: { $ref: "#/components/schemas/StockStatus" }
+
+  /ebills/{bill_id}:
+    get:
+      tags: [ebill]
+      security: []
+      summary: Public e-bill JSON. HTML version lives at {origin}/b/{bill_id}. bill_id is an unguessable id.
+      parameters:
+        - { name: bill_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bill: { $ref: "#/components/schemas/Bill" }
+                  shop: { $ref: "#/components/schemas/PublicShop" }
+                  share_text: { type: string, description: "Ready for WhatsApp: shop, total, link" }
+                  share_url: { type: string }
+
+  /shop/ai/shelf-photo:
+    post:
+      tags: [ai]
+      summary: |
+        One-shot onboarding. Photo(s) of shelves/counter -> detected products matched to the shared catalogue,
+        each with a visible-count estimate. Owner confirms (one tap per row), then client calls POST /shop/products/bulk
+        with count_source = photo_estimate. Suggest only, never writes stock.
+        Counts only cover what is visible from the front, so treat as an estimate, not a precise stock.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [images]
+              properties:
+                images:
+                  type: array
+                  maxItems: 6
+                  items: { type: string, format: binary }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detections:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        label: { type: string, description: "What the model saw, e.g. 'Lux soap pink 100g'" }
+                        match:
+                          allOf: [{ $ref: "#/components/schemas/Product" }]
+                          nullable: true
+                          description: "Best catalogue match, null if none"
+                        alternatives:
+                          type: array
+                          description: "Other candidate matches for a one-tap swap"
+                          items: { $ref: "#/components/schemas/Product" }
+                        visible_count: { type: integer, description: "Facings/units counted in the photo" }
+                        suggested_level: { type: string, enum: [plenty, some, few] }
+                        confidence: { type: number, minimum: 0, maximum: 1 }
+                        needs_scan: { type: boolean, description: "True when no confident match: UI prompts the owner to scan this item's barcode" }
+                  image_quality: { type: string, enum: [good, blurry, too_dark, too_far], description: "Prompt the owner to retake when not good" }
+
+  /shop/ai/invoice:
+    post:
+      tags: [ai]
+      summary: "Photo of supplier invoice -> suggested restock lines. Owner confirms, then client calls /shop/stock-events."
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image: { type: string, format: binary }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        raw_text: { type: string }
+                        product: { allOf: [{ $ref: "#/components/schemas/Product" }], nullable: true }
+                        quantity: { type: integer }
+                        confidence: { type: number, minimum: 0, maximum: 1 }
+
+  /shop/ai/voice-bill:
+    post:
+      tags: [ai]
+      summary: "Malayalam/English audio -> suggested bill lines. Owner confirms before POST /shop/bills."
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                audio: { type: string, format: binary }
+                language: { type: string, enum: [ml, en], default: ml }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transcript: { type: string }
+                  suggestions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        product: { allOf: [{ $ref: "#/components/schemas/Product" }], nullable: true }
+                        quantity: { type: integer }
+                        confidence: { type: number }
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, example: not_found }
+            message: { type: string }
+
+    StockStatus:
+      type: string
+      enum: [in_stock, low, out]
+
+    Unit:
+      type: string
+      enum: [piece, gram]
+      description: |
+        Base unit stock and quantities are stored in. Loose goods use gram.
+        Price is per piece, or per kg when unit = gram.
+
+    Location:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: { type: number, example: 9.9312 }
+        lng: { type: number, example: 76.2673 }
+
+    ShopInput:
+      type: object
+      properties:
+        name: { type: string }
+        owner_name: { type: string }
+        phone: { type: string }
+        address: { type: string }
+        location: { $ref: "#/components/schemas/Location" }
+        language: { type: string, enum: [ml, en], default: ml }
+        shop_type: { type: string, enum: [grocery, provision, vegetable, stationery, bakery, general], description: "Picks the onboarding starter pack" }
+
+    Shop:
+      allOf:
+        - $ref: "#/components/schemas/ShopInput"
+        - type: object
+          properties:
+            id: { type: string }
+
+    PublicShop:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        address: { type: string }
+        phone: { type: string }
+        location: { $ref: "#/components/schemas/Location" }
+
+    ProductInput:
+      type: object
+      required: [name, unit]
+      properties:
+        barcode: { type: string, nullable: true, description: "Null for loose items" }
+        name: { type: string, example: Lux Soap }
+        name_ml: { type: string, nullable: true }
+        brand: { type: string, nullable: true }
+        size: { type: string, nullable: true, example: 100 g }
+        category: { type: string, nullable: true }
+        unit: { $ref: "#/components/schemas/Unit" }
+        image_url: { type: string, nullable: true }
+        mrp: { type: number, format: double, nullable: true, description: "Printed MRP in rupees. Used as the default shop price during onboarding." }
+
+    Product:
+      allOf:
+        - $ref: "#/components/schemas/ProductInput"
+        - type: object
+          properties:
+            id: { type: string }
+
+    ShopProduct:
+      type: object
+      properties:
+        product: { $ref: "#/components/schemas/Product" }
+        price: { type: number, format: double, description: "Per piece, or per kg if unit = gram" }
+        cost_price: { type: number, format: double, nullable: true }
+        stock_qty: { type: integer, description: "Base units. Owner-facing only, never in public endpoints." }
+        low_threshold: { type: integer }
+        stock_status: { $ref: "#/components/schemas/StockStatus" }
+        needs_recount: { type: boolean }
+        pinned: { type: boolean }
+
+    BillLineInput:
+      type: object
+      required: [product_id, quantity]
+      properties:
+        product_id: { type: string }
+        quantity: { type: integer, description: "Base units: pieces or grams" }
+        price: { type: number, format: double, description: "Optional override per price unit; defaults to shop price" }
+
+    BillLine:
+      allOf:
+        - $ref: "#/components/schemas/BillLineInput"
+        - type: object
+          properties:
+            name: { type: string }
+            unit: { $ref: "#/components/schemas/Unit" }
+            line_total: { type: number, format: double, description: "Server computed. piece: price*qty. gram: round(price*qty/1000, 2)" }
+
+    BillInput:
+      type: object
+      required: [client_id, items, payment_mode]
+      properties:
+        client_id: { type: string, description: "Client generated UUID. Idempotency key." }
+        created_at: { type: string, format: date-time, description: "Client time; matters for offline bills" }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/BillLineInput" }
+        payment_mode: { type: string, enum: [cash, upi, card, other] }
+        customer_contact: { type: string, nullable: true, description: "Optional phone, only with consent" }
+
+    Bill:
+      type: object
+      properties:
+        id: { type: string, description: "Unguessable; used in e-bill URL" }
+        client_id: { type: string }
+        shop_id: { type: string }
+        created_at: { type: string, format: date-time }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/BillLine" }
+        total: { type: number, format: double }
+        payment_mode: { type: string }
+        share_url: { type: string }
+
+    StockEventInput:
+      type: object
+      required: [client_id, product_id, type, quantity]
+      properties:
+        client_id: { type: string }
+        product_id: { type: string }
+        type: { type: string, enum: [restock, correction] }
+        quantity:
+          type: integer
+          description: "restock: units added (>0). correction: the counted absolute quantity."
+        created_at: { type: string, format: date-time }
+
+    SearchResult:
+      type: object
+      properties:
+        shop: { $ref: "#/components/schemas/PublicShop" }
+        product: { $ref: "#/components/schemas/Product" }
+        price: { type: number, format: double }
+        stock_status: { $ref: "#/components/schemas/StockStatus" }
+        distance_m: { type: integer }
