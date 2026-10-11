@@ -1,5 +1,6 @@
 import io
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 from fastapi import FastAPI
@@ -10,7 +11,7 @@ from app.auth import create_access_token
 from app.config import Settings, get_settings
 from app.db import get_db
 from app.errors import install
-from app.models import OwnerIdentity, Product, Shop, Supplier
+from app.models import OwnerIdentity, Product, Shop, ShopProduct, StockEvent, Supplier
 from app.routers.ai import get_shelf_vision, router
 from app.services.catalogue_match import STRONG, CatalogueIndex, classify
 from app.services.shelf_pipeline import merge_with_tiles
@@ -33,6 +34,8 @@ def product(brand, name, size="", barcode=None):
         category=None, name_ml=None, image_url=None, mrp=None, is_active=True,
     )  # fmt: skip
 
+
+NOW = datetime(2026, 10, 11, tzinfo=timezone.utc)
 
 CATALOGUE = [
     product("Parle", "Parle-G", "56 g", "8901719101755"),
@@ -119,8 +122,9 @@ class MedianResult:
 
 
 class FakeSession:
-    def __init__(self, products=None, role="retailer", medians=None):
+    def __init__(self, products=None, role="retailer", medians=None, shop_rows=None):
         self.products = products or []
+        self.shop_rows = shop_rows or []  # ShopProduct rows this shop already has
         self.role = role
         self.medians = medians or {}  # product id -> typical price charged by other shops
 
@@ -141,6 +145,8 @@ class FakeSession:
         return None
 
     def scalars(self, statement):
+        if statement.column_descriptions[0].get("entity") is ShopProduct:
+            return FakeResult(self.shop_rows)
         return FakeResult(self.products)
 
 
@@ -154,11 +160,13 @@ class FakeVision:
         return ShelfResult(detections=self.detections)
 
 
-def client(vision, products=None, role="retailer", medians=None):
+def client(vision, products=None, role="retailer", medians=None, shop_rows=None):
     app = FastAPI()
     install(app)
     app.include_router(router)
-    session = FakeSession(products if products is not None else CATALOGUE, role, medians)
+    session = FakeSession(
+        products if products is not None else CATALOGUE, role, medians, shop_rows
+    )
     app.dependency_overrides[get_db] = lambda: session
     app.dependency_overrides[get_settings] = lambda: TEST_SETTINGS
     app.dependency_overrides[get_shelf_vision] = lambda: vision
@@ -437,3 +445,29 @@ def test_unmatched_items_get_no_suggested_price():
     dets = [Detection(name="Small bottles", category="other", readable=False)]
     d = post(client(FakeVision(dets)), [photo()], thorough="false").json()["detections"][0]
     assert d["match"] is None and d["suggested_price"] is None
+
+
+def test_items_the_shop_already_stocks_report_the_system_count_for_a_recount():
+    stocked = product("Parle", "Parle-G", "56 g", barcode="8901719101755")
+    other = product("Dabur", "Dabur Honey", "250 g", barcode="8901207000000")
+    row = ShopProduct(product_id=stocked.id, low_threshold=5)
+    row.stock_events = [
+        StockEvent(id=uuid.uuid4(), type="correction", quantity=40, created_at=NOW)
+    ]
+    dets = [
+        Detection(brand="Parle", name="Parle-G", size="56 g", category="snacks_biscuits"),
+        Detection(brand="Dabur", name="Dabur Honey", size="250 g", category="grocery"),
+    ]
+    c = client(FakeVision(dets), [stocked, other], shop_rows=[row])
+    d = by_label(post(c, [photo()], thorough="false").json())
+    parle, honey = d["Parle Parle-G 56 g"], d["Dabur Dabur Honey 250 g"]
+    assert (parle["in_shop"], parle["current_quantity"], parle["current_status"]) == (
+        True, 40, "in_stock"
+    )  # fmt: skip
+    assert (honey["in_shop"], honey["current_quantity"]) == (False, None)
+
+
+def test_unmatched_items_are_not_in_shop():
+    dets = [Detection(name="Small bottles", category="other", readable=False)]
+    d = post(client(FakeVision(dets)), [photo()], thorough="false").json()["detections"][0]
+    assert d["in_shop"] is False and d["current_quantity"] is None

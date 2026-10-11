@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.auth import AuthenticatedOwner, require_retailer
 from app.config import Settings, get_settings
@@ -37,6 +37,7 @@ from app.services.shelf_vision import (
     suggested_level,
     worst_quality,
 )
+from app.stock import stock_quantity, stock_status
 
 router = APIRouter(prefix="/shop/ai", tags=["ai"])
 
@@ -64,7 +65,7 @@ def shelf_photo(
     thorough: bool = Query(True, description="Also re-read zoomed tiles to identify small labels"),
     db: Session = Depends(get_db),
     vision: ShelfVision = Depends(get_shelf_vision),
-    _: AuthenticatedOwner = Depends(require_retailer),
+    owner: AuthenticatedOwner = Depends(require_retailer),
 ) -> dict[str, Any]:
     if not 1 <= len(images) <= MAX_IMAGES:
         raise HTTPException(status_code=400, detail=f"Send 1 to {MAX_IMAGES} images")
@@ -132,6 +133,7 @@ def shelf_photo(
         )
 
     _add_suggested_prices(db, detections)
+    _add_shop_state(db, owner, detections)
     return {"detections": detections, "image_quality": quality}
 
 
@@ -203,6 +205,32 @@ def invoice_photo(
         },
         "image_quality": quality,
     }
+
+
+def _add_shop_state(
+    db: Session, owner: AuthenticatedOwner, detections: list[dict[str, Any]]
+) -> None:
+    """Tell the app which matched items the shop already stocks, with the system's count.
+
+    Onboarding skips these, so the app can offer a recount (`POST /shop/recount`) instead:
+    the owner sees "system says 40, photo shows few" and confirms.
+    """
+    for d in detections:
+        d["in_shop"], d["current_quantity"], d["current_status"] = False, None, None
+    ids = [UUID(d["match"]["id"]) for d in detections if d.get("match")]
+    if owner.shop is None or not ids:
+        return
+    rows = db.scalars(
+        select(ShopProduct)
+        .where(ShopProduct.shop_id == owner.shop.id, ShopProduct.product_id.in_(ids))
+        .options(selectinload(ShopProduct.stock_events))
+    ).all()
+    state = {r.product_id: (stock_quantity(r.stock_events), r.low_threshold) for r in rows}
+    for d in detections:
+        if d.get("match") and UUID(d["match"]["id"]) in state:
+            qty, threshold = state[UUID(d["match"]["id"])]
+            d["in_shop"], d["current_quantity"] = True, qty
+            d["current_status"] = stock_status(qty, threshold)
 
 
 def _add_suggested_prices(db: Session, detections: list[dict[str, Any]]) -> None:
