@@ -7,6 +7,9 @@ DEFAULT_JWT_SECRET = "change-me"
 LOCAL_ENVIRONMENTS = {"local", "development"}
 
 
+NATIVE_APP_ORIGINS = ("https://localhost", "http://localhost", "capacitor://localhost")
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -25,7 +28,10 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        configured = [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        # The Android apps (Capacitor WebView) always call from these origins. They carry a bearer
+        # token, not cookies, so allowing them is safe, and it must not depend on a deploy setting.
+        return [*configured, *(o for o in NATIVE_APP_ORIGINS if o not in configured)]
 
 
 @lru_cache
