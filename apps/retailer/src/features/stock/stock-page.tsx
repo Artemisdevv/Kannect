@@ -115,7 +115,7 @@ export function StockPage() {
             <Button variant="ghost" onClick={() => open(row)} aria-label={`Count ${row.product?.name}`}>
               <span className="flex flex-col items-end gap-1">
                 <span className={`status-pill ${statusClass(row.needs_recount ? "low" : row.stock_status)}`}>
-                  {row.needs_recount ? t("Review", locale) : t(STATUS_LABEL[row.stock_status ?? "in_stock"], locale)}
+                  {row.needs_recount ? t("Review", locale) : t(STATUS_LABEL[row.stock_status ?? "in_stock"] ?? "", locale)}
                 </span>
                 <span className="text-xs">{priceLabel(row.price, row.product?.unit)}</span>
               </span>

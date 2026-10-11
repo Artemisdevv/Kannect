@@ -24,7 +24,7 @@ export function setLocale(locale: Locale) {
   listeners.forEach((fn) => fn());
 }
 export function useLocale() {
-  const locale = useSyncExternalStore((fn) => { listeners.add(fn); return () => listeners.delete(fn); }, getLocale, () => 'en');
+  const locale = useSyncExternalStore<Locale>((fn) => { listeners.add(fn); return () => listeners.delete(fn); }, getLocale, () => 'en');
   useEffect(() => { document.documentElement.lang = locale; }, [locale]);
   return locale;
 }
@@ -63,7 +63,6 @@ const extraMl: Record<string, string> = {
   "A little freshness": '\u{d05}\u{d7d}\u{d2a}\u{d4d}\u{d2a}\u{d02} \u{d2a}\u{d41}\u{d24}\u{d41}\u{d2e}',
   "Good for you. Good for your neighbourhood.": '\u{d28}\u{d3f}\u{d19}\u{d4d}\u{d19}\u{d7e}\u{d15}\u{d4d}\u{d15}\u{d41}\u{d02} \u{d28}\u{d3f}\u{d19}\u{d4d}\u{d19}\u{d33}\u{d41}\u{d1f}\u{d46} \u{d2a}\u{d4d}\u{d30}\u{d26}\u{d47}\u{d36}\u{d24}\u{d4d}\u{d24}\u{d3f}\u{d28}\u{d41}\u{d02} \u{d28}\u{d32}\u{d4d}\u{d32}\u{d24}\u{d4d}.',
   "A shorter trip. A familiar face. Find your essentials at the local shops that make your neighbourhood yours.": '\u{d1a}\u{d46}\u{d31}\u{d3f}\u{d2f} \u{d2f}\u{d3e}\u{d24}\u{d4d}\u{d30}. \u{d2a}\u{d30}\u{d3f}\u{d1a}\u{d3f}\u{d24}\u{d2e}\u{d3e}\u{d2f} \u{d2e}\u{d41}\u{d16}\u{d19}\u{d4d}\u{d19}\u{d7e}. \u{d28}\u{d3f}\u{d19}\u{d4d}\u{d19}\u{d33}\u{d41}\u{d1f}\u{d46} \u{d2a}\u{d4d}\u{d30}\u{d26}\u{d47}\u{d36}\u{d24}\u{d4d}\u{d24}\u{d46} \u{d15}\u{d1f}\u{d15}\u{d33}\u{d3f}\u{d7d} \u{d06}\u{d35}\u{d36}\u{d4d}\u{d2f}\u{d2e}\u{d3e}\u{d2f}\u{d35} \u{d15}\u{d23}\u{d4d}\u{d1f}\u{d46}\u{d24}\u{d4d}\u{d24}\u{d42}.',
-  "Checking nearby shops…": '\u{d38}\u{d2e}\u{d40}\u{d2a}\u{d24}\u{d4d}\u{d24}\u{d46} \u{d15}\u{d1f}\u{d15}\u{d7e} \u{d2a}\u{d30}\u{d3f}\u{d36}\u{d4b}\u{d27}\u{d3f}\u{d15}\u{d4d}\u{d15}\u{d41}\u{d28}\u{d4d}\u{d28}\u{d41}\u{2026}',
   "Retry search": '\u{d35}\u{d40}\u{d23}\u{d4d}\u{d1f}\u{d41}\u{d02} \u{d24}\u{d3f}\u{d30}\u{d2f}\u{d41}\u{d15}',
   "Search results": '\u{d24}\u{d3f}\u{d30}\u{d1a}\u{d4d}\u{d1a}\u{d3f}\u{d7d} \u{d2b}\u{d32}\u{d19}\u{d4d}\u{d19}\u{d7e}',
   "Reported availability": '\u{d15}\u{d1f}\u{d15}\u{d7e} \u{d28}\u{d7d}\u{d15}\u{d3f}\u{d2f} \u{d32}\u{d2d}\u{d4d}\u{d2f}\u{d24}',
@@ -114,7 +113,6 @@ const extraMl: Record<string, string> = {
 };
 
 const moreMl: Record<string, string> = {
-  "Finding matches for ": '\u{d07}\u{d35}\u{d2f}\u{d41}\u{d2e}\u{d3e}\u{d2f}\u{d3f} \u{d2a}\u{d4a}\u{d30}\u{d41}\u{d24}\u{d4d}\u{d24}\u{d2e}\u{d41}\u{d33}\u{d4d}\u{d33}\u{d35} \u{d15}\u{d23}\u{d4d}\u{d1f}\u{d46}\u{d24}\u{d4d}\u{d24}\u{d41}\u{d28}\u{d4d}\u{d28}\u{d41}: ',
   "Fresh vegetables, fruit, milk and rice from a neighbourhood grocery shop": '\u{d2a}\u{d4d}\u{d30}\u{d26}\u{d47}\u{d36}\u{d24}\u{d4d}\u{d24}\u{d46} \u{d2a}\u{d32}\u{d1a}\u{d30}\u{d15}\u{d4d}\u{d15}\u{d4d} \u{d15}\u{d1f}\u{d2f}\u{d3f}\u{d32}\u{d46} \u{d2a}\u{d41}\u{d24}\u{d3f}\u{d2f} \u{d2a}\u{d1a}\u{d4d}\u{d1a}\u{d15}\u{d4d}\u{d15}\u{d31}\u{d3f}\u{d15}\u{d7e}, \u{d2a}\u{d34}\u{d19}\u{d4d}\u{d19}\u{d7e}, \u{d2a}\u{d3e}\u{d7d}, \u{d05}\u{d30}\u{d3f}',
   "Fresh vegetables, fruit, milk and rice in a neighbourhood grocery bag": '\u{d2a}\u{d4d}\u{d30}\u{d26}\u{d47}\u{d36}\u{d24}\u{d4d}\u{d24}\u{d46} \u{d2a}\u{d32}\u{d1a}\u{d30}\u{d15}\u{d4d}\u{d15}\u{d4d} \u{d15}\u{d1f}\u{d2f}\u{d3f}\u{d32}\u{d46} \u{d2a}\u{d41}\u{d24}\u{d3f}\u{d2f} \u{d2a}\u{d1a}\u{d4d}\u{d1a}\u{d15}\u{d4d}\u{d15}\u{d31}\u{d3f}\u{d15}\u{d7e}, \u{d2a}\u{d34}\u{d19}\u{d4d}\u{d19}\u{d7e}, \u{d2a}\u{d3e}\u{d7d}, \u{d05}\u{d30}\u{d3f}',
   "Find what you need, right around the corner.": '\u{d28}\u{d3f}\u{d19}\u{d4d}\u{d19}\u{d7e}\u{d15}\u{d4d}\u{d15}\u{d4d} \u{d35}\u{d47}\u{d23}\u{d4d}\u{d1f}\u{d24}\u{d4d} \u{d24}\u{d4a}\u{d1f}\u{d4d}\u{d1f}\u{d1f}\u{d41}\u{d24}\u{d4d}\u{d24}\u{d4d} \u{d15}\u{d23}\u{d4d}\u{d1f}\u{d46}\u{d24}\u{d4d}\u{d24}\u{d42}.',
@@ -153,6 +151,9 @@ const finalMl: Record<string, string> = {
   "No requests yet": '\u{d05}\u{d2d}\u{d4d}\u{d2f}\u{d7c}\u{d24}\u{d4d}\u{d25}\u{d28}\u{d15}\u{d33}\u{d4a}\u{d28}\u{d4d}\u{d28}\u{d41}\u{d2e}\u{d3f}\u{d32}\u{d4d}\u{d32}',
   "Checking…": '\u{d2a}\u{d30}\u{d3f}\u{d36}\u{d4b}\u{d27}\u{d3f}\u{d15}\u{d4d}\u{d15}\u{d41}\u{d28}\u{d4d}\u{d28}\u{d41}\u{2026}',
   "Searching": '\u{d24}\u{d3f}\u{d30}\u{d2f}\u{d41}\u{d28}\u{d4d}\u{d28}\u{d41}',
+  "Enter another area": 'മറ്റൊരു പ്രദേശം നൽകുക',
+  "Neighbourhood shops": 'അടുത്തുള്ള കടകൾ',
+  "Could not cancel.": 'റദ്ദാക്കാനായില്ല.',
 };
 
 export function t(text: string, locale = getLocale()) { return locale === 'ml' ? (ml[text] ?? extraMl[text] ?? moreMl[text] ?? finalMl[text] ?? text) : text; }

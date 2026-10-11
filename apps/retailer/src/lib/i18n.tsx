@@ -15,7 +15,7 @@ const ml: Record<string, string> = {
 };
 export function getLocale(): Locale { try { memoryLocale = window.localStorage.getItem(KEY) === 'ml' ? 'ml' : 'en'; } catch { /* storage can be unavailable */ } return memoryLocale; }
 export function setLocale(locale: Locale) { memoryLocale = locale; try { window.localStorage.setItem(KEY, locale); } catch { /* keep this tab's preference */ } if (typeof document !== 'undefined') document.documentElement.lang = locale; listeners.forEach((fn) => fn()); }
-export function useLocale() { const locale = useSyncExternalStore((fn) => { listeners.add(fn); return () => listeners.delete(fn); }, getLocale, () => 'en'); useEffect(() => { document.documentElement.lang = locale; }, [locale]); return locale; }
+export function useLocale() { const locale = useSyncExternalStore<Locale>((fn) => { listeners.add(fn); return () => listeners.delete(fn); }, getLocale, () => 'en'); useEffect(() => { document.documentElement.lang = locale; }, [locale]); return locale; }
 const extraMl: Record<string, string> = {
   "Search stock": '\u{d38}\u{d4d}\u{d31}\u{d4d}\u{d31}\u{d4b}\u{d15}\u{d4d}\u{d15}\u{d4d} \u{d24}\u{d3f}\u{d30}\u{d2f}\u{d41}\u{d15}',
   "Search your stock…": '\u{d38}\u{d4d}\u{d31}\u{d4d}\u{d31}\u{d4b}\u{d15}\u{d4d}\u{d15}\u{d3f}\u{d7d} \u{d24}\u{d3f}\u{d30}\u{d2f}\u{d41}\u{d15}\u{2026}',
@@ -74,6 +74,9 @@ const homeMl: Record<string, string> = {
   "Cancelled": '\u{d31}\u{d26}\u{d4d}\u{d26}\u{d3e}\u{d15}\u{d4d}\u{d15}\u{d3f}',
   "No products yet": '\u{d09}\u{d7d}\u{d2a}\u{d4d}\u{d2a}\u{d28}\u{d4d}\u{d28}\u{d19}\u{d4d}\u{d19}\u{d33}\u{d3f}\u{d32}\u{d4d}\u{d32}',
   "Adjust if the shelf is different.": '\u{d37}\u{d46}\u{d7d}\u{d2b}\u{d3f}\u{d32}\u{d46} \u{d0e}\u{d23}\u{d4d}\u{d23}\u{d24}\u{d4d}\u{d24}\u{d3f}\u{d7d} \u{d35}\u{d4d}\u{d2f}\u{d24}\u{d4d}\u{d2f}\u{d3e}\u{d38}\u{d2e}\u{d41}\u{d23}\u{d4d}\u{d1f}\u{d46}\u{d19}\u{d4d}\u{d15}\u{d3f}\u{d7d} \u{d2e}\u{d3e}\u{d31}\u{d4d}\u{d31}\u{d41}\u{d15}.',
+  "waiting": 'കാത്തിരിക്കുന്നു',
+  "held for a shopper": 'ഉപഭോക്താവിനായി മാറ്റിവെച്ചു',
+  "today": 'ഇന്ന്',
 };
 
 export function t(text: string, locale = getLocale()) { return locale === 'ml' ? (ml[text] ?? extraMl[text] ?? homeMl[text] ?? text) : text; }
