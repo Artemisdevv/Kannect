@@ -725,7 +725,7 @@ paths:
               type: object
               properties:
                 audio: { type: string, format: binary }
-                language: { type: string, enum: [ml, en], default: ml }
+                language: { type: string, enum: [ml, en], default: ml, description: "Ignored for now: the model detects the language" }
       responses:
         "200":
           description: OK
@@ -740,9 +740,16 @@ paths:
                     items:
                       type: object
                       properties:
-                        product: { type: object, nullable: true, allOf: [{ $ref: "#/components/schemas/Product" }] }
-                        quantity: { type: integer }
+                        spoken: { type: string, description: "The item as said, in the original script" }
+                        name: { type: string, description: "The model's English name for it" }
+                        product: { type: object, nullable: true, allOf: [{ $ref: "#/components/schemas/Product" }], description: "Matched against THIS shop's own products only" }
+                        alternatives: { type: array, items: { $ref: "#/components/schemas/Product" } }
+                        quantity: { type: integer, description: "Base units: pieces, or grams for loose goods (0.5 kg -> 500)" }
+                        unit: { type: string, enum: [piece, gram] }
+                        price: { type: number, nullable: true, description: "This shop's price (per piece, or per kg for loose goods); pass to POST /shop/bills or omit to use it" }
                         confidence: { type: number }
+                        needs_check: { type: boolean, description: "True when unmatched, low confidence, or the unit did not fit the product" }
+                        note: { type: string, nullable: true }
 
   # ---------------- Procurement (retailer buys from suppliers) ----------------
   /suppliers:
