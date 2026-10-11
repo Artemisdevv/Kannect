@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import errors
 from app.config import get_settings, validate_runtime_settings
-from app.routers import auth, billing, catalogue, health, shop
+from app.routers import ai, auth, billing, catalogue, health, shop
 
 API_PREFIX = "/api/v1"
 
@@ -33,6 +33,7 @@ app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(catalogue.router, prefix=API_PREFIX)
 app.include_router(shop.router, prefix=API_PREFIX)
 app.include_router(billing.router, prefix=API_PREFIX)
+app.include_router(ai.router, prefix=API_PREFIX)
 
 # Add routers here, matching docs/openapi.yaml:
 #   auth, shop, catalogue, billing, sync  (issues #11-#18, #37, #38, #44)
