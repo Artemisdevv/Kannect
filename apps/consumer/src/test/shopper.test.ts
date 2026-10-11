@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { alternatives, distanceKm, getReferral, getShopPage, nearbyShops, origin, searchProducts, type ShopResult } from '@/lib/shopper';
+import { alternatives, getReferral, getShopPage, nearbyShops, resultMapShops, searchProducts, type ShopResult } from '@/lib/shopper';
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -21,7 +21,8 @@ describe('searchProducts', () => {
     const url = lastUrl();
     expect(url.pathname).toBe('/api/v1/search');
     expect(url.searchParams.get('q')).toBe('soap');
-    expect(url.searchParams.get('lat')).toBe('9.999');
+    expect(url.searchParams.get('area')).toBe('Kaloor');
+    expect(url.searchParams.has('lat')).toBe(false);
     expect(url.searchParams.get('include_out')).toBe('true');
     expect(out.shops.map(s => [s.name, s.status, s.distanceKm, s.product])).toEqual([
       ['Sreeram Stores', 'out', 0.141, 'Godrej Cinthol soap 100g'],
@@ -50,10 +51,12 @@ describe('searchProducts', () => {
 
 describe('browsing and shop page', () => {
   it('lists nearby shops with distance', async () => {
-    fetchMock.mockResolvedValueOnce(json({ shops: [{ shop, distance_m: 1500 }] }));
+    fetchMock.mockResolvedValueOnce(json({ shops: [{ shop, distance_m: null }] }));
     const list = await nearbyShops('Edappally');
     expect(lastUrl().pathname).toBe('/api/v1/shops/nearby');
-    expect(list[0]).toMatchObject({ id: 's1', name: 'Sreeram Stores', distanceKm: 1.5 });
+    expect(lastUrl().searchParams.get('area')).toBe('Edappally');
+    expect(list[0]).toMatchObject({ id: 's1', name: 'Sreeram Stores', coordinates: { latitude: 9.99, longitude: 76.3 } });
+    expect(list[0]?.distanceKm).toBeUndefined();
   });
 
   it('loads a shop page with product status only', async () => {
@@ -71,16 +74,23 @@ describe('browsing and shop page', () => {
 });
 
 describe('helpers', () => {
-  it('origin prefers real coordinates, then the area, then the default', () => {
-    expect(origin('Kaloor', { latitude: 1, longitude: 2 })).toEqual({ latitude: 1, longitude: 2 });
-    expect(origin('Edappally').latitude).toBeCloseTo(10.0254);
-    expect(origin('Nowhere').latitude).toBeCloseTo(9.999);
-    expect(origin('Kaloor', { latitude: 999, longitude: 0 }).latitude).toBeCloseTo(9.999);
+  it('groups product results into one real shop marker without losing stock statuses', () => {
+    const base: ShopResult = {
+      id: 's1', uid: 's1:p1', name: 'Store', area: 'Kaloor', address: 'Kaloor Road', product: 'Soap', productId: 'p1',
+      price: 40, status: 'out', coordinates: { latitude: 9.99, longitude: 76.3 },
+    };
+    const markers = resultMapShops([base, { ...base, uid: 's1:p2', productId: 'p2', status: 'low' }]);
+    expect(markers).toHaveLength(1);
+    expect(markers[0]?.statuses).toEqual(['out', 'low']);
+    expect(markers[0]?.coordinates).toEqual(base.coordinates);
   });
 
-  it('distance is zero for the same point and about 111 km per degree of latitude', () => {
-    expect(distanceKm({ latitude: 10, longitude: 76 }, { latitude: 10, longitude: 76 })).toBe(0);
-    expect(distanceKm({ latitude: 10, longitude: 76 }, { latitude: 11, longitude: 76 })).toBeCloseTo(111.2, 0);
+  it('sends actual shopper coordinates and rejects unavailable location without an area fallback', async () => {
+    fetchMock.mockResolvedValueOnce(json({ shops: [] }));
+    await nearbyShops('Your location', { latitude: 10.1, longitude: 76.4 });
+    expect(lastUrl().searchParams.get('lat')).toBe('10.1');
+    expect(lastUrl().searchParams.get('lng')).toBe('76.4');
+    await expect(nearbyShops('Your location')).rejects.toThrow('Choose an area');
   });
 
   it('alternatives are other shops with the same product in stock', () => {

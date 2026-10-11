@@ -4,8 +4,8 @@ The app reads the live Kannect API. Set `VITE_API_URL` (for example `https://kan
 default is `http://localhost:8000/api/v1`. Types are generated from `docs/openapi.yaml` with `bun run gen:api`.
 
 ## What it calls (all public, no sign-in)
-- `GET /search` : shops that stock an item around a point (`include_out=true` so "out" shops show and can refer elsewhere)
-- `GET /shops/nearby` : shops around a point for browsing before any search (shops with no products are left out)
+- `GET /search` : shops that stock an item around coordinates or a literal saved-address area (`include_out=true` so "out" shops show and can refer elsewhere)
+- `GET /shops/nearby` : shops around coordinates or a literal saved-address area for browsing before any search (shops with no products are left out)
 - `GET /shops/{id}` : a shop's public page, products with status only
 - `GET /search/referral` : nearest other shop that has the item in stock
 
@@ -13,12 +13,14 @@ Never exposed to the shopper: exact stock counts and any retailer data. Status i
 All transport lives in `src/lib/shopper.ts` (+ `src/api/client.ts`); screens do not call `fetch`.
 
 ## Where searches start
-The shopper's own location if they allow it ("Use my location"), otherwise the centre of the area they picked
-(`areaCenters` in `src/lib/shopper.ts`). Their position is never stored; only public results are cached per session.
+The shopper's own location if they allow it ("Use my location"), otherwise the selected area is matched as a
+case-insensitive substring of each saved shop address. Area searches do not geocode and do not report a distance.
+Their position is held only in memory and is never cached; only area-based public results are cached per session.
 
 ## Map
-No map provider or key is configured; the map toggle shows an accessible list fallback. Add a provider and public key
-restrictions before adding a real map. Do not send precise shopper coordinates to analytics.
+Leaflet renders the shop locations supplied by the API on OpenStreetMap tiles. Keep visible OpenStreetMap attribution;
+`VITE_MAP_TILE_URL` can select another compatible tile provider. Shops without saved coordinates remain in the
+accessible list and have no marker. Do not pre-cache map tiles or send precise shopper coordinates to analytics.
 
 ## PWA and Android
 `vite-plugin-pwa` generates `/sw.js` (network-first HTML, hashed assets cached). The Android app (Capacitor,

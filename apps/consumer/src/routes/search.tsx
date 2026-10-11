@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useShopper } from '@/components/shopper-shell';
 import { ShopCard } from '@/components/shop-result';
-import { isKnownArea } from '@/lib/shopper';
+import { ShopMap } from '@/components/shop-map';
+import { isKnownArea, resultMapShops } from '@/lib/shopper';
 import groceries from '@/assets/neighbourhood-groceries.jpg';
 
 export const Route = createFileRoute('/search')({
@@ -21,6 +22,7 @@ const suggestions = [{ name: 'Rice & grains', sub: 'Everyday staples', query: 'r
 function SearchPage() {
   const { query, setQuery, resetSearch, response, loading, error, search, area, setLocationOpen, offline } = useShopper();
   const [view, setView] = useState<'list' | 'map'>('list');
+  const [selectedShopId, setSelectedShopId] = useState<string>();
   const showingResults = !!response || loading || !!error;
   return <main className="app-main">
     <div className="welcome"><p className="eyebrow">A little closer. A little easier.</p><h1>Your neighbourhood, <span>in stock.</span></h1></div>
@@ -37,8 +39,8 @@ function SearchPage() {
       {loading ? <div className="empty-state" role="status"><Loader2 className="animate-spin" /><h2>Checking nearby shops…</h2><p>Finding matches for “{query}”.</p></div> : error ? <div className="empty-state" role="alert">{offline ? <WifiOff /> : <SearchX />}<h2>Let’s try that again</h2><p>{error}</p><Button onClick={() => void search(query)}>Retry search</Button></div> : response && <>
         <div className="section-heading"><div className="min-w-0"><h2>{response.shops.length ? `${response.shops.length} shops with “${query}”` : 'Search results'}</h2><p>{area} · Reported availability</p></div><div className="view-toggle" role="group" aria-label="Result view"><Button variant={view === 'list' ? 'secondary' : 'ghost'} size="icon" aria-label="List view" aria-pressed={view === 'list'} onClick={() => setView('list')}><List /></Button><Button variant={view === 'map' ? 'secondary' : 'ghost'} size="icon" aria-label="Map view" aria-pressed={view === 'map'} onClick={() => setView('map')}><Map /></Button></div></div>
         {response.cachedAt && <div className="demo-banner"><Info size={14} />Saved results · Availability may be out of date.</div>}
-        {view === 'map' && <div className="local-note mb-5 mt-0"><MapPin size={28} /><div><h3>Map isn’t available yet</h3><p>A map service hasn’t been connected. You can still find all matching shops in the list below.</p><Button variant="outline" className="mt-3" onClick={() => setView('list')}>Back to list</Button></div></div>}
-        {response.shops.length ? <div className="shop-list" aria-label="Matching shops">{response.shops.map(shop => <ShopCard key={shop.uid} shop={shop} />)}</div> : <div className="empty-state"><SearchX /><h2>{isKnownArea(area) ? 'No matching products' : 'No shops in this area yet'}</h2><p>No shops near {area} have “{query}” right now. Try another word, or another area.</p><Button variant="secondary" onClick={() => setLocationOpen(true)}><MapPin />Change area</Button></div>}
+        {view === 'map' && <ShopMap shops={resultMapShops(response.shops)} selectedId={selectedShopId} onSelect={setSelectedShopId} />}
+        {response.shops.length ? <div className="shop-list" aria-label="Matching shops">{response.shops.map(shop => <ShopCard key={shop.uid} shop={shop} selected={selectedShopId === shop.id} onSelect={() => setSelectedShopId(shop.id)} />)}</div> : <div className="empty-state"><SearchX /><h2>{isKnownArea(area) ? 'No matching products' : 'No shops in this area yet'}</h2><p>No shops near {area} have “{query}” right now. Try another word, or another area.</p><Button variant="secondary" onClick={() => setLocationOpen(true)}><MapPin />Change area</Button></div>}
       </>}
     </>}
     <p className="trust-note"><ShieldCheck size={14} className="shrink-0 mt-0.5" /><span>No account needed. Availability comes from shop updates<br className="hidden sm:block" /> and may change before you arrive.</span></p>

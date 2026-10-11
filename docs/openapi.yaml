@@ -559,11 +559,12 @@ paths:
     get:
       tags: [search]
       security: []
-      summary: Nearby shops that stock an item. Sorted by distance. Never exposes exact counts.
+      summary: Nearby shops that stock an item. Use coordinates or a literal address area. Never exposes exact counts.
       parameters:
         - { name: q, in: query, required: true, schema: { type: string, example: soap } }
-        - { name: lat, in: query, required: true, schema: { type: number } }
-        - { name: lng, in: query, required: true, schema: { type: number } }
+        - { name: lat, in: query, schema: { type: number, minimum: -90, maximum: 90, description: "Provide together with lng, or use area" } }
+        - { name: lng, in: query, schema: { type: number, minimum: -180, maximum: 180, description: "Provide together with lat, or use area" } }
+        - { name: area, in: query, schema: { type: string, minLength: 1, maxLength: 100, description: "Literal case-insensitive substring matched against the saved shop address. No geocoding or distance is inferred. Mutually exclusive with lat/lng." } }
         - { name: radius_m, in: query, schema: { type: integer, default: 2000 } }
         - { name: include_out, in: query, schema: { type: boolean, default: false } }
       responses:
@@ -577,6 +578,33 @@ paths:
                   results:
                     type: array
                     items: { $ref: "#/components/schemas/SearchResult" }
+
+  /shops/nearby:
+    get:
+      tags: [search]
+      security: []
+      summary: Discover public shops by coordinates or literal saved-address area
+      description: Area matching does not geocode or infer distance. Only shops with saved coordinates are returned so map markers always use real locations.
+      parameters:
+        - { name: lat, in: query, schema: { type: number, minimum: -90, maximum: 90 } }
+        - { name: lng, in: query, schema: { type: number, minimum: -180, maximum: 180 } }
+        - { name: area, in: query, schema: { type: string, minLength: 1, maxLength: 100, description: "Literal case-insensitive substring of saved shop address; mutually exclusive with lat/lng" } }
+        - { name: radius_m, in: query, schema: { type: integer, minimum: 100, maximum: 20000, default: 2000 } }
+      responses:
+        "200":
+          description: Matching shops (maximum 50)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  shops:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        shop: { $ref: "#/components/schemas/PublicShop" }
+                        distance_m: { type: integer, nullable: true, description: "Null for address-area searches" }
 
   /search/referral:
     get:
@@ -598,31 +626,6 @@ paths:
                     type: object
                     allOf: [{ $ref: "#/components/schemas/SearchResult" }]
                     nullable: true
-
-  /shops/nearby:
-    get:
-      tags: [search]
-      security: []
-      summary: Shops around a point, nearest first, without needing a product (for browsing)
-      parameters:
-        - { name: lat, in: query, required: true, schema: { type: number } }
-        - { name: lng, in: query, required: true, schema: { type: number } }
-        - { name: radius_m, in: query, schema: { type: integer, default: 2000 } }
-      responses:
-        "200":
-          description: OK. Shops with no products yet are left out.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  shops:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        shop: { $ref: "#/components/schemas/PublicShop" }
-                        distance_m: { type: integer }
 
   /shops/{shop_id}:
     get:
@@ -647,7 +650,7 @@ paths:
                       type: object
                       properties:
                         product: { $ref: "#/components/schemas/Product" }
-                        price: { type: number, format: double }
+                        price: { type: number, format: double, nullable: true }
                         stock_status: { $ref: "#/components/schemas/StockStatus" }
 
   /ebills/{bill_id}:
@@ -1341,7 +1344,15 @@ components:
         name: { type: string }
         address: { type: string }
         phone: { type: string }
-        location: { $ref: "#/components/schemas/Location" }
+        location: { $ref: "#/components/schemas/PublicLocation" }
+
+    PublicLocation:
+      type: object
+      required: [lat, lng]
+      description: Public shop pages can have a saved shop without coordinates; missing coordinates are returned as null.
+      properties:
+        lat: { type: number, nullable: true }
+        lng: { type: number, nullable: true }
 
     ProductInput:
       type: object
@@ -1437,9 +1448,9 @@ components:
       properties:
         shop: { $ref: "#/components/schemas/PublicShop" }
         product: { $ref: "#/components/schemas/Product" }
-        price: { type: number, format: double }
+        price: { type: number, format: double, nullable: true }
         stock_status: { $ref: "#/components/schemas/StockStatus" }
-        distance_m: { type: integer }
+        distance_m: { type: integer, nullable: true, description: "Null when the search uses an address area instead of coordinates" }
 
     SupplierInput:
       type: object

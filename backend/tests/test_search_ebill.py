@@ -132,6 +132,58 @@ def test_search_needs_no_auth():
     assert r.status_code == 200
 
 
+def test_search_supports_address_area_fallback_without_claiming_distance():
+    result = row(distance_m=None)
+    r = client(FakeDB([result])).get("/search", params={"q": "soap", "area": "Kaloor"})
+    assert r.status_code == 200
+    assert r.json()["results"][0]["distance_m"] is None
+    db = FakeDB([])
+    client(db).get("/search", params={"q": "soap", "area": "Kaloor"})
+    assert "POSITION(LOWER(:area)" in db.calls[0][0] and db.calls[0][1]["area"] == "Kaloor"
+
+
+def test_nearby_shops_returns_saved_locations_and_never_fabricates_area_distance():
+    shop_row = {
+        "id": SHOP_ID,
+        "name": "Mary",
+        "address": "Kaloor",
+        "phone": None,
+        "lat": 9.997,
+        "lng": 76.3035,
+        "distance_m": None,
+    }
+    db = FakeDB([shop_row])
+    response = client(db).get("/shops/nearby", params={"area": "Kaloor"})
+    assert response.status_code == 200
+    result = response.json()["shops"][0]
+    assert result["shop"]["location"] == {"lat": 9.997, "lng": 76.3035}
+    assert result["distance_m"] is None
+    assert "POSITION(LOWER(:area)" in db.calls[0][0]
+    assert client(FakeDB([])).get("/shops/nearby", params={"lat": 1}).status_code == 400
+
+
+def test_nearby_shops_coordinate_mode_uses_radius_and_real_distance():
+    db = FakeDB(
+        [
+            {
+                "id": SHOP_ID,
+                "name": "Mary",
+                "address": "Kaloor",
+                "phone": None,
+                "lat": 9.997,
+                "lng": 76.3035,
+                "distance_m": 276,
+            }
+        ]
+    )
+    response = client(db).get("/shops/nearby", params={"lat": 10, "lng": 76.3, "radius_m": 500})
+    assert response.status_code == 200
+    assert response.json()["shops"][0]["distance_m"] == 276
+    sql, params = db.calls[0]
+    assert "ST_DWithin" in sql and params["radius"] == 500
+    assert "POSITION" not in sql
+
+
 # ---------- referral ----------
 
 

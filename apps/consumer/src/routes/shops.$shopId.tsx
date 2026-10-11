@@ -26,7 +26,7 @@ function ShopDetail() {
     <Button variant="ghost" asChild className="-ml-4"><Link to="/"><ArrowLeft />Back</Link></Button>
     <div className="detail-header"><div className="detail-symbol"><Store /></div><h1>{shop.name}</h1><p>{shop.address}</p></div>
     <div className="flex flex-wrap gap-2 mt-4">
-      {shop.coordinates.latitude !== 0 && <Button variant="secondary" asChild><a href={`https://www.google.com/maps/dir/?api=1&destination=${shop.coordinates.latitude},${shop.coordinates.longitude}`} target="_blank" rel="noopener noreferrer"><Navigation />Directions</a></Button>}
+      {shop.coordinates && <Button variant="secondary" asChild><a href={`https://www.google.com/maps/dir/?api=1&destination=${shop.coordinates.latitude},${shop.coordinates.longitude}`} target="_blank" rel="noopener noreferrer"><Navigation />Directions</a></Button>}
       {shop.phone && <Button variant="outline" asChild><a href={`tel:${shop.phone}`}><Phone />Call</a></Button>}
     </div>
     <div className="section-heading"><h2>What they have</h2></div>
@@ -35,7 +35,7 @@ function ShopDetail() {
   </main>;
 }
 
-function ProductRow({ shop, product }: { shop: ShopResult; product: { productId: string; name: string; price: number; status: 'in' | 'low' | 'out' } }) {
+function ProductRow({ shop, product }: { shop: ShopResult; product: { productId: string; name: string; price: number | null; status: 'in' | 'low' | 'out' } }) {
   const [asked, setAsked] = useState(false);
   const referral = useQuery({
     queryKey: ['referral', shop.id, product.productId], enabled: asked, retry: 1,

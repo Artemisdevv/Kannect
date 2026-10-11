@@ -105,6 +105,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which login the app should show (demo OTP or phone.email). Nothing secret. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            otp_provider?: "demo" | "phone_email";
+                            /** @description Public client id for the phone.email button; null in demo mode */
+                            phone_email_client_id?: string | null;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/phone-email/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log in with a number verified by phone.email (only when otp_provider = phone_email)
+         * @description The app shows the phone.email "Sign in with Phone" button; on success it receives a
+         *     `user_json_url`. Send it here. The server accepts only https URLs on the configured
+         *     phone.email host, fetches the verified number itself, and issues the same token as
+         *     /auth/otp/verify. Each result URL works once. When this mode is on, the demo OTP only
+         *     works for the fictional demo numbers (+91900000...).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @example https://user.phone.email/user_abc123.json */
+                        user_json_url: string;
+                        /**
+                         * @default retailer
+                         * @enum {string}
+                         */
+                        role?: "retailer" | "supplier";
+                    };
+                };
+            };
+            responses: {
+                /** @description Same body as /auth/otp/verify */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            token?: string;
+                            /** @enum {string} */
+                            role?: "retailer" | "supplier";
+                            shop?: components["schemas"]["Shop"] | null;
+                            supplier?: components["schemas"]["Supplier"] | null;
+                        };
+                    };
+                };
+                400: components["responses"]["Error"];
+                401: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/shop": {
         parameters: {
             query?: never;
@@ -870,7 +974,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Export all shop data (no lock-in) */
+        /**
+         * Export this retailer's product, stock, and sales data (no lock-in)
+         * @description Requires retailer authentication. JSON includes shop details, current shop products and stock quantities, bills with line items, and stock-event history. CSV downloads the same data as product, sale-line, and stock-event records. The export is scoped to the authenticated retailer's shop.
+         */
         get: {
             parameters: {
                 query?: {
@@ -882,14 +989,19 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description File download */
+                /** @description Shop data file download */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": unknown;
-                        "text/csv": unknown;
+                        "application/json": {
+                            shop?: Record<string, never>;
+                            products?: Record<string, never>[];
+                            bills?: Record<string, never>[];
+                            stock_events?: Record<string, never>[];
+                        };
+                        "text/csv": string;
                     };
                 };
             };
@@ -909,13 +1021,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Nearby shops that stock an item. Sorted by distance. Never exposes exact counts. */
+        /** Nearby shops that stock an item. Use coordinates or a literal address area. Never exposes exact counts. */
         get: {
             parameters: {
                 query: {
                     q: string;
-                    lat: number;
-                    lng: number;
+                    lat?: number;
+                    lng?: number;
+                    area?: string;
                     radius_m?: number;
                     include_out?: boolean;
                 };
@@ -933,6 +1046,56 @@ export interface paths {
                     content: {
                         "application/json": {
                             results?: components["schemas"]["SearchResult"][];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shops/nearby": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover public shops by coordinates or literal saved-address area
+         * @description Area matching does not geocode or infer distance. Only shops with saved coordinates are returned so map markers always use real locations.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    lat?: number;
+                    lng?: number;
+                    area?: string;
+                    radius_m?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Matching shops (maximum 50) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            shops?: {
+                                shop?: components["schemas"]["PublicShop"];
+                                /** @description Null for address-area searches */
+                                distance_m?: number | null;
+                            }[];
                         };
                     };
                 };
@@ -987,51 +1150,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/shops/nearby": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Shops around a point, nearest first, without needing a product (for browsing) */
-        get: {
-            parameters: {
-                query: {
-                    lat: number;
-                    lng: number;
-                    radius_m?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK. Shops with no products yet are left out. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            shops?: {
-                                shop?: components["schemas"]["PublicShop"];
-                                distance_m?: number;
-                            }[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/shops/{shop_id}": {
         parameters: {
             query?: never;
@@ -1064,7 +1182,7 @@ export interface paths {
                             products?: {
                                 product?: components["schemas"]["Product"];
                                 /** Format: double */
-                                price?: number;
+                                price?: number | null;
                                 stock_status?: components["schemas"]["StockStatus"];
                             }[];
                         };
@@ -2334,7 +2452,12 @@ export interface components {
             name?: string;
             address?: string;
             phone?: string;
-            location?: components["schemas"]["Location"];
+            location?: components["schemas"]["PublicLocation"];
+        };
+        /** @description Public shop pages can have a saved shop without coordinates; missing coordinates are returned as null. */
+        PublicLocation: {
+            lat: number | null;
+            lng: number | null;
         };
         ProductInput: {
             /** @description Null for loose items */
@@ -2433,9 +2556,10 @@ export interface components {
             shop?: components["schemas"]["PublicShop"];
             product?: components["schemas"]["Product"];
             /** Format: double */
-            price?: number;
+            price?: number | null;
             stock_status?: components["schemas"]["StockStatus"];
-            distance_m?: number;
+            /** @description Null when the search uses an address area instead of coordinates */
+            distance_m?: number | null;
         };
         SupplierInput: {
             name?: string;

@@ -28,7 +28,8 @@ COLUMNS = f"""
   p.id AS product_id, p.barcode, p.name, p.name_ml, p.brand, p.size, p.category, p.unit,
   p.image_url, p.mrp,
   st.price, {STATUS_SQL} AS status,
-  ROUND(ST_Distance(s.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography))
+  ROUND(ST_Distance(s.location::geography,
+    ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography))::integer
     AS distance_m
 """
 
@@ -45,7 +46,7 @@ def _result(row: Any) -> dict[str, Any]:
         "product": _product(row),
         "price": float(row["price"]) if row["price"] is not None else None,
         "stock_status": row["status"],
-        "distance_m": int(row["distance_m"]),
+        "distance_m": int(row["distance_m"]) if row["distance_m"] is not None else None,
     }
 
 
@@ -68,11 +69,37 @@ def _tokens(q: str) -> list[str]:
     return [t for t in q.lower().split() if t][:6]
 
 
+def _origin_filter(
+    lat: float | None, lng: float | None, area: str | None
+) -> tuple[str, str, dict[str, Any]]:
+    has_coordinates = lat is not None and lng is not None
+    has_partial_coordinates = (lat is None) != (lng is None)
+    normalized_area = area.strip() if area else ""
+    if has_partial_coordinates or has_coordinates == bool(normalized_area):
+        raise HTTPException(
+            status_code=400, detail="Provide either lat and lng, or a non-empty area"
+        )
+    if has_coordinates:
+        return (
+            "ST_DWithin(s.location::geography, "
+            "ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radius)",
+            "ROUND(ST_Distance(s.location::geography, "
+            "ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography))::integer",
+            {"lat": lat, "lng": lng},
+        )
+    return (
+        "POSITION(LOWER(:area) IN LOWER(COALESCE(s.address, ''))) > 0",
+        "NULL::integer",
+        {"area": normalized_area},
+    )
+
+
 @router.get("/search")
 def search(
     q: str = Query(..., min_length=1, max_length=80),
-    lat: float = Query(..., ge=-90, le=90),
-    lng: float = Query(..., ge=-180, le=180),
+    lat: float | None = Query(None, ge=-90, le=90),
+    lng: float | None = Query(None, ge=-180, le=180),
+    area: str | None = Query(None, min_length=1, max_length=100),
     radius_m: int = Query(DEFAULT_RADIUS_M, ge=100, le=MAX_RADIUS_M),
     include_out: bool = False,
     db: Session = Depends(get_db),
@@ -81,7 +108,8 @@ def search(
     tokens = _tokens(q)
     if not tokens:
         raise HTTPException(status_code=400, detail="q must contain a word")
-    params: dict[str, Any] = {"lat": lat, "lng": lng, "radius": radius_m, "limit": RESULT_LIMIT}
+    origin_filter, distance_expression, params = _origin_filter(lat, lng, area)
+    params |= {"lat": lat, "lng": lng, "radius": radius_m, "limit": RESULT_LIMIT}
     # every word must appear in the name, brand, Malayalam name or category
     word_filters = []
     for i, token in enumerate(tokens):
@@ -91,21 +119,64 @@ def search(
             f"OR p.category ILIKE :t{i})"
         )
     status_filter = "" if include_out else "AND st.qty > 0"
+    columns = COLUMNS.replace(
+        "ROUND(ST_Distance(s.location::geography, "
+        "ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography))::integer\n    AS distance_m",
+        f"{distance_expression}\n    AS distance_m",
+    )
     sql = f"""
     WITH {STOCK_CTE}
-    SELECT {COLUMNS}
+    SELECT {columns}
     FROM stock st
     JOIN shop s ON s.id = st.shop_id
     JOIN product p ON p.id = st.product_id
     WHERE p.is_active AND s.location IS NOT NULL {status_filter}
       AND {" AND ".join(word_filters)}
-      AND ST_DWithin(s.location::geography,
-                     ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radius)
+      AND {origin_filter}
     ORDER BY distance_m, p.name
     LIMIT :limit
     """
     rows = db.execute(text(sql), params).mappings().all()
     return {"results": [_result(r) for r in rows]}
+
+
+@router.get("/shops/nearby")
+def nearby_shops(
+    lat: float | None = Query(None, ge=-90, le=90),
+    lng: float | None = Query(None, ge=-180, le=180),
+    area: str | None = Query(None, min_length=1, max_length=100),
+    radius_m: int = Query(DEFAULT_RADIUS_M, ge=100, le=MAX_RADIUS_M),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Discover shops by coordinates or literal matching against their saved address."""
+    origin_filter, distance_expression, params = _origin_filter(lat, lng, area)
+    params |= {"radius": radius_m, "limit": RESULT_LIMIT}
+    sql = f"""
+    SELECT s.id, s.name, s.address, s.phone, ST_Y(s.location) AS lat, ST_X(s.location) AS lng,
+      {distance_expression} AS distance_m
+    FROM shop s
+    WHERE s.location IS NOT NULL
+      AND EXISTS (SELECT 1 FROM shop_product sp WHERE sp.shop_id = s.id)
+      AND {origin_filter}
+    ORDER BY distance_m NULLS LAST, s.name
+    LIMIT :limit
+    """
+    rows = db.execute(text(sql), params).mappings().all()
+    return {
+        "shops": [
+            {
+                "shop": {
+                    "id": str(r["id"]),
+                    "name": r["name"],
+                    "address": r["address"],
+                    "phone": r["phone"],
+                    "location": {"lat": r["lat"], "lng": r["lng"]},
+                },
+                "distance_m": r["distance_m"],
+            }
+            for r in rows
+        ]
+    }
 
 
 @router.get("/search/referral")
@@ -142,50 +213,6 @@ def referral(
          "product_id": product_id, "shop_id": shop_id},
     ).mappings().first()  # fmt: skip
     return {"referral": _result(row) if row else None}
-
-
-@router.get("/shops/nearby")
-def nearby_shops(
-    lat: float = Query(..., ge=-90, le=90),
-    lng: float = Query(..., ge=-180, le=180),
-    radius_m: int = Query(DEFAULT_RADIUS_M, ge=100, le=MAX_RADIUS_M),
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
-    """Shops around a point, nearest first (public: name, address, phone, location only).
-
-    For browsing before the shopper has searched for anything. Shops with no products yet are
-    left out so the list does not send people to an empty shop.
-    """
-    sql = """
-    SELECT s.id, s.name, s.address, s.phone, ST_Y(s.location) AS lat, ST_X(s.location) AS lng,
-      ROUND(ST_Distance(s.location::geography,
-            ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography)) AS distance_m
-    FROM shop s
-    WHERE s.location IS NOT NULL
-      AND EXISTS (SELECT 1 FROM shop_product sp WHERE sp.shop_id = s.id)
-      AND ST_DWithin(s.location::geography,
-                     ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radius)
-    ORDER BY distance_m, s.name
-    LIMIT :limit
-    """
-    rows = db.execute(
-        text(sql), {"lat": lat, "lng": lng, "radius": radius_m, "limit": RESULT_LIMIT}
-    ).mappings().all()  # fmt: skip
-    return {
-        "shops": [
-            {
-                "shop": {
-                    "id": str(r["id"]),
-                    "name": r["name"],
-                    "address": r["address"],
-                    "phone": r["phone"],
-                    "location": {"lat": r["lat"], "lng": r["lng"]},
-                },
-                "distance_m": int(r["distance_m"]),
-            }
-            for r in rows
-        ]
-    }
 
 
 @router.get("/shops/{shop_id}")
