@@ -1229,10 +1229,10 @@ components:
     ShopInput:
       type: object
       properties:
-        name: { type: string }
-        owner_name: { type: string }
+        name: { type: string, minLength: 2, maxLength: 120, description: "Trimmed; blank counts as not given" }
+        owner_name: { type: string, maxLength: 120 }
         phone: { type: string }
-        address: { type: string }
+        address: { type: string, maxLength: 500 }
         location: { $ref: "#/components/schemas/Location" }
         language: { type: string, enum: [ml, en], default: ml }
         shop_type: { type: string, enum: [grocery, provision, vegetable, stationery, bakery, general], description: "Picks the onboarding starter pack" }
