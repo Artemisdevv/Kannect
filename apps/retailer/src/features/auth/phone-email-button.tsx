@@ -1,5 +1,6 @@
 // phone.email "Sign in with Phone": the owner enters their number, gets an SMS code, and the widget
 // hands us a result URL. The server fetches the verified number itself, so nothing here is trusted.
+// The button the widget draws is restyled in src/styles.css (.pe_signin_button).
 import { useEffect, useRef } from "react";
 
 declare global {
@@ -9,6 +10,7 @@ declare global {
 }
 
 const SCRIPT = "https://www.phone.email/sign_in_button_v1.js";
+const LABEL = "Continue with phone number";
 
 export function PhoneEmailButton({
   clientId,
@@ -29,7 +31,18 @@ export function PhoneEmailButton({
     script.src = SCRIPT;
     script.async = true;
     document.body.appendChild(script);
+
+    // The widget writes its own label ("Sign in with Phone"); use ours so it reads like the app.
+    const relabel = () => {
+      const text = holder.current?.querySelector("#btn_ph_login_text");
+      if (text && text.textContent !== LABEL) text.textContent = LABEL;
+    };
+    const watcher = new MutationObserver(relabel);
+    if (holder.current) watcher.observe(holder.current, { childList: true, subtree: true, characterData: true });
+    relabel();
+
     return () => {
+      watcher.disconnect();
       script.remove();
       delete window.phoneEmailListener;
     };
