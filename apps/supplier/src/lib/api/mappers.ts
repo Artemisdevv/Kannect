@@ -96,7 +96,7 @@ export function toOrder(o: S["Order"]): Order {
     retailer: {
       name: o.shop?.name ?? "Shop",
       area: o.shop?.address ?? "",
-      ...(loc ? { location: { lat: loc.lat ?? null, lng: loc.lng ?? null } } : {}),
+      ...(loc && loc.lat != null && loc.lng != null ? { location: { lat: loc.lat, lng: loc.lng } } : {}),
     },
     items: (o.items ?? []).map((l) => ({
       productId: l.product_id, name: l.name ?? "Item", sku: "", packSize: l.pack_size ?? 1,

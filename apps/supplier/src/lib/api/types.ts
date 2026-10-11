@@ -14,7 +14,7 @@ export interface Supplier {
   location?: { lat: number; lng: number } | null;
 }
 
-export type SupplierInput = Omit<Supplier, "id" | "phone" | "location">;
+export type SupplierInput = Omit<Supplier, "id" | "phone">;
 
 export interface Product {
   id: string;

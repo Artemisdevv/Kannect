@@ -49,6 +49,9 @@ export function RouteMap({ supplier, shop }: { supplier: RouteEndpoint; shop: Ro
       const map = L.map(container.current, { scrollWheelZoom: false });
       const supplierPoint: [number, number] = [supplierLocation.lat, supplierLocation.lng];
       const shopPoint: [number, number] = [shopLocation.lat, shopLocation.lng];
+      // Leaflet draws markers and lines against the map's view: without one it throws while adding
+      // them ("reading 'intersects'") and the map never shows. fitBounds below sets the final view.
+      map.setView(supplierPoint, 13);
       const endpoints = L.featureGroup().addTo(map);
       L.circleMarker(supplierPoint, {
         radius: 8,
