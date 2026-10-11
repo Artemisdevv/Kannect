@@ -6,6 +6,7 @@ from typing import Any, Literal
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from geoalchemy2 import WKTElement
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -13,7 +14,8 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth import AuthenticatedOwner, require_retailer
 from app.db import get_db
-from app.models import Product, ShopProduct, StockEvent
+from app.models import Product, Shop, ShopProduct, StockEvent
+from app.routers.auth import _shop_response
 from app.stock import (
     StockLevel,
     default_low_threshold,
@@ -23,6 +25,32 @@ from app.stock import (
 )
 
 router = APIRouter(prefix="/shop", tags=["shop"])
+
+
+ShopType = Literal["grocery", "provision", "vegetable", "stationery", "bakery", "general"]
+
+
+class LocationInput(BaseModel):
+    lat: float = Field(ge=-90, le=90)
+    lng: float = Field(ge=-180, le=180)
+
+
+class ShopProfileInput(BaseModel):
+    """Everything is optional so a new owner can register with just a name and fill in the rest."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, max_length=255)
+    owner_name: str | None = Field(default=None, max_length=255)
+    address: str | None = None
+    location: LocationInput | None = None
+    language: Literal["ml", "en"] = "ml"
+    shop_type: ShopType | None = None
+    phone: str | None = None  # must equal the logged-in phone if sent
+
+
+class ShopProfilePatch(ShopProfileInput):
+    language: Literal["ml", "en"] | None = None
 
 
 class ShopProductCreate(BaseModel):
@@ -80,6 +108,74 @@ class StockEventInput(BaseModel):
                 raise ValueError("created_at must include a timezone")
             return value.astimezone(timezone.utc)
         return value
+
+
+def _point(location: LocationInput | None):
+    if location is None:
+        return None
+    return WKTElement(f"POINT({location.lng} {location.lat})", srid=4326)
+
+
+@router.post("", status_code=201)
+def create_shop_profile(
+    request: ShopProfileInput,
+    db: Session = Depends(get_db),
+    owner: AuthenticatedOwner = Depends(require_retailer),
+) -> dict[str, Any]:
+    """Register the owner's shop. One shop per phone; the phone comes from the login."""
+    if owner.shop is not None:
+        raise HTTPException(status_code=409, detail="Shop already exists")
+    if request.phone is not None and request.phone != owner.phone:
+        raise HTTPException(status_code=400, detail="Phone must match the authenticated owner")
+    shop = Shop(
+        **request.model_dump(exclude={"phone", "location"}),
+        phone=owner.phone,
+        location=_point(request.location),
+    )
+    db.add(shop)
+    try:
+        db.commit()
+        db.refresh(shop)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Shop already exists") from exc
+    return _shop_response(shop)
+
+
+@router.get("")
+def get_shop_profile(owner: AuthenticatedOwner = Depends(require_retailer)) -> dict[str, Any]:
+    if owner.shop is None:
+        raise HTTPException(status_code=404, detail="Shop not found")
+    return _shop_response(owner.shop)
+
+
+@router.patch("")
+def update_shop_profile(
+    request: ShopProfilePatch,
+    db: Session = Depends(get_db),
+    owner: AuthenticatedOwner = Depends(require_retailer),
+) -> dict[str, Any]:
+    shop = owner.shop
+    if shop is None:
+        raise HTTPException(status_code=404, detail="Shop not found")
+    values = request.model_dump(exclude_unset=True)
+    if "phone" in values and values["phone"] != owner.phone:
+        raise HTTPException(status_code=400, detail="Phone must match the authenticated owner")
+    values.pop("phone", None)
+    if values.get("language", "x") is None:
+        values.pop("language")  # null does not clear the language
+    if "location" in values:
+        values["location"] = _point(request.location)
+    for name, value in values.items():
+        setattr(shop, name, value)
+    if values:
+        try:
+            db.commit()
+            db.refresh(shop)
+        except IntegrityError as exc:
+            db.rollback()
+            raise HTTPException(status_code=400, detail="Invalid shop values") from exc
+    return _shop_response(shop)
 
 
 def _shop_id(owner: AuthenticatedOwner) -> UUID:
@@ -186,7 +282,7 @@ def add_shop_products_bulk(
     request: BulkShopProductInput,
     db: Session = Depends(get_db),
     owner: AuthenticatedOwner = Depends(require_retailer),
-) -> dict[str, list[dict[str, Any]]]:
+) -> dict[str, Any]:
     shop_id = _shop_id(owner)
     product_ids = [item.product_id for item in request.items]
     if len(product_ids) != len(set(product_ids)):
@@ -215,11 +311,14 @@ def add_shop_products_bulk(
         if requested_ids
         else set()
     )
-    if existing_ids:
-        raise HTTPException(status_code=409, detail="Product already belongs to this shop")
-
+    # Re-photographing a shelf overlaps with what was saved before. Products the shop already has
+    # are skipped (never overwritten by a photo estimate) and reported, not treated as an error.
     rows: list[tuple[ShopProduct, Product, int]] = []
+    skipped: list[str] = []
     for item in request.items:
+        if item.product_id in existing_ids:
+            skipped.append(str(item.product_id))
+            continue
         product = products[item.product_id]
         price = item.price if item.price is not None else product.mrp
         if price is None:
@@ -247,7 +346,9 @@ def add_shop_products_bulk(
     try:
         db.add_all([row for row, _, _ in rows])
         db.flush()
-        for (row, _, quantity), item in zip(rows, request.items, strict=True):
+        items_by_product = {i.product_id: i for i in request.items}
+        for row, _, quantity in rows:
+            item = items_by_product[row.product_id]
             db.add(
                 StockEvent(
                     shop_id=shop_id,
@@ -269,7 +370,8 @@ def add_shop_products_bulk(
         "items": [
             shop_product_payload(row, product, quantity)
             for row, product, quantity in rows
-        ]
+        ],
+        "skipped": skipped,
     }
 
 
