@@ -79,5 +79,76 @@ const homeMl: Record<string, string> = {
   "today": 'ഇന്ന്',
 };
 
-export function t(text: string, locale = getLocale()) { return locale === 'ml' ? (ml[text] ?? extraMl[text] ?? homeMl[text] ?? text) : text; }
+// Group buys. Whole sentences with {placeholders} (filled by tf) so Malayalam word order is free.
+// Malayalam written as readable text; a fluent speaker should review these wordings.
+const groupBuyMl: Record<string, string> = {
+  "Loading group buys…": "കൂട്ടവാങ്ങലുകൾ ലഭ്യമാക്കുന്നു…",
+  "Could not load group buys": "കൂട്ടവാങ്ങലുകൾ ലഭ്യമാക്കാനായില്ല",
+  "Please try again.": "ദയവായി വീണ്ടും ശ്രമിക്കുക.",
+  "Try again": "വീണ്ടും ശ്രമിക്കുക",
+  "Procurement": "സംഭരണം",
+  "Group buys": "കൂട്ടവാങ്ങലുകൾ",
+  "Group buy": "കൂട്ടവാങ്ങൽ",
+  "Join supplier deals with other shops": "മറ്റ് കടകളോടൊപ്പം വിതരണക്കാരുടെ ഓഫറുകളിൽ ചേരുക",
+  "Join other shops to unlock lower wholesale prices.": "കുറഞ്ഞ മൊത്തവില ലഭിക്കാൻ മറ്റ് കടകളോടൊപ്പം ചേരൂ.",
+  "You joined": "നിങ്ങൾ ചേർന്നവ",
+  "Available": "ലഭ്യമായവ",
+  "No open group buys": "തുറന്ന കൂട്ടവാങ്ങലുകളില്ല",
+  "Check back later. Suppliers near you post new deals regularly.": "പിന്നീട് നോക്കുക. നിങ്ങളുടെ അടുത്തുള്ള വിതരണക്കാർ പുതിയ ഓഫറുകൾ പതിവായി ചേർക്കാറുണ്ട്.",
+  "Supplier": "വിതരണക്കാരൻ",
+  "Product": "ഉൽപ്പന്നം",
+  "Joined {n} pack": "{n} പാക്ക് ചേർന്നു",
+  "Joined {n} packs": "{n} പാക്ക് ചേർന്നു",
+  "a pack now": "ഇപ്പോൾ ഒരു പാക്കിന്",
+  "Packs pooled": "ഒരുമിച്ച പാക്കുകൾ",
+  "Deadline": "അവസാന തീയതി",
+  "{n} more pack to unlock {price} a pack": "{n} പാക്ക് കൂടി ചേർന്നാൽ ഒരു പാക്കിന് {price}",
+  "{n} more packs to unlock {price} a pack": "{n} പാക്ക് കൂടി ചേർന്നാൽ ഒരു പാക്കിന് {price}",
+  "(saves {saving} a pack)": "(ഒരു പാക്കിന് {saving} ലാഭം)",
+  "View details": "വിശദാംശങ്ങൾ കാണുക",
+  "{n} pcs per pack": "ഒരു പാക്കിൽ {n} എണ്ണം",
+  "{n} g per pack": "ഒരു പാക്കിൽ {n} ഗ്രാം",
+  "in {n} day": "{n} ദിവസത്തിനകം",
+  "in {n} days": "{n} ദിവസത്തിനകം",
+  "in {n} hour": "{n} മണിക്കൂറിനകം",
+  "in {n} hours": "{n} മണിക്കൂറിനകം",
+  "in {n} minute": "{n} മിനിറ്റിനകം",
+  "in {n} minutes": "{n} മിനിറ്റിനകം",
+  "in less than a minute": "ഒരു മിനിറ്റിനുള്ളിൽ",
+  "Closed": "അവസാനിച്ചു",
+  "Back": "തിരികെ",
+  "Could not load this group buy": "ഈ കൂട്ടവാങ്ങൽ ലഭ്യമാക്കാനായില്ല",
+  "Group buy not found": "കൂട്ടവാങ്ങൽ കണ്ടെത്താനായില്ല",
+  "This group buy is not open to your shop any more. It may have closed.": "ഈ കൂട്ടവാങ്ങൽ ഇനി നിങ്ങളുടെ കടയ്ക്ക് ലഭ്യമല്ല. ഇത് അവസാനിച്ചിരിക്കാം.",
+  "Price per pack now": "ഇപ്പോഴത്തെ ഒരു പാക്കിന്റെ വില",
+  "Price tiers": "വില ഘട്ടങ്ങൾ",
+  "{pooled} / {top} for the best price": "മികച്ച വിലയ്ക്ക് {pooled} / {top}",
+  "{n}+ packs: {price} a pack": "{n}+ പാക്കുകൾ: ഒരു പാക്കിന് {price}",
+  "{n} shop joined": "{n} കട ചേർന്നു",
+  "{n} shops joined": "{n} കടകൾ ചേർന്നു",
+  "Your commitment": "നിങ്ങൾ ഏറ്റ പാക്കുകൾ",
+  "Not joined": "ചേർന്നിട്ടില്ല",
+  "{n} pack joined": "{n} പാക്ക് ചേർന്നു",
+  "{n} packs joined": "{n} പാക്ക് ചേർന്നു",
+  "This group buy is closed, so it no longer takes packs.": "ഈ കൂട്ടവാങ്ങൽ അവസാനിച്ചു, ഇനി പാക്കുകൾ സ്വീകരിക്കില്ല.",
+  "Packs to commit": "ചേർക്കേണ്ട പാക്കുകൾ",
+  "Fewer packs": "പാക്ക് കുറയ്ക്കുക",
+  "More packs": "പാക്ക് കൂട്ടുക",
+  "About {amount} at today's price. The final price is set when the deadline passes.": "ഇന്നത്തെ വിലയിൽ ഏകദേശം {amount}. അവസാന തീയതി കഴിഞ്ഞാൽ അന്തിമ വില നിശ്ചയിക്കും.",
+  "This replaces your earlier commitment.": "ഇത് നിങ്ങളുടെ മുൻപത്തെ എണ്ണത്തിന് പകരമാകും.",
+  "Joining…": "ചേരുന്നു…",
+  "Update commitment": "പാക്കുകൾ പുതുക്കുക",
+  "Join group buy": "കൂട്ടവാങ്ങലിൽ ചേരുക",
+  "Commitment updated": "പാക്കുകൾ പുതുക്കി",
+  "You joined the group buy": "കൂട്ടവാങ്ങലിൽ ചേർന്നു",
+  "Could not join. Check your connection and try again.": "ചേരാനായില്ല. കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
+};
+
+export function t(text: string, locale = getLocale()) { return locale === 'ml' ? (ml[text] ?? extraMl[text] ?? homeMl[text] ?? groupBuyMl[text] ?? text) : text; }
+/** Every Malayalam entry in one object (same precedence as t). For tests and tooling. */
+export const translations = (): Record<string, string> => ({ ...groupBuyMl, ...homeMl, ...extraMl, ...ml });
+/** Translate a whole sentence, then fill its {placeholders}: word order can differ per language. */
+export function tf(text: string, vars: Record<string, string | number>, locale = getLocale()) {
+  return t(text, locale).replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? String(vars[name]) : whole));
+}
 export function LanguageSelector() { const locale = useLocale(); return <label className="flex min-h-12 items-center justify-between gap-4"><span>{t('Language', locale)}</span><select aria-label={t('Language', locale)} className="h-12 w-auto rounded-md border border-input bg-background px-3 text-sm" value={locale} onChange={(e) => setLocale(e.target.value as Locale)}><option value="en">English</option><option value="ml">Malayalam</option></select></label>; }

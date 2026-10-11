@@ -1,5 +1,7 @@
 // Small, pure helpers for the group-buy screens. The API already says the current price and how
 // many packs the shop committed (`current_price`, `my_packs`); these only shape it for display.
+import { getLocale, t, tf, type Locale } from "@/lib/i18n";
+
 export const MAX_PACKS = 100000; // the API's limit for one commitment
 
 type Tier = { min_packs: number; price: number };
@@ -31,11 +33,29 @@ export function clampPacks(raw: number | string): number {
   return Math.min(MAX_PACKS, Math.floor(n));
 }
 
-export function productLabel(product?: { brand?: string | null; name?: string; size?: string | null }) {
-  return [product?.brand, product?.name, product?.size].filter(Boolean).join(" ") || "Product";
+export function productLabel(
+  product?: { brand?: string | null; name?: string; size?: string | null },
+  locale: Locale = getLocale(),
+) {
+  return [product?.brand, product?.name, product?.size].filter(Boolean).join(" ") || t("Product", locale);
 }
 
-export function packSizeLabel(packSize?: number, unit?: string) {
+export function packSizeLabel(packSize?: number, unit?: string, locale: Locale = getLocale()) {
   if (!packSize) return "";
-  return `${packSize} ${unit === "gram" ? "g" : "pcs"} per pack`;
+  return tf(unit === "gram" ? "{n} g per pack" : "{n} pcs per pack", { n: packSize }, locale);
+}
+
+/** "in 3 days", "in 5 hours", "in 30 minutes", "Closed": words, so every language can say it. */
+export function deadlineLabel(deadline: string | undefined, locale: Locale = getLocale(), now = Date.now()) {
+  const end = deadline ? Date.parse(deadline) : NaN;
+  if (Number.isNaN(end)) return "—";
+  const ms = end - now;
+  if (ms <= 0) return t("Closed", locale);
+  const minutes = Math.floor(ms / 60000);
+  if (minutes < 1) return t("in less than a minute", locale);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days >= 1) return tf(days === 1 ? "in {n} day" : "in {n} days", { n: days }, locale);
+  if (hours >= 1) return tf(hours === 1 ? "in {n} hour" : "in {n} hours", { n: hours }, locale);
+  return tf(minutes === 1 ? "in {n} minute" : "in {n} minutes", { n: minutes }, locale);
 }
