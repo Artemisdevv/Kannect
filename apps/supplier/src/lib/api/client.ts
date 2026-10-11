@@ -77,8 +77,12 @@ export async function request<T>(method: string, path: string, body?: unknown): 
 
   const data = await res.json().catch(() => undefined);
   if (res.ok) return data as T;
-  const msg = (data && (data.message || data.error)) || `Request failed (${res.status})`;
+  const err = (data as { error?: { message?: string } | string; message?: string } | undefined) ?? {};
+  const msg =
+    (typeof err.error === "object" ? err.error?.message : err.error) ?? err.message ?? `Request failed (${res.status})`;
   if (res.status === 401) {
+    // a wrong sign-in code is the person's mistake, not an expired session
+    if (path.startsWith("/auth/")) throw new ApiError("validation", msg, 401);
     onUnauthorized?.();
     throw new ApiError("unauthorized", "Your session has expired. Please sign in again.", 401);
   }

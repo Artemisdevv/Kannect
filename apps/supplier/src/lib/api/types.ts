@@ -29,7 +29,16 @@ export interface Product {
   active: boolean;
 }
 
-export type ProductInput = Omit<Product, "id">;
+export type ProductInput = Omit<Product, "id"> & { catalogueId?: string };
+
+/** A product from the shared catalogue that a supplier can list for wholesale. */
+export interface CatalogueChoice {
+  id: string;
+  name: string;
+  sku: string;
+  category: string;
+  unit: string;
+}
 
 export interface OrderItem {
   productId: string;
@@ -73,6 +82,8 @@ export interface Invoice {
   gst: number;
   total: number;
   status?: "unpaid" | "paid";
+  /** Set by the live API: GST is not calculated, show this note instead. */
+  taxNote?: string;
 }
 
 export interface DemandSignal {
@@ -83,6 +94,8 @@ export interface DemandSignal {
   shopCount: number;
   totalPacks: number;
   period: string;
+  /** Live API only: how many nearby shops were counted. */
+  shopsTotal?: number;
 }
 
 export type GroupBuyStatus = "open" | "confirmed" | "failed" | "expired";

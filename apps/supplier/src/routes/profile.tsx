@@ -23,7 +23,8 @@ export const Route = createFileRoute("/profile")({
 });
 
 const EMPTY: SupplierInput = { businessName: "", contactName: "", address: "", serviceArea: "", gstin: "" };
-const FIELDS: { k: keyof SupplierInput; label: string; optional?: boolean }[] = [
+type FieldKey = Exclude<keyof SupplierInput, "location">; // location is set from the device, not typed
+const FIELDS: { k: FieldKey; label: string; optional?: boolean }[] = [
   { k: "businessName", label: "Business name" },
   { k: "contactName", label: "Contact person" },
   { k: "address", label: "Address" },
