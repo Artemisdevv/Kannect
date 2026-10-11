@@ -12,6 +12,8 @@ const config: CapacitorConfig = {
   appName: "Kannect",
   webDir: "dist",
   android: { allowMixedContent: dev },
+  // dark status-bar icons on our light header; the app reads the safe-area insets from CSS
+  plugins: { SystemBars: { style: "LIGHT", insetsHandling: "css" } },
   server: { androidScheme: dev ? "http" : "https", cleartext: dev },
 };
 
