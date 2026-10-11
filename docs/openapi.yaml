@@ -312,6 +312,56 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ShopProduct" }
 
+  /shop/recount:
+    post:
+      tags: [shop]
+      summary: Set stock for products the shop already has, from an exact count or a photo/level estimate
+      description: |
+        Writes an absolute `correction` per item with its `count_source`. Send `quantity` with
+        `owner_exact`, or `stock_level` (plenty/some/few/none) with `photo_estimate` or `level_guess`.
+        An estimate that lands in the same stock band as the current count is skipped (`unchanged`),
+        so a photo never overwrites a good exact count with a rougher number; one that disagrees
+        (the photo shows few, the system says 40) is applied. `client_id` makes retries safe.
+        For a barcode scan: GET /catalogue/barcode/{code}, then recount that product_id exactly.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  maxItems: 200
+                  items:
+                    type: object
+                    required: [client_id, product_id]
+                    properties:
+                      client_id: { type: string, format: uuid }
+                      product_id: { type: string, format: uuid }
+                      quantity: { type: integer, minimum: 0 }
+                      stock_level: { type: string, enum: [plenty, some, few, none] }
+                      count_source: { type: string, enum: [owner_exact, photo_estimate, level_guess], default: owner_exact }
+      responses:
+        "200":
+          description: Applied items (with `previous_qty`) and skipped items (reason `not_in_shop`, `unchanged` or `already_applied`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/ShopProduct" }
+                  skipped:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        product_id: { type: string, format: uuid }
+                        reason: { type: string, enum: [not_in_shop, unchanged, already_applied] }
+
   /shop/recount-suggestions:
     get:
       tags: [shop]
@@ -585,6 +635,9 @@ paths:
                         confidence: { type: number, minimum: 0, maximum: 1 }
                         suggested_price: { type: number, format: double, nullable: true, description: "Pre-filled price for the confirm list: the printed MRP, else the median price other shops charge. null when neither is known (the owner types one). Never invented." }
                         price_source: { type: string, enum: [mrp, nearby_median], nullable: true }
+                        in_shop: { type: boolean, description: "True when the matched product is already in this shop. Onboarding skips it; offer a recount instead (POST /shop/recount)." }
+                        current_quantity: { type: integer, nullable: true, description: "The system's count for an in_shop item, in base units" }
+                        current_status: { type: string, enum: [in_stock, low, out], nullable: true }
                         loose: { type: boolean, description: "Unlabelled goods (produce, eggs, sacks). `match` is one of the shop's loose tiles, or null when there is no tile yet. Never needs a barcode scan." }
                         uncertain: { type: boolean, description: "The model named a brand but could not read the pack clearly. `alternatives` are suggestions to confirm, never an automatic match." }
                         needs_scan: { type: boolean, description: "True when no confident match: UI prompts the owner to scan this item's barcode" }

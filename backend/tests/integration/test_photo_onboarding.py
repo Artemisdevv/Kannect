@@ -186,3 +186,52 @@ def test_bulk_save_still_needs_a_price_when_nothing_suggests_one(world):
     r = client.post("/api/v1/shop/products/bulk", headers=headers,
                     json={"items": [{"product_id": str(world["tile"]), "stock_level": "some"}]})  # fmt: skip
     assert r.status_code == 400 and "price" in r.text.lower()
+
+
+def test_second_photo_recounts_what_the_shop_already_has(world):
+    tag, brand = world["tag"], world["brand"]
+    headers, _ = login(world["phone"])
+    client.post("/api/v1/shop", headers=headers, json={"name": f"R {tag}", "location": {"lat": LAT, "lng": LNG}})
+    a, b = str(world["alpha"]), str(world["beta"])
+    client.post("/api/v1/shop/products/bulk", headers=headers, json={"items": [
+        {"product_id": a, "price": 10, "opening_stock": 40, "count_source": "owner_exact"},
+        {"product_id": b, "price": 20, "stock_level": "plenty", "count_source": "photo_estimate"}]})  # fmt: skip
+
+    # second photo: the shelf now shows 1 Alpha and plenty of Beta
+    shelf = [
+        Detection(brand=brand, name=f"Alpha Biscuit {tag}", size="50 g", category="snacks_biscuits", visible_count=1),
+        Detection(brand=brand, name=f"Beta Namkeen {tag}", size="100 g", category="snacks_biscuits", visible_count=9),
+    ]  # fmt: skip
+    app.dependency_overrides[get_shelf_vision] = lambda: FixedShelf(shelf)
+    r = client.post("/api/v1/shop/ai/shelf-photo?thorough=false", headers=headers,
+                    files=[("images", ("shelf.jpg", photo(), "image/jpeg"))])  # fmt: skip
+    got = {d["match"]["id"]: d for d in r.json()["detections"] if d["match"]}
+    assert got[a]["in_shop"] and got[a]["current_quantity"] == 40 and got[a]["current_status"] == "in_stock"
+    assert got[b]["in_shop"] and got[b]["current_quantity"] == 25
+
+    ids = {k: uuid.uuid4() for k in "ab"}
+    body = {"items": [
+        {"client_id": str(ids["a"]), "product_id": a, "stock_level": "few", "count_source": "photo_estimate"},  # disagrees with 40
+        {"client_id": str(ids["b"]), "product_id": b, "stock_level": "plenty", "count_source": "photo_estimate"},  # same band
+        {"client_id": str(uuid.uuid4()), "product_id": str(world["tile"]), "quantity": 3},  # not in this shop
+    ]}  # fmt: skip
+    out = client.post("/api/v1/shop/recount", headers=headers, json=body)
+    assert out.status_code == 200, out.text
+    assert [(x["product"]["id"], x["stock_qty"], x["previous_qty"]) for x in out.json()["items"]] == [(a, 3, 40)]
+    assert {(s["product_id"], s["reason"]) for s in out.json()["skipped"]} == {
+        (b, "unchanged"), (str(world["tile"]), "not_in_shop")}  # fmt: skip
+
+    # a retried request is a no-op
+    again = client.post("/api/v1/shop/recount", headers=headers, json=body).json()
+    assert again["items"] == [] and (a, "already_applied") in {(s["product_id"], s["reason"]) for s in again["skipped"]}
+
+    # a barcode scan gives an exact count, which always applies and clears needs_recount
+    exact = client.post("/api/v1/shop/recount", headers=headers, json={"items": [
+        {"client_id": str(uuid.uuid4()), "product_id": a, "quantity": 12}]})  # fmt: skip
+    assert exact.json()["items"][0]["stock_qty"] == 12
+    mine = {x["product"]["id"]: x for x in client.get("/api/v1/shop/products", headers=headers).json()["items"]}
+    assert mine[a]["stock_qty"] == 12 and mine[a]["needs_recount"] is False
+    with SessionLocal() as db:
+        sources = list(db.scalars(select(StockEvent.count_source).where(StockEvent.product_id == world["alpha"],
+                                                                         StockEvent.type == "correction")))  # fmt: skip
+    assert sorted(sources) == ["owner_exact", "owner_exact", "photo_estimate"]
