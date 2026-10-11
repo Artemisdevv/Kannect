@@ -312,7 +312,7 @@ def create_stock_event(
     row = db.scalar(
         select(ShopProduct)
         .where(ShopProduct.shop_id == shop_id, ShopProduct.product_id == request.product_id)
-        .with_for_update()
+        .with_for_update(of=ShopProduct)
         .options(joinedload(ShopProduct.product), selectinload(ShopProduct.stock_events))
     )
     if row is None:

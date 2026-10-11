@@ -147,7 +147,7 @@ def create_bill(
             select(ShopProduct)
             .where(ShopProduct.shop_id == shop_id, ShopProduct.product_id.in_(product_ids))
             .order_by(ShopProduct.product_id)
-            .with_for_update()
+            .with_for_update(of=ShopProduct)
             .options(joinedload(ShopProduct.product), selectinload(ShopProduct.stock_events))
         ).all()
     )
