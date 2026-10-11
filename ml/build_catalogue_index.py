@@ -28,6 +28,11 @@ IMG = CACHE / "img"
 MODEL = "google/siglip-base-patch16-224"
 
 
+def as_tensor(x):
+    """transformers 5 returns an output object, older versions a tensor."""
+    return x if isinstance(x, torch.Tensor) else x.pooler_output
+
+
 def fetch(item: dict) -> Path | None:
     dest = IMG / f"{item['code']}.jpg"
     if dest.exists() and dest.stat().st_size > 0:
@@ -76,11 +81,11 @@ def main() -> None:
             if not imgs:
                 continue
             inp = proc(images=imgs, return_tensors="pt").to(dev)
-            e = model.get_image_features(**inp)
+            e = as_tensor(model.get_image_features(**inp))
             img_embs.append(torch.nn.functional.normalize(e, dim=-1).cpu().numpy())
             texts = [f"{it['brands']} {it['product_name']} {it['quantity']}".strip() for it in ok]
             tin = proc(text=texts, padding="max_length", max_length=64, truncation=True, return_tensors="pt").to(dev)
-            t = model.get_text_features(**tin)
+            t = as_tensor(model.get_text_features(**tin))
             txt_embs.append(torch.nn.functional.normalize(t, dim=-1).cpu().numpy())
             meta.extend(
                 {k: it[k] for k in ("code", "product_name", "brands", "quantity", "categories_tags", "unique_scans_n")}
