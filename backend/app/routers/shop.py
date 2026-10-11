@@ -1,11 +1,14 @@
 """Retailer shop-product and stock-event endpoints."""
 
+import csv
+import io
+import json
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from geoalchemy2 import WKTElement
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
@@ -14,7 +17,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth import AuthenticatedOwner, require_retailer
 from app.db import get_db
-from app.models import Product, Shop, ShopProduct, StockEvent
+from app.models import Bill, Product, Shop, ShopProduct, StockEvent
 from app.routers.auth import _shop_response
 from app.stock import (
     StockLevel,
@@ -193,6 +196,167 @@ def _load_shop_products(db: Session, shop_id: UUID) -> list[ShopProduct]:
                 joinedload(ShopProduct.product), selectinload(ShopProduct.stock_events)
             )
         ).all()
+    )
+
+
+@router.get("/export")
+def export_shop_data(
+    format: Literal["json", "csv"] = Query(default="json"),
+    db: Session = Depends(get_db),
+    owner: AuthenticatedOwner = Depends(require_retailer),
+) -> Response:
+    """Download this shop's product/stock state, sales, and stock-event history."""
+    shop_id = _shop_id(owner)
+    products = _load_shop_products(db, shop_id)
+    bills = list(
+        db.scalars(
+            select(Bill)
+            .where(Bill.shop_id == shop_id)
+            .order_by(Bill.created_at, Bill.id)
+            .options(selectinload(Bill.items))
+        ).all()
+    )
+    events = list(
+        db.scalars(
+            select(StockEvent)
+            .where(StockEvent.shop_id == shop_id)
+            .order_by(StockEvent.created_at, StockEvent.id)
+        ).all()
+    )
+
+    payload = {
+        "shop": {"id": str(shop_id), "name": owner.shop.name},
+        "products": [
+            {
+                "product_id": str(row.product_id),
+                "name": row.product.name,
+                "barcode": row.product.barcode,
+                "unit": row.product.unit,
+                "price": str(row.price),
+                "stock_quantity": stock_quantity(row.stock_events),
+                "low_threshold": row.low_threshold,
+                "needs_recount": row.needs_recount,
+            }
+            for row in products
+        ],
+        "bills": [
+            {
+                "id": str(bill.id),
+                "client_id": str(bill.client_id),
+                "created_at": bill.created_at.isoformat(),
+                "total": str(bill.total),
+                "payment_mode": bill.payment_mode,
+                "customer_contact": bill.customer_contact,
+                "items": [
+                    {
+                        "product_id": str(line.product_id),
+                        "name": line.name,
+                        "unit": line.unit,
+                        "quantity": line.quantity,
+                        "unit_price": str(line.unit_price),
+                        "line_total": str(line.line_total),
+                    }
+                    for line in bill.items
+                ],
+            }
+            for bill in bills
+        ],
+        "stock_events": [
+            {
+                "id": str(event.id),
+                "client_id": str(event.client_id),
+                "product_id": str(event.product_id),
+                "type": event.type,
+                "quantity": event.quantity,
+                "count_source": event.count_source,
+                "created_at": event.created_at.isoformat(),
+            }
+            for event in events
+        ],
+    }
+
+    if format == "json":
+        return Response(
+            content=json.dumps(payload, ensure_ascii=False, indent=2),
+            media_type="application/json",
+            headers={"Content-Disposition": 'attachment; filename="kannect-shop-export.json"'},
+        )
+
+    output = io.StringIO(newline="")
+    columns = [
+        "record_type",
+        "shop_id",
+        "shop_name",
+        "product_id",
+        "product_name",
+        "barcode",
+        "unit",
+        "price",
+        "stock_quantity",
+        "low_threshold",
+        "needs_recount",
+        "bill_id",
+        "bill_client_id",
+        "created_at",
+        "quantity",
+        "unit_price",
+        "line_total",
+        "bill_total",
+        "payment_mode",
+        "customer_contact",
+        "stock_event_id",
+        "stock_event_client_id",
+        "event_type",
+        "count_source",
+    ]
+    writer = csv.DictWriter(output, fieldnames=columns)
+    writer.writeheader()
+    for product in payload["products"]:
+        writer.writerow(
+            {
+                "record_type": "product",
+                "shop_id": shop_id,
+                "shop_name": owner.shop.name,
+                **{key: value for key, value in product.items() if key != "name"},
+                "product_name": product["name"],
+            }
+        )
+    for bill_data in payload["bills"]:
+        for line in bill_data["items"]:
+            writer.writerow(
+                {
+                    "record_type": "sale",
+                    "shop_id": shop_id,
+                    "shop_name": owner.shop.name,
+                    "bill_id": bill_data["id"],
+                    "bill_client_id": bill_data["client_id"],
+                    "created_at": bill_data["created_at"],
+                    "bill_total": bill_data["total"],
+                    "payment_mode": bill_data["payment_mode"],
+                    "customer_contact": bill_data["customer_contact"],
+                    **{key: value for key, value in line.items() if key != "name"},
+                    "product_name": line["name"],
+                }
+            )
+    for event in payload["stock_events"]:
+        writer.writerow(
+            {
+                "record_type": "stock_event",
+                "shop_id": shop_id,
+                "shop_name": owner.shop.name,
+                "stock_event_id": event["id"],
+                "stock_event_client_id": event["client_id"],
+                "product_id": event["product_id"],
+                "quantity": event["quantity"],
+                "created_at": event["created_at"],
+                "count_source": event["count_source"],
+                "event_type": event["type"],
+            }
+        )
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="kannect-shop-export.csv"'},
     )
 
 

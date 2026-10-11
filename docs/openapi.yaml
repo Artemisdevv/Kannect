@@ -489,15 +489,18 @@ paths:
   /shop/export:
     get:
       tags: [shop]
-      summary: Export all shop data (no lock-in)
+      summary: Export this retailer's product, stock, and sales data (no lock-in)
+      description: Requires retailer authentication. JSON includes shop details, current shop products and stock quantities, bills with line items, and stock-event history. CSV downloads the same data as product, sale-line, and stock-event records. The export is scoped to the authenticated retailer's shop.
       parameters:
         - { name: format, in: query, schema: { type: string, enum: [json, csv], default: json } }
       responses:
         "200":
-          description: File download
+          description: Shop data file download
           content:
-            application/json: {}
-            text/csv: {}
+            application/json:
+              schema: { type: object, properties: { shop: { type: object }, products: { type: array, items: { type: object } }, bills: { type: array, items: { type: object } }, stock_events: { type: array, items: { type: object } } } }
+            text/csv:
+              schema: { type: string, format: binary }
 
   /search:
     get:
