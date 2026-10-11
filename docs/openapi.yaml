@@ -161,18 +161,25 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/ProductInput" }
+            schema:
+              allOf:
+                - { $ref: "#/components/schemas/ProductInput" }
+                - type: object
+                  properties:
+                    allow_similar: { type: boolean, default: false, description: "Create even if a near duplicate exists (a different variant). Barcode must be 6 to 14 digits when given." }
       responses:
         "201":
           description: Created
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Product" }
+        "409":
+          description: Barcode already exists, or a similar product exists (code `similar_product`, with `candidates` to use instead)
 
   /catalogue/starter-packs:
     get:
       tags: [catalogue]
-      summary: Onboarding starter packs. Pre-curated popular Kerala items by shop type, with images and MRP. Owner ticks what they sell.
+      summary: Ordered onboarding catalogue items for a shop type. Pack MRPs are demo values.
       parameters:
         - { name: shop_type, in: query, required: true, schema: { type: string, enum: [grocery, provision, vegetable, stationery, bakery, general] } }
       responses:
@@ -186,6 +193,8 @@ paths:
                   items:
                     type: array
                     items: { $ref: "#/components/schemas/Product" }
+        "401": { $ref: "#/components/responses/Error" }
+        "400": { $ref: "#/components/responses/Error" }
 
   /shop/products/bulk:
     post:
@@ -312,10 +321,61 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ShopProduct" }
 
+  /shop/recount:
+    post:
+      tags: [shop]
+      summary: Set stock for products the shop already has, from an exact count or a photo/level estimate
+      description: |
+        Writes an absolute `correction` per item with its `count_source`. Send `quantity` with
+        `owner_exact`, or `stock_level` (plenty/some/few/none) with `photo_estimate` or `level_guess`.
+        An estimate that lands in the same stock band as the current count is skipped (`unchanged`),
+        so a photo never overwrites a good exact count with a rougher number; one that disagrees
+        (the photo shows few, the system says 40) is applied. `client_id` makes retries safe.
+        For a barcode scan: GET /catalogue/barcode/{code}, then recount that product_id exactly.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  maxItems: 200
+                  items:
+                    type: object
+                    required: [client_id, product_id]
+                    properties:
+                      client_id: { type: string, format: uuid }
+                      product_id: { type: string, format: uuid }
+                      quantity: { type: integer, minimum: 0 }
+                      stock_level: { type: string, enum: [plenty, some, few, none] }
+                      count_source: { type: string, enum: [owner_exact, photo_estimate, level_guess], default: owner_exact }
+      responses:
+        "200":
+          description: Applied items (with `previous_qty`) and skipped items (reason `not_in_shop`, `unchanged` or `already_applied`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/ShopProduct" }
+                  skipped:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        product_id: { type: string, format: uuid }
+                        reason: { type: string, enum: [not_in_shop, unchanged, already_applied] }
+
   /shop/recount-suggestions:
     get:
       tags: [shop]
-      summary: 10-15 items to recount this week (loose items first, flagged conflicts first)
+      summary: Up to 15 items to recount, ordered by needs_recount, photo estimates, level guesses, then loose items
+      description: Within each priority, loose gram items precede other products; names break remaining ties.
       responses:
         "200":
           description: OK
@@ -585,6 +645,9 @@ paths:
                         confidence: { type: number, minimum: 0, maximum: 1 }
                         suggested_price: { type: number, format: double, nullable: true, description: "Pre-filled price for the confirm list: the printed MRP, else the median price other shops charge. null when neither is known (the owner types one). Never invented." }
                         price_source: { type: string, enum: [mrp, nearby_median], nullable: true }
+                        in_shop: { type: boolean, description: "True when the matched product is already in this shop. Onboarding skips it; offer a recount instead (POST /shop/recount)." }
+                        current_quantity: { type: integer, nullable: true, description: "The system's count for an in_shop item, in base units" }
+                        current_status: { type: string, enum: [in_stock, low, out], nullable: true }
                         loose: { type: boolean, description: "Unlabelled goods (produce, eggs, sacks). `match` is one of the shop's loose tiles, or null when there is no tile yet. Never needs a barcode scan." }
                         uncertain: { type: boolean, description: "The model named a brand but could not read the pack clearly. `alternatives` are suggestions to confirm, never an automatic match." }
                         needs_scan: { type: boolean, description: "True when no confident match: UI prompts the owner to scan this item's barcode" }
@@ -665,7 +728,7 @@ paths:
               type: object
               properties:
                 audio: { type: string, format: binary }
-                language: { type: string, enum: [ml, en], default: ml }
+                language: { type: string, enum: [ml, en], default: ml, description: "Ignored for now: the model detects the language" }
       responses:
         "200":
           description: OK
@@ -680,9 +743,16 @@ paths:
                     items:
                       type: object
                       properties:
-                        product: { type: object, nullable: true, allOf: [{ $ref: "#/components/schemas/Product" }] }
-                        quantity: { type: integer }
+                        spoken: { type: string, description: "The item as said, in the original script" }
+                        name: { type: string, description: "The model's English name for it" }
+                        product: { type: object, nullable: true, allOf: [{ $ref: "#/components/schemas/Product" }], description: "Matched against THIS shop's own products only" }
+                        alternatives: { type: array, items: { $ref: "#/components/schemas/Product" } }
+                        quantity: { type: integer, description: "Base units: pieces, or grams for loose goods (0.5 kg -> 500)" }
+                        unit: { type: string, enum: [piece, gram] }
+                        price: { type: number, nullable: true, description: "This shop's price (per piece, or per kg for loose goods); pass to POST /shop/bills or omit to use it" }
                         confidence: { type: number }
+                        needs_check: { type: boolean, description: "True when unmatched, low confidence, or the unit did not fit the product" }
+                        note: { type: string, nullable: true }
 
   # ---------------- Procurement (retailer buys from suppliers) ----------------
   /suppliers:
@@ -761,6 +831,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Order" }
+        "200":
+          description: Existing order returned for an idempotent replay
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
     get:
       tags: [procurement]
       summary: This shop's orders, newest first
@@ -819,29 +894,32 @@ paths:
               properties:
                 items:
                   type: array
-                  description: Defaults to the ordered quantities
+                  description: "If omitted, receives every ordered pack in full. If supplied, only listed products are received; omitted products remain unreceived and may be reported in a later request. Replaying the same quantities is idempotent; changing an already received quantity returns 409."
                   items:
                     type: object
                     required: [product_id, quantity]
                     properties:
                       product_id: { type: string }
-                      quantity: { type: integer, description: "Base units" }
+                      quantity: { type: integer, minimum: 0, description: "Received base units; zero means not received yet" }
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Order" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
 
   /shop/orders/{order_id}/invoice:
     get:
       tags: [procurement]
-      summary: Invoice for an accepted order
+      summary: Demo invoice for an accepted order; GST is not currently implemented
       parameters:
         - { name: order_id, in: path, required: true, schema: { type: string } }
       responses:
         "200":
-          description: OK
+          description: Demo invoice without GST calculation
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Invoice" }
@@ -1002,12 +1080,26 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Order" }
 
+  /supplier/orders/{order_id}/invoice:
+    get:
+      summary: Demo invoice for an accepted order; GST is not currently implemented
+      tags: [supplier]
+      parameters:
+        - { name: order_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Demo invoice
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+        "404": { $ref: "#/components/responses/Error" }
+
   /supplier/orders/{order_id}/status:
     post:
       tags: [supplier]
       summary: |
         Move an order forward. Allowed: placed to accepted or rejected, accepted to dispatched, dispatched to delivered.
-        Accepting generates the invoice. Each change is appended to the order tracking history.
+        Accepting generates a demo invoice without GST calculation. Each change is appended to the order tracking history.
       parameters:
         - { name: order_id, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -1028,19 +1120,6 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Order" }
         "409": { $ref: "#/components/responses/Error" }
-
-  /supplier/orders/{order_id}/invoice:
-    get:
-      summary: Invoice for an order
-      tags: [supplier]
-      parameters:
-        - { name: order_id, in: path, required: true, schema: { type: string } }
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Invoice" }
 
   /supplier/demand:
     get:
@@ -1371,7 +1450,9 @@ components:
           type: array
           items: { $ref: "#/components/schemas/OrderLine" }
         subtotal: { type: number, format: double }
-        gst: { type: number, format: double, description: "Demo only: flat illustrative rate, label clearly in the UI" }
+        gst: { type: number, format: double, description: "Always 0.00 until GST is implemented; no tax calculation is performed" }
+        tax_status: { type: string, enum: [not_implemented], description: "GST-ready for future work; this invoice does not calculate GST" }
+        tax_note: { type: string, description: "Display this note wherever invoice tax is shown" }
         total: { type: number, format: double }
         status: { type: string, enum: [unpaid, paid] }
 

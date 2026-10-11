@@ -15,3 +15,6 @@ ml/.venv/
 ml/cache/
 ml/out/
 ml/index.log
+
+# frontend build output
+apps/*/dist/

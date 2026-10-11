@@ -18,6 +18,7 @@ from app.routers.shop import (
     add_shop_product,
     add_shop_products_bulk,
     list_shop_products,
+    recount_suggestions,
 )
 from app.stock import default_low_threshold, stock_quantity, stock_status
 
@@ -155,6 +156,7 @@ def test_bulk_add_maps_levels_to_unit_quantities_thresholds_and_count_sources():
 
 
 def test_bill_line_rounds_gram_price_per_kilogram_to_cents():
+    assert _line_total(Decimal("48.00"), 2000, "gram") == Decimal("96.00")
     assert _line_total(Decimal("199.99"), 250, "gram") == Decimal("50.00")
     assert _line_total(Decimal("12.50"), 3, "piece") == Decimal("37.50")
 
@@ -235,6 +237,47 @@ def test_shop_product_listing_filters_by_name_and_derived_status():
     assert response["items"][0]["stock_qty"] == 2
     assert response["items"][0]["stock_status"] == "low"
     assert response["items"][0]["product"]["is_active"] is False
+
+
+def test_recount_suggestions_order_flags_then_source_then_loose_items():
+    shop_id = uuid4()
+    definitions = [
+        ("loose-photo", "gram", True, "photo_estimate"),
+        ("level", "piece", False, "level_guess"),
+        ("loose-level", "gram", False, "level_guess"),
+        ("photo", "piece", False, "photo_estimate"),
+        ("flagged-owner", "piece", True, "owner_exact"),
+        ("unknown", "piece", False, None),
+    ]
+    rows = []
+    for name, unit, needs_recount, source in definitions:
+        product = Product(id=uuid4(), name=name, unit=unit, is_active=True)
+        row = SimpleNamespace(
+            shop_id=shop_id,
+            product_id=product.id,
+            product=product,
+            price=Decimal("1.00"),
+            cost_price=None,
+            low_threshold=5,
+            needs_recount=needs_recount,
+            pinned=False,
+        )
+        row.stock_events = [] if source is None else [
+            StockEvent(
+                id=uuid4(), shop_id=shop_id, product_id=product.id, client_id=uuid4(),
+                type="correction", quantity=1, count_source=source,
+                created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            )
+        ]
+        rows.append(row)
+
+    result = recount_suggestions(
+        db=CatalogueSession(rows), owner=SimpleNamespace(shop=SimpleNamespace(id=shop_id))
+    )
+
+    assert [item["product"]["name"] for item in result["items"]] == [
+        "loose-photo", "flagged-owner", "photo", "loose-level", "level", "unknown"
+    ]
 
 
 class BillingSession:

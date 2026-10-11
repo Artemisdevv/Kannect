@@ -30,6 +30,7 @@ Even the `web` ones disagree between sources (Tata Salt 1 kg: Rs 22 vs Rs 30), s
 
 The pack prices are copied into `product.mrp` in the database. There is no source column there, so the pack JSON is the record of where each price came from.
 
-## Still to do
-- Pack **membership** (which product belongs to which shop type) needs the `starter_pack_item` table and `GET /catalogue/starter-packs` from issue #37. Until then the JSON files are the source of truth.
-- More packs: `vegetable`, `stationery`, `bakery`, `general`.
+## Membership and endpoint
+- `starter_pack_item` stores each pack's product IDs and their display order. `GET /catalogue/starter-packs?shop_type=grocery` returns active catalogue products in that order.
+- After upgrading the database, run `python scripts/load_packs.py --apply` from `backend/` to load product data and refresh membership from the JSON files. The loader replaces memberships only for pack files present in `data/seed/packs/`.
+- More packs: `vegetable`, `stationery`, `bakery`, `general`. These shop types return an empty list until curated JSON files are added.

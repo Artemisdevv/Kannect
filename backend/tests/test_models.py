@@ -7,7 +7,7 @@ from app.db import Base
 
 def test_domain_models_register_and_relationships_configure():
     configure_mappers()
-    assert len(models.__all__) == 15
+    assert len(models.__all__) == 16
     assert set(Base.metadata.tables) == {
         "shop",
         "owner_identity",
@@ -18,6 +18,7 @@ def test_domain_models_register_and_relationships_configure():
         "order_tracking",
         "invoice",
         "product",
+        "starter_pack_item",
         "shop_product",
         "stock_event",
         "bill",

@@ -480,7 +480,7 @@ def recount_suggestions(
     owner: AuthenticatedOwner = Depends(require_retailer),
 ) -> dict[str, list[dict[str, Any]]]:
     rows = _load_shop_products(db, _shop_id(owner))
-    source_rank = {"level_guess": 0, "photo_estimate": 1, "owner_exact": 2, None: 3}
+    source_rank = {"photo_estimate": 0, "level_guess": 1, "owner_exact": 2, None: 3}
 
     def priority(row: ShopProduct) -> tuple[int, int, int, str]:
         latest_source = next(
@@ -495,8 +495,8 @@ def recount_suggestions(
         )
         return (
             0 if row.needs_recount else 1,
-            0 if row.product.unit == "gram" else 1,
             source_rank.get(latest_source, 3),
+            0 if row.product.unit == "gram" else 1,
             row.product.name.casefold(),
         )
 

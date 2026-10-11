@@ -5,16 +5,19 @@ from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, field_validator
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import AuthenticatedOwner, require_retailer
 from app.db import get_db
-from app.models import Product
+from app.models import Product, StarterPackItem
+from app.services.catalogue_match import STRONG, CatalogueIndex, norm
 
 router = APIRouter(prefix="/catalogue", tags=["catalogue"])
+ShopType = Literal["grocery", "provision", "vegetable", "stationery", "bakery", "general"]
 
 
 class ProductInput(BaseModel):
@@ -27,6 +30,29 @@ class ProductInput(BaseModel):
     unit: Literal["piece", "gram"]
     image_url: str | None = None
     mrp: Decimal | None = None
+
+
+class ProductCreate(ProductInput):
+    """Create input. `allow_similar` confirms a new product even if a near duplicate exists."""
+
+    allow_similar: bool = False
+
+    @field_validator("barcode", mode="before")
+    @classmethod
+    def clean_barcode(cls, value):
+        if value is None:
+            return None
+        value = str(value).strip()
+        if not value:
+            return None
+        if not (value.isdigit() and 6 <= len(value) <= 14):
+            raise ValueError("barcode must be 6 to 14 digits")
+        return value
+
+    @field_validator("name", "brand", "size", mode="before")
+    @classmethod
+    def clean_text(cls, value):
+        return " ".join(value.split()) if isinstance(value, str) else value
 
 
 class ProductResponse(ProductInput):
@@ -80,6 +106,24 @@ def lookup_barcode(
     return _product_response(canonical)
 
 
+@router.get("/starter-packs", response_model=ProductListResponse)
+def list_starter_pack(
+    shop_type: ShopType,
+    db: Session = Depends(get_db),
+    _: AuthenticatedOwner = Depends(require_retailer),
+) -> dict[str, list[dict[str, Any]]]:
+    products = db.scalars(
+        select(Product)
+        .join(StarterPackItem, StarterPackItem.product_id == Product.id)
+        .where(
+            StarterPackItem.shop_type == shop_type,
+            Product.is_active.is_(True),
+        )
+        .order_by(StarterPackItem.position)
+    ).all()
+    return {"items": [_product_response(product) for product in products]}
+
+
 @router.get("/products", response_model=ProductListResponse)
 def list_products(
     q: str = Query(...),
@@ -99,9 +143,34 @@ def list_products(
     return {"items": [_product_response(product) for product in products]}
 
 
+def _similar_products(db: Session, request: ProductCreate) -> list[Product]:
+    """Active products that look like the same item, so a scan does not fork the catalogue.
+
+    Different sizes are different products (100g vs 200g have different barcodes), so a size
+    mismatch rules a candidate out.
+    """
+    words = [w for w in norm(f"{request.brand} {request.name}").split() if len(w) > 2]
+    if not words:
+        return []
+    statement = (
+        select(Product)
+        .where(
+            Product.is_active.is_(True),
+            or_(*(Product.name.ilike(f"%{w}%") for w in words[:3])),
+        )
+        .limit(400)
+    )
+    pool = list(db.scalars(statement).all())
+    size = norm(request.size).replace(" ", "")
+    if size:
+        pool = [p for p in pool if not p.size or norm(p.size).replace(" ", "") == size]
+    matches = CatalogueIndex(pool).match(request.brand or "", request.name, request.size or "")
+    return [m.product for m in matches if m.score >= STRONG]
+
+
 @router.post("/products", status_code=201, response_model=ProductResponse)
 def create_product(
-    request: ProductInput,
+    request: ProductCreate,
     db: Session = Depends(get_db),
     _: AuthenticatedOwner = Depends(require_retailer),
 ) -> dict[str, Any]:
@@ -110,7 +179,22 @@ def create_product(
         if existing is not None:
             raise HTTPException(status_code=409, detail="Barcode already exists")
 
-    product = Product(**request.model_dump())
+    if not request.allow_similar:
+        similar = _similar_products(db, request)
+        if similar:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "error": {
+                        "code": "similar_product",
+                        "message": "A similar product exists. Use it, or resend with "
+                        "allow_similar=true to add this as a new product.",
+                        "candidates": [_product_response(p) for p in similar],
+                    }
+                },
+            )
+
+    product = Product(**request.model_dump(exclude={"allow_similar"}))
     db.add(product)
     try:
         db.commit()

@@ -76,9 +76,9 @@ Settled between Aswin and Adnan. Change via PR, same as the spec.
 - Products are never hard-deleted (`ON DELETE RESTRICT`).
 
 ### Starter packs
-- **Data owner: Adnan (#39).** Curated JSON at `data/seed/packs/<shop_type>.json`. Each item: `barcode` (null for loose goods), `name`, `name_ml`, `brand`, `size`, `category`, `unit`, `mrp`, `image_url`, `mrp_source` (`verified` or `demo`). Adnan also supplies the loader that upserts catalogue products and pack membership.
-- **Schema and endpoints owner: Aswin (#37).** Membership table (for example `starter_pack_item(shop_type, product_id, position)`), `GET /catalogue/starter-packs` and `POST /shop/products/bulk`. Build against a few fixture rows until real packs land.
-- First packs: `grocery` and `provision`.
+- **Data owner: Adnan (#39).** Curated JSON at `data/seed/packs/<shop_type>.json`. Each item: `barcode` (null for loose goods), `name`, `name_ml`, `brand`, `size`, `category`, `unit`, `mrp`, `image_url`, and `mrp_source` (`web` or `estimate`). These are demo prices unless verified from physical packaging.
+- **Schema and endpoints owner: Aswin (#37).** `starter_pack_item(shop_type, product_id, position)` stores ordered membership. `GET /catalogue/starter-packs` returns active products in that order. `POST /shop/products/bulk` maps rough levels to starting quantities and defaults price to catalogue MRP. `backend/scripts/load_packs.py --apply` loads curated product data and refreshes membership.
+- Curated packs currently available: `grocery` and `provision`. Other supported shop types return an empty list until their packs are curated.
 
 ### Apps and hostnames
 - Three PWAs (consumer, retailer, supplier) plus a landing page, each on its own host. See [apps.md](./apps.md).

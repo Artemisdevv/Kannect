@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth import AuthenticatedOwner, require_retailer
 from app.config import Settings, get_settings
@@ -37,6 +37,9 @@ from app.services.shelf_vision import (
     suggested_level,
     worst_quality,
 )
+from app.services.voice_bill import GeminiVoiceBill, VoiceVision
+from app.services.voice_bill import to_base_units as voice_base_units
+from app.stock import stock_quantity, stock_status
 
 router = APIRouter(prefix="/shop/ai", tags=["ai"])
 
@@ -47,6 +50,10 @@ MAX_BYTES = 10 * 1024 * 1024
 
 def get_shelf_vision(settings: Settings = Depends(get_settings)) -> ShelfVision:
     return GeminiShelfVision(settings)
+
+
+def get_voice_vision(settings: Settings = Depends(get_settings)) -> VoiceVision:
+    return GeminiVoiceBill(settings)
 
 
 def get_invoice_vision(settings: Settings = Depends(get_settings)) -> InvoiceVision:
@@ -64,7 +71,7 @@ def shelf_photo(
     thorough: bool = Query(True, description="Also re-read zoomed tiles to identify small labels"),
     db: Session = Depends(get_db),
     vision: ShelfVision = Depends(get_shelf_vision),
-    _: AuthenticatedOwner = Depends(require_retailer),
+    owner: AuthenticatedOwner = Depends(require_retailer),
 ) -> dict[str, Any]:
     if not 1 <= len(images) <= MAX_IMAGES:
         raise HTTPException(status_code=400, detail=f"Send 1 to {MAX_IMAGES} images")
@@ -132,6 +139,7 @@ def shelf_photo(
         )
 
     _add_suggested_prices(db, detections)
+    _add_shop_state(db, owner, detections)
     return {"detections": detections, "image_quality": quality}
 
 
@@ -205,6 +213,32 @@ def invoice_photo(
     }
 
 
+def _add_shop_state(
+    db: Session, owner: AuthenticatedOwner, detections: list[dict[str, Any]]
+) -> None:
+    """Tell the app which matched items the shop already stocks, with the system's count.
+
+    Onboarding skips these, so the app can offer a recount (`POST /shop/recount`) instead:
+    the owner sees "system says 40, photo shows few" and confirms.
+    """
+    for d in detections:
+        d["in_shop"], d["current_quantity"], d["current_status"] = False, None, None
+    ids = [UUID(d["match"]["id"]) for d in detections if d.get("match")]
+    if owner.shop is None or not ids:
+        return
+    rows = db.scalars(
+        select(ShopProduct)
+        .where(ShopProduct.shop_id == owner.shop.id, ShopProduct.product_id.in_(ids))
+        .options(selectinload(ShopProduct.stock_events))
+    ).all()
+    state = {r.product_id: (stock_quantity(r.stock_events), r.low_threshold) for r in rows}
+    for d in detections:
+        if d.get("match") and UUID(d["match"]["id"]) in state:
+            qty, threshold = state[UUID(d["match"]["id"])]
+            d["in_shop"], d["current_quantity"] = True, qty
+            d["current_status"] = stock_status(qty, threshold)
+
+
 def _add_suggested_prices(db: Session, detections: list[dict[str, Any]]) -> None:
     """Pre-fill a price so onboarding from a photo is not a typing job.
 
@@ -249,3 +283,86 @@ def _read_tiles(vision: ShelfVision, prepared: list[bytes]) -> list[list[Detecti
         return list(pool.map(read, tiles))
 
 
+
+
+AUDIO_TYPES = {
+    ".ogg": "audio/ogg", ".oga": "audio/ogg", ".opus": "audio/ogg", ".mp3": "audio/mp3",
+    ".wav": "audio/wav", ".m4a": "audio/aac", ".aac": "audio/aac", ".webm": "audio/webm",
+    ".flac": "audio/flac",
+}  # fmt: skip
+MAX_AUDIO_BYTES = 5 * 1024 * 1024
+
+
+def _audio_mime(upload: UploadFile) -> str | None:
+    name = upload.filename or ""
+    ext = "." + name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    if ext in AUDIO_TYPES:
+        return AUDIO_TYPES[ext]
+    content_type = upload.content_type or ""
+    return content_type if content_type.startswith("audio/") else None
+
+
+@router.post("/voice-bill")
+def voice_bill(
+    audio: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    vision: VoiceVision = Depends(get_voice_vision),
+    owner: AuthenticatedOwner = Depends(require_retailer),
+) -> dict[str, Any]:
+    """Spoken bill ("ara kilo thakkali, randu Parle-G") -> suggested bill lines from this shop's
+    own products. Nothing is saved: the owner confirms, then the app calls POST /shop/bills."""
+    if owner.shop is None:
+        raise HTTPException(status_code=404, detail="Shop not found")
+    data = audio.file.read(MAX_AUDIO_BYTES + 1)
+    if len(data) > MAX_AUDIO_BYTES:
+        raise HTTPException(status_code=400, detail="Audio must be under 5 MB")
+    if not data:
+        raise HTTPException(status_code=400, detail="Audio is empty")
+    mime = _audio_mime(audio)
+    if mime is None:
+        raise HTTPException(status_code=400, detail="File must be audio (ogg, mp3, wav, m4a, webm)")
+
+    result = vision.analyze(data, mime)
+
+    rows = db.scalars(
+        select(ShopProduct)
+        .where(ShopProduct.shop_id == owner.shop.id)
+        .options(joinedload(ShopProduct.product))
+    ).all()
+    by_product = {r.product_id: r for r in rows if r.product.is_active}
+    pool = [r.product for r in by_product.values()]
+    loose_pool = [p for p in pool if p.barcode is None]
+    index = CatalogueIndex(pool)
+
+    suggestions: list[dict[str, Any]] = []
+    for line in result.lines:
+        if not (line.name or line.brand or line.spoken).strip() or line.quantity <= 0:
+            continue
+        product, alternatives = None, []
+        if not line.brand.strip():  # produce and staples are said without a brand
+            heard = Detection(name=line.name or line.spoken, category="other")
+            product = match_loose(heard, loose_pool)
+        if product is None:
+            best, alts, _ = classify(index.match(line.brand.strip(), line.name.strip(), ""))
+            product = best.product if best else None
+            alternatives = [a.product for a in alts]
+        unit = product.unit if product else (alternatives[0].unit if alternatives else None)
+        base_qty, note = voice_base_units(line, unit)
+        row = by_product.get(product.id) if product else None
+        if product is None:
+            note = note or "Not found in your shop's products: pick one or add it"
+        suggestions.append(
+            {
+                "spoken": line.spoken or line.name,
+                "name": line.name,
+                "product": _product_response(product) if product else None,
+                "alternatives": [_product_response(p) for p in alternatives],
+                "quantity": base_qty,
+                "unit": unit or "piece",
+                "price": float(row.price) if row else None,
+                "confidence": max(0.0, min(1.0, line.confidence)),
+                "needs_check": product is None or note is not None or line.confidence < 0.6,
+                "note": note,
+            }
+        )
+    return {"transcript": result.transcript, "suggestions": suggestions}
