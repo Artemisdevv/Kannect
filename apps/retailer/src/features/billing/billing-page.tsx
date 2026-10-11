@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useCreateBill, useShopProducts } from "@/features/queries";
 import { ScanDialog } from "@/features/scan/scan-dialog";
-import { formatQty, lineTotal, newId, priceLabel, rupees, STATUS_LABEL, statusClass, stepFor } from "@/lib/format";
+import { clampToStock, formatQty, lineTotal, newId, priceLabel, rupees, STATUS_LABEL, statusClass, stepFor } from "@/lib/format";
 
 import { VoiceDialog, type VoiceLine } from "./voice-dialog";
 
@@ -42,12 +42,22 @@ export function BillingPage() {
     })
     .slice(0, 60);
 
-  const addQty = (id: string, delta: number) =>
+  // A bill can never take more than the shop has: the quantity stops at the stock count.
+  const limitMessage = (id: string, max: number) => {
+    const unit = byId.get(id)?.product?.unit;
+    return max === 0
+      ? "Out of stock. Count it in Stock first if you have some."
+      : `Only ${formatQty(max, unit)} in stock.`;
+  };
+
+  const addQty = (id: string, delta: number) => {
+    const { next, max, limited } = clampToStock(cart[id] ?? 0, delta, byId.get(id)?.stock_qty);
+    if (limited) toast.info(limitMessage(id, max));
     setCart((c) => {
-      const next = Math.max(0, (c[id] ?? 0) + delta);
       const { [id]: _drop, ...rest } = c;
       return next > 0 ? { ...rest, [id]: next } : rest;
     });
+  };
 
   const items = Object.entries(cart)
     .map(([id, qty]) => ({ id, qty, row: byId.get(id) }))
@@ -78,12 +88,16 @@ export function BillingPage() {
   };
 
   const onVoice = (lines: VoiceLine[]) => {
-    setCart((c) => {
-      const next = { ...c };
-      lines.forEach((l) => (next[l.productId] = (next[l.productId] ?? 0) + l.quantity));
-      return next;
+    const next = { ...cart };
+    let capped = 0;
+    lines.forEach((l) => {
+      const { next: qty, limited } = clampToStock(next[l.productId] ?? 0, l.quantity, byId.get(l.productId)?.stock_qty);
+      if (limited) capped++;
+      if (qty > 0) next[l.productId] = qty;
     });
+    setCart(next);
     toast.success(`Added ${lines.length} item${lines.length === 1 ? "" : "s"}`);
+    if (capped) toast.info(`${capped} item${capped === 1 ? " was" : "s were"} limited to what is in stock.`);
   };
 
   return (
@@ -128,7 +142,7 @@ export function BillingPage() {
               <div className="min-w-0">
                 <div className="product-name">{row.product?.name}</div>
                 <div className="product-sub">
-                  {priceLabel(row.price, row.product?.unit)} ·{" "}
+                  {priceLabel(row.price, row.product?.unit)} · {formatQty(row.stock_qty ?? 0, row.product?.unit)} in stock ·{" "}
                   <span className={`status-pill ${statusClass(row.stock_status)}`}>
                     {STATUS_LABEL[row.stock_status ?? "in_stock"]}
                   </span>
@@ -143,7 +157,13 @@ export function BillingPage() {
                     <span>{formatQty(qty, row.product?.unit)}</span>
                   </>
                 )}
-                <Button variant="outline" size="icon" aria-label={`Add ${row.product?.name}`} onClick={() => addQty(id, step)}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label={qty >= (row.stock_qty ?? 0) ? `No more ${row.product?.name} in stock` : `Add ${row.product?.name}`}
+                  disabled={qty >= Math.max(0, row.stock_qty ?? 0)}
+                  onClick={() => addQty(id, step)}
+                >
                   <Plus />
                 </Button>
               </div>
