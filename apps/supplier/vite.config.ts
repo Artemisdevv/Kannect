@@ -11,6 +11,9 @@ export default defineConfig({
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+    // The Android app needs static files, not a server: with CAPACITOR_BUILD=1 the build also
+    // prerenders an SPA shell (index.html in .output/public). The web build is unchanged.
+    ...(process.env["CAPACITOR_BUILD"] === "1" ? { spa: { enabled: true } } : {}),
   },
   vite: {
     // Pre-bundle deps used only by lazily loaded routes so the dev server doesn't

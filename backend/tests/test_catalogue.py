@@ -297,7 +297,7 @@ def test_supplier_token_cannot_access_retailer_catalogue_routes():
         "Authorization": f"Bearer {token}"
     }
     response = _client(FakeSession(role="supplier")).get(
-        "/api/v1/catalogue/products?q=soap", headers=supplier_headers
+        "/api/v1/catalogue/barcode/8901023010484", headers=supplier_headers
     )
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "unauthorized"

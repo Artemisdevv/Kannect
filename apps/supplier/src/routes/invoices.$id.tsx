@@ -34,7 +34,8 @@ function InvoiceDetail() {
       </div>
 
       <div className="mb-4 rounded-[18px] bg-warning-surface px-4 py-3 text-sm text-warning">
-        <b>Demo document.</b> This is not a GST-compliant tax invoice and is not tax advice. GST is shown at an illustrative flat rate. No payment is processed in this app.
+        <b>Demo document.</b>{" "}
+        {i.taxNote ?? "This is not a GST-compliant tax invoice and is not tax advice. GST is shown at an illustrative flat rate. No payment is processed in this app."}
       </div>
 
       <div className="summary space-y-5">
@@ -73,7 +74,7 @@ function InvoiceDetail() {
         <div className="space-y-1 border-t border-border pt-3 text-sm">
           <div className="flex justify-between"><span>Subtotal</span><span className="tabular">{inr(i.subtotal)}</span></div>
           <div className="flex justify-between text-muted-foreground">
-            <span>GST (illustrative flat {Math.round(i.gstRate * 100)}%)</span><span className="tabular">{inr(i.gst)}</span>
+            <span>{i.taxNote ? "GST (not implemented)" : `GST (illustrative flat ${Math.round(i.gstRate * 100)}%)`}</span><span className="tabular">{inr(i.gst)}</span>
           </div>
           <div className="flex justify-between pt-1 text-base font-bold"><span>Total</span><span className="tabular">{inr(i.total)}</span></div>
         </div>

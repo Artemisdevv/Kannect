@@ -66,7 +66,8 @@ function Login() {
         return;
       }
       signIn(s);
-      navigate({ to: "/", replace: true });
+      // a new supplier has nothing to look at until the profile exists
+      navigate({ to: s.hasProfile === false ? "/profile" : "/", replace: true });
     } catch (e) {
       setErr(errorText(e));
     } finally {

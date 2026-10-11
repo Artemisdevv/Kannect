@@ -19,7 +19,7 @@ type LocationPoint = {
 };
 
 // Helper to validate location data (similar to retailer approach)
-const isValidLocation = (lat: number | null, lng: number | null): lat is number & lng is number => {
+const isValidLocation = (lat: number | null, lng: number | null): boolean => {
   return lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng);
 };
 
@@ -126,7 +126,7 @@ export const SupplierMap = () => {
     <MapContainer
       center={[20.5937, 78.9629]} // Default to India center
       zoom={5}
-      whenCreated={setMap}
+      ref={setMap}
       style={{ height: '400px', width: '100%' }}
       scrollWheelZoom={true}
     >

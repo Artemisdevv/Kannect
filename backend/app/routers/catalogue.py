@@ -11,7 +11,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth import AuthenticatedOwner, require_retailer
+from app.auth import AuthenticatedOwner, require_owner, require_retailer
 from app.db import get_db
 from app.models import Product, StarterPackItem
 from app.services.catalogue_match import STRONG, CatalogueIndex, norm
@@ -128,7 +128,7 @@ def list_starter_pack(
 def list_products(
     q: str = Query(...),
     db: Session = Depends(get_db),
-    _: AuthenticatedOwner = Depends(require_retailer),
+    _: AuthenticatedOwner = Depends(require_owner),
 ) -> dict[str, list[dict[str, Any]]]:
     pattern = f"%{q}%"
     statement = (

@@ -1,7 +1,10 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { ClipboardList, Package, TrendingUp, Users, Menu, WifiOff, Loader2 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSession } from "@/lib/session";
+import { q } from "@/lib/api/service";
+import { needsProfile } from "@/lib/profile-guard";
 import { IS_DEMO } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +41,12 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
     if (ready && !session) navigate({ to: "/login", replace: true });
   }, [ready, session, navigate]);
 
+  const profile = useQuery({ ...q.supplier, enabled: ready && !!session });
+  const toProfile = needsProfile(profile.error, pathname);
+  useEffect(() => {
+    if (toProfile) navigate({ to: "/profile", replace: true });
+  }, [toProfile, navigate]);
+
   return (
     <div className="app-shell flex flex-col">
       <header className="no-print sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 px-6 backdrop-blur">
@@ -57,7 +66,7 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
         </div>
       )}
       <main className="app-main flex-1" aria-label={title}>
-        {!ready || !session ? (
+        {!ready || !session || toProfile ? (
           <div className="flex justify-center py-20 text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" aria-label="Loading" />
           </div>

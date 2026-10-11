@@ -145,3 +145,8 @@ def require_role(expected_role: AuthRole):
 
 require_retailer = require_role("retailer")
 require_supplier = require_role("supplier")
+
+
+def require_owner(owner: AuthenticatedOwner = Depends(get_current_owner)) -> AuthenticatedOwner:
+    """Any signed-in owner, retailer or supplier."""
+    return owner
