@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { t, tf, useLocale } from "@/lib/i18n";
 import { textElement } from "@/lib/safe-dom";
 import "leaflet/dist/leaflet.css";
 
@@ -27,6 +28,7 @@ function validLocation(location: Location | null | undefined): location is Point
 }
 
 export function OrderRouteMap({ supplier, shop }: { supplier: RouteEndpoint; shop: RouteEndpoint }) {
+  const locale = useLocale();
   const container = useRef<HTMLDivElement>(null);
   const [tileError, setTileError] = useState(false);
   const [mapError, setMapError] = useState(false);
@@ -72,7 +74,7 @@ export function OrderRouteMap({ supplier, shop }: { supplier: RouteEndpoint; sho
         dashArray: "7 7",
         weight: 4,
       }).addTo(map);
-      route.bindTooltip("Straight-line overview");
+      route.bindTooltip(t("Straight-line overview", locale));
 
       const tiles = L.tileLayer(
         import.meta.env["VITE_MAP_TILE_URL"] || "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -104,7 +106,7 @@ export function OrderRouteMap({ supplier, shop }: { supplier: RouteEndpoint; sho
       disposed = true;
       cleanup?.();
     };
-  }, [supplier.label, supplierLocation, shop.label, shopLocation]);
+  }, [supplier.label, supplierLocation, shop.label, shopLocation, locale]);
 
   if (!supplierLocation || !shopLocation) {
     const missing = [
@@ -112,24 +114,24 @@ export function OrderRouteMap({ supplier, shop }: { supplier: RouteEndpoint; sho
       !shopLocation ? shop.label : null,
     ].filter(Boolean);
     return (
-      <section className="order-route" aria-label="Order route overview">
-        <h3>Route overview unavailable</h3>
-        <p>Saved coordinates are missing or invalid for {missing.join(" and ")}.</p>
+      <section className="order-route" aria-label={t("Order route overview", locale)}>
+        <h3>{t("Route overview unavailable", locale)}</h3>
+        <p>{tf("Saved coordinates are missing or invalid for {names}.", { names: missing.join(t(" and ", locale)) }, locale)}</p>
       </section>
     );
   }
 
   return (
-    <section className="order-route" aria-label="Order route overview">
-      <h3>Route overview</h3>
-      <p className="order-route-label">Straight-line overview · not a road route or live vehicle location</p>
-      <div ref={container} className="order-route-map" role="region" aria-label="Supplier to shop route map" />
+    <section className="order-route" aria-label={t("Order route overview", locale)}>
+      <h3>{t("Route overview", locale)}</h3>
+      <p className="order-route-label">{t("Straight-line overview · not a road route or live vehicle location", locale)}</p>
+      <div ref={container} className="order-route-map" role="region" aria-label={t("Supplier to shop route map", locale)} />
       <div className="order-route-endpoints">
-        <span><i className="supplier-point" />Supplier: {supplier.label}</span>
-        <span><i className="shop-point" />Your shop: {shop.label}</span>
+        <span><i className="supplier-point" />{tf("Supplier: {name}", { name: supplier.label }, locale)}</span>
+        <span><i className="shop-point" />{tf("Your shop: {name}", { name: shop.label }, locale)}</span>
       </div>
-      {mapError && <p className="order-route-warning" role="status">Map unavailable. Supplier and shop locations are listed above.</p>}
-      <p className="order-route-warning" role="status" hidden={!tileError}>Map tiles are unavailable. The saved locations and order timeline are still shown.</p>
+      {mapError && <p className="order-route-warning" role="status">{t("Map unavailable. Supplier and shop locations are listed above.", locale)}</p>}
+      <p className="order-route-warning" role="status" hidden={!tileError}>{t("Map tiles are unavailable. The saved locations and order timeline are still shown.", locale)}</p>
     </section>
   );
 }

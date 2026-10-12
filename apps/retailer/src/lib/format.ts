@@ -81,3 +81,17 @@ export function shopTypeLabel(type: string | undefined, locale?: Locale) {
   const english = SHOP_TYPE_LABELS[type];
   return english ? t(english, locale) : type;
 }
+
+const ORDER_STATUS_TEXT: Record<string, string> = {
+  placed: "Waiting for supplier",
+  accepted: "Accepted",
+  rejected: "Rejected",
+  dispatched: "On the way",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+/** An order status, ready to show: translated, and the raw word for a status we do not know. */
+export function orderStatusLabel(status: string | undefined, locale?: Locale) {
+  const english = ORDER_STATUS_TEXT[status ?? ""];
+  return english ? t(english, locale) : (status ?? "");
+}

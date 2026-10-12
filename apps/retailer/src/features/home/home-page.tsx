@@ -4,7 +4,7 @@ import { ArrowUpRight, Camera, ChevronRight, HandHelping, Package, ReceiptText, 
 import { Heading, Shell, useShop } from "@/components/kannect/shell";
 import { Button } from "@/components/ui/button";
 import { useBills, useOrders, usePickups, useShopProducts } from "@/features/queries";
-import { formatQty, rupees, STATUS_LABEL, statusClass } from "@/lib/format";
+import { formatQty, rupees, STATUS_LABEL, statusClass, orderStatusLabel } from "@/lib/format";
 import { t, tf, useLocale } from "@/lib/i18n";
 
 const isToday = (iso?: string) => {
@@ -121,7 +121,7 @@ export function TodayPage() {
               <div className="product-name">{open.supplier?.name}</div>
               <div className="product-sub">{tf((open.items?.length ?? 0) === 1 ? "{n} item" : "{n} items", { n: open.items?.length ?? 0 }, locale)} · {rupees(open.total)}</div>
             </div>
-            <span className="status-pill">{open.status}</span>
+            <span className="status-pill">{orderStatusLabel(open.status, locale)}</span>
           </Link>
         </>
       )}

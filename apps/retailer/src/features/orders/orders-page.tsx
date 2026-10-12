@@ -8,21 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { keys, useOrders, useReceiveOrder, useReorderSuggestions } from "@/features/queries";
 import { OrderRouteMap } from "@/features/orders/order-route-map";
-import { newId, rupees } from "@/lib/format";
+import { newId, orderStatusLabel, rupees } from "@/lib/format";
+import { t, tf, useLocale, type Locale } from "@/lib/i18n";
 import { useQueryClient } from "@tanstack/react-query";
 
 type Suggestion = NonNullable<ReturnType<typeof useReorderSuggestions>["data"]>[number];
 type Order = NonNullable<ReturnType<typeof useOrders>["data"]>[number];
 type TrackingEvent = NonNullable<Order["tracking"]>[number];
-
-const STATUS_TEXT: Record<string, string> = {
-  placed: "Waiting for supplier",
-  accepted: "Accepted",
-  rejected: "Rejected",
-  dispatched: "On the way",
-  delivered: "Delivered",
-  cancelled: "Cancelled",
-};
 
 function chronologicalTracking(events: TrackingEvent[] | undefined) {
   return [...(events ?? [])]
@@ -36,11 +28,12 @@ function latestEta(events: TrackingEvent[]) {
     .sort((a, b) => Date.parse(b.at!) - Date.parse(a.at!))[0]?.eta;
 }
 
-function formatTimestamp(value: string) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+function formatTimestamp(value: string, locale: Locale) {
+  return new Intl.DateTimeFormat(locale === "ml" ? "ml-IN" : undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 export function OrdersPage() {
+  const locale = useLocale();
   const orders = useOrders();
   const suggestions = useReorderSuggestions();
   const receive = useReceiveOrder();
@@ -72,12 +65,12 @@ export function OrdersPage() {
         supplier_id: option.supplier.id,
         items: [{ product_id: option.product.id, packs: nPacks }],
       });
-      toast.success("Order placed");
+      toast.success(t("Order placed", locale));
       setPicked(null);
       setList(false);
       await qc.invalidateQueries({ queryKey: keys.orders });
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not place the order.");
+      toast.error(e instanceof ApiError ? e.message : t("Could not place the order.", locale));
     } finally {
       setPlacing(false);
     }
@@ -86,10 +79,10 @@ export function OrdersPage() {
   const doReceive = async (o: Order) => {
     try {
       await receive.mutateAsync(o.id as string);
-      toast.success("Received into your stock");
+      toast.success(t("Received into your stock", locale));
       setDetail(null);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not record the delivery.");
+      toast.error(e instanceof ApiError ? e.message : t("Could not record the delivery.", locale));
     }
   };
 
@@ -99,7 +92,7 @@ export function OrdersPage() {
       await qc.invalidateQueries({ queryKey: keys.orders });
       setDetail(null);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not cancel the order.");
+      toast.error(e instanceof ApiError ? e.message : t("Could not cancel the order.", locale));
     }
   };
 
@@ -109,20 +102,20 @@ export function OrdersPage() {
 
   return (
     <Shell active="Orders">
-      <p className="eyebrow">Restock your shop</p>
-      <h1>Orders</h1>
+      <p className="eyebrow">{t("Restock your shop", locale)}</p>
+      <h1>{t("Orders", locale)}</h1>
       <Button variant="secondary" className="w-full mt-3 justify-between" onClick={() => setList(true)}>
         <span className="flex items-center gap-2">
           <Leaf />
-          {count} reorder suggestion{count === 1 ? "" : "s"}
+          {tf(count === 1 ? "{n} reorder suggestion" : "{n} reorder suggestions", { n: count }, locale)}
         </span>
         <ChevronRight />
       </Button>
 
-      <Heading title="Your orders" />
-      {orders.isLoading && <p className="text-muted-foreground text-sm">Loading…</p>}
+      <Heading title={t("Your orders", locale)} />
+      {orders.isLoading && <p className="text-muted-foreground text-sm">{t("Loading…", locale)}</p>}
       {orders.data && orders.data.length === 0 && (
-        <p className="text-muted-foreground text-sm">No orders yet. Start from a suggestion above.</p>
+        <p className="text-muted-foreground text-sm">{t("No orders yet. Start from a suggestion above.", locale)}</p>
       )}
       <div className="list-surface">
         {(orders.data ?? []).map((o) => (
@@ -131,25 +124,25 @@ export function OrdersPage() {
             <div className="min-w-0">
               <div className="product-name">{o.supplier?.name}</div>
               <div className="product-sub">
-                {o.items?.length ?? 0} item{(o.items?.length ?? 0) === 1 ? "" : "s"} · {rupees(o.total)}
+                {tf((o.items?.length ?? 0) === 1 ? "{n} item" : "{n} items", { n: o.items?.length ?? 0 }, locale)} · {rupees(o.total)}
               </div>
             </div>
-            <span className="status-pill">{STATUS_TEXT[o.status ?? ""] ?? o.status}</span>
+            <span className="status-pill">{orderStatusLabel(o.status, locale)}</span>
           </button>
         ))}
       </div>
 
       <Dialog open={list} onOpenChange={setList}>
         <DialogContent className="mobile-dialog">
-          <DialogTitle>Reorder suggestions</DialogTitle>
-          <DialogDescription>Low or out of stock, with suppliers near you. Nothing is ordered until you confirm.</DialogDescription>
-          {suggestions.data?.length === 0 && <p className="text-sm">Nothing needs restocking.</p>}
+          <DialogTitle>{t("Reorder suggestions", locale)}</DialogTitle>
+          <DialogDescription>{t("Low or out of stock, with suppliers near you. Nothing is ordered until you confirm.", locale)}</DialogDescription>
+          {suggestions.data?.length === 0 && <p className="text-sm">{t("Nothing needs restocking.", locale)}</p>}
           {(suggestions.data ?? []).map((s) => (
             <button key={s.shop_product?.product?.id} type="button" className="border-b py-3 text-left" onClick={() => choose(s)}>
               <strong className="text-sm">{s.shop_product?.product?.name}</strong>
               <p className="text-xs text-muted-foreground">{s.reason}</p>
               <p className="text-xs text-primary">
-                {s.options?.length ?? 0} supplier{(s.options?.length ?? 0) === 1 ? "" : "s"} · suggest {s.suggested_packs} pack{s.suggested_packs === 1 ? "" : "s"}
+                {tf((s.options?.length ?? 0) === 1 ? "{n} supplier" : "{n} suppliers", { n: s.options?.length ?? 0 }, locale)} · {tf(s.suggested_packs === 1 ? "suggest {n} pack" : "suggest {n} packs", { n: s.suggested_packs ?? 1 }, locale)}
               </p>
             </button>
           ))}
@@ -164,19 +157,19 @@ export function OrdersPage() {
             <Button key={o.supplier?.id} variant={i === optionIndex ? "secondary" : "outline"} className="justify-between h-auto py-3" onClick={() => setOptionIndex(i)}>
               <span className="text-left">
                 {o.supplier?.name}
-                <span className="block text-xs text-muted-foreground">Pack of {o.pack_size} · min {o.min_order_packs ?? 1}</span>
+                <span className="block text-xs text-muted-foreground">{tf("Pack of {size} · min {min}", { size: o.pack_size ?? 1, min: o.min_order_packs ?? 1 }, locale)}</span>
               </span>
               <strong>{rupees(o.price)}</strong>
             </Button>
           ))}
-          <label className="text-sm" htmlFor="packs">Packs</label>
+          <label className="text-sm" htmlFor="packs">{t("Packs", locale)}</label>
           <input id="packs" className="page-search" type="number" min={option?.min_order_packs ?? 1} inputMode="numeric" value={packs} onChange={(e) => setPacks(e.target.value)} />
           <div className="flex justify-between border-t pt-3">
-            <strong>Total</strong>
+            <strong>{t("Total", locale)}</strong>
             <strong>{rupees((option?.price ?? 0) * nPacks)}</strong>
           </div>
           <Button disabled={placing || !option || nPacks < (option.min_order_packs ?? 1)} onClick={() => void place()}>
-            {placing ? "Placing…" : "Place order"}
+            {placing ? t("Placing…", locale) : t("Place order", locale)}
           </Button>
         </DialogContent>
       </Dialog>
@@ -184,46 +177,46 @@ export function OrdersPage() {
       <Dialog open={detail !== null} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent className="mobile-dialog">
           <DialogTitle>{detail?.supplier?.name}</DialogTitle>
-          <DialogDescription>{STATUS_TEXT[detail?.status ?? ""] ?? detail?.status} · {rupees(detail?.total)}</DialogDescription>
+          <DialogDescription>{orderStatusLabel(detail?.status, locale)} · {rupees(detail?.total)}</DialogDescription>
           {detail && (
             <OrderRouteMap
-              supplier={{ label: detail.supplier?.name ?? "Supplier", location: detail.supplier?.location }}
-              shop={{ label: detail.shop?.name ?? "Your shop", location: detail.shop?.location }}
+              supplier={{ label: detail.supplier?.name ?? t("Supplier", locale), location: detail.supplier?.location }}
+              shop={{ label: detail.shop?.name ?? t("Your shop", locale), location: detail.shop?.location }}
             />
           )}
-          <section className="order-tracking" aria-label="Order tracking">
+          <section className="order-tracking" aria-label={t("Order tracking", locale)}>
             <div className="order-tracking-heading">
-              <h3>Tracking history</h3>
-              <p>{eta ? `Expected ${formatTimestamp(eta)}` : "No ETA provided"}</p>
+              <h3>{t("Tracking history", locale)}</h3>
+              <p>{eta ? tf("Expected {time}", { time: formatTimestamp(eta, locale) }, locale) : t("No ETA provided", locale)}</p>
             </div>
             {tracking.length ? (
               <ol>
                 {tracking.map((event, index) => (
                   <li key={`${event.at}-${event.status}-${index}`}>
-                    <strong>{STATUS_TEXT[event.status ?? ""] ?? event.status ?? "Order update"}</strong>
-                    <time dateTime={event.at}>{formatTimestamp(event.at!)}</time>
+                    <strong>{event.status ? orderStatusLabel(event.status, locale) : t("Order update", locale)}</strong>
+                    <time dateTime={event.at}>{formatTimestamp(event.at!, locale)}</time>
                     {event.note && <p>{event.note}</p>}
                     {event.eta && Number.isFinite(Date.parse(event.eta)) && (
-                      <p>ETA updated to {formatTimestamp(event.eta)}</p>
+                      <p>{tf("ETA updated to {time}", { time: formatTimestamp(event.eta, locale) }, locale)}</p>
                     )}
                   </li>
                 ))}
               </ol>
-            ) : <p>No tracking updates yet.</p>}
+            ) : <p>{t("No tracking updates yet.", locale)}</p>}
           </section>
           <div className="border-y py-3 text-sm space-y-1">
             {(detail?.items ?? []).map((l) => (
-              <p key={l.product_id}>{l.name} · {l.packs} pack{l.packs === 1 ? "" : "s"} × {rupees(l.unit_price)}</p>
+              <p key={l.product_id}>{tf(l.packs === 1 ? "{name} · {n} pack × {price}" : "{name} · {n} packs × {price}", { name: l.name ?? "", n: l.packs ?? 0, price: rupees(l.unit_price) }, locale)}</p>
             ))}
           </div>
 
           {detail?.status === "delivered" && (
             <Button disabled={receive.isPending} onClick={() => void doReceive(detail)}>
-              {receive.isPending ? "Saving…" : "Confirm everything arrived"}
+              {receive.isPending ? t("Saving…", locale) : t("Confirm everything arrived", locale)}
             </Button>
           )}
           {detail?.status === "placed" && (
-            <Button variant="outline" onClick={() => void doCancel(detail)}>Cancel order</Button>
+            <Button variant="outline" onClick={() => void doCancel(detail)}>{t("Cancel order", locale)}</Button>
           )}
         </DialogContent>
       </Dialog>
