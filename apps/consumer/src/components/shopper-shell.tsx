@@ -51,11 +51,9 @@ export function ShopperShell({ children }: { children: ReactNode }) {
       .finally(() => { if (!cancelled) setNearbyLoading(false); });
     return () => { cancelled = true; };
   }, [area, coordinates]);
-  // When location was already allowed, put the shopper on the map straight away (no prompt shown).
-  useEffect(() => {
-    const permissions = (navigator as Navigator & { permissions?: Permissions }).permissions;
-    permissions?.query({ name: 'geolocation' }).then(status => { if (status.state === 'granted') locate(false); }).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Ask for the shopper's position once on launch so they appear on the map. If it is refused or
+  // unavailable nothing is shown; the area list and the "Show where I am" button still work.
+  useEffect(() => { locate(false); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     const update = () => setOffline(!navigator.onLine);
