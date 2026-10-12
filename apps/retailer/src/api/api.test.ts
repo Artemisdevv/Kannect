@@ -4,6 +4,7 @@ import { ApiError } from "./client";
 import {
   createBill,
   createProduct,
+  exportShopCsv,
   lookupBarcode,
   recount,
   shelfPhoto,
@@ -126,4 +127,27 @@ it("clearSession empties storage", () => {
   setSession({ token: "t", shop: null });
   clearSession();
   expect(window.localStorage.getItem("kannect.retailer.token")).toBeNull();
+});
+
+describe("export", () => {
+  it("fetches the shop's data as a CSV, with the login token", async () => {
+    setSession({ token: "tok", shop: null });
+    fetchMock.mockResolvedValueOnce(new Response("record_type,shop_id\nproduct,s1", { status: 200, headers: { "content-type": "text/csv" } }));
+    const blob = await exportShopCsv();
+    const [url, init] = fetchMock.mock.calls.at(-1)! as [string, RequestInit];
+    expect(url).toContain("/shop/export?format=csv");
+    expect((init.headers as Record<string, string>)["Authorization"]).toBe("Bearer tok");
+    const text = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.readAsText(blob);
+    });
+    expect(text).toContain("record_type");
+  });
+
+  it("explains a failure with the server's message", async () => {
+    setSession({ token: "tok", shop: null });
+    fetchMock.mockResolvedValueOnce(json({ error: { code: "not_found", message: "Shop not found" } }, 404));
+    await expect(exportShopCsv()).rejects.toMatchObject({ status: 404, message: "Shop not found" });
+  });
 });
