@@ -33,7 +33,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="KadaNet API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="കnnect API", version="0.1.0", lifespan=lifespan)
 errors.install(app)
 
 app.add_middleware(

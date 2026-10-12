@@ -1,4 +1,4 @@
-"""Core KadaNet persistence models."""
+"""Core കnnect persistence models."""
 
 from __future__ import annotations
 

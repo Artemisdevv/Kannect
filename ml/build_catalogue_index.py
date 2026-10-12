@@ -38,7 +38,7 @@ def fetch(item: dict) -> Path | None:
     if dest.exists() and dest.stat().st_size > 0:
         return dest
     try:
-        req = urllib.request.Request(item["image_small_url"], headers={"User-Agent": "KadaNet-hackathon/0.1"})
+        req = urllib.request.Request(item["image_small_url"], headers={"User-Agent": "കnnect-hackathon/0.1"})
         with urllib.request.urlopen(req, timeout=20) as r:
             dest.write_bytes(r.read())
         return dest

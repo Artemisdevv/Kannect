@@ -1,4 +1,4 @@
-# KadaNet API Contract (v0.1)
+# കnnect API Contract (v0.1)
 
 Source of truth: [`openapi.yaml`](./openapi.yaml). This page is the quick read.
 

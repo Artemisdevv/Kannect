@@ -10,7 +10,7 @@ import type { OrderStatus } from "@/lib/api/types";
 import { t, useLocale } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
-  head: () => seo("Today", "Incoming retailer orders, deliveries in progress and quick links for KadaNet suppliers."),
+  head: () => seo("Today", "Incoming retailer orders, deliveries in progress and quick links for കnnect suppliers."),
   component: Home,
 });
 

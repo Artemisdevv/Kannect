@@ -1,4 +1,4 @@
-# KadaNet Team Plan
+# കnnect Team Plan
 
 Stack (per `winning_solution.md`): PWA + Capacitor (Android), React + Vite + Tailwind + shadcn/ui, Postgres + PostGIS backend, OpenStreetMap maps, ZXing scanner in PWA / ML Kit in Capacitor.
 

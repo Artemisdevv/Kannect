@@ -49,7 +49,7 @@ function More() {
       </div>
       <h2 className="section-title mb-3 mt-7">{translate("Settings", locale)}</h2>
       <div className="summary text-sm">
-        <p><b>Connection:</b> {IS_DEMO ? "Demo mode — sample data, nothing is sent to a server." : "Connected to KadaNet server."}</p>
+        <p><b>Connection:</b> {IS_DEMO ? "Demo mode — sample data, nothing is sent to a server." : "Connected to കnnect server."}</p>
         <p className="mt-2 text-muted-foreground">Install: use your browser menu → “Add to Home screen”.</p>
       </div>
       <Button variant="outline" size="lg" className="mt-6 w-full" onClick={out}><LogOut /> {translate("Sign out", locale)}</Button>

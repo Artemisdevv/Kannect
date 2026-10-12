@@ -1,4 +1,4 @@
-# KadaNet backend
+# കnnect backend
 
 FastAPI + SQLAlchemy 2 + Postgres/PostGIS. Contract: [`docs/openapi.yaml`](../docs/openapi.yaml).
 

@@ -1,6 +1,6 @@
-# KadaNet
+# കnnect
 
-KadaNet is a prototype for helping neighbourhood kirana shops manage billing and stock, connect with suppliers, and help nearby shoppers find products. The repository is named **Temp-SOC**, while the product and project documentation call it **KadaNet**.
+കnnect is a prototype for helping neighbourhood kirana shops manage billing and stock, connect with suppliers, and help nearby shoppers find products. The repository is named **Temp-SOC**, while the product and project documentation call it **കnnect**.
 
 The project is designed around three installable progressive web apps (PWAs) and a landing page:
 

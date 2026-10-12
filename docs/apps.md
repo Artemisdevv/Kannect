@@ -4,7 +4,7 @@ This replaces the earlier "one deployment, route trees" suggestion. Users are th
 
 | App | Folder | Users | Login | Core screens |
 |---|---|---|---|---|
-| **Landing** | `apps/landing` | Everyone | None | What KadaNet is, three install cards, demo link, privacy/data ownership |
+| **Landing** | `apps/landing` | Everyone | None | What കnnect is, three install cards, demo link, privacy/data ownership |
 | **Consumer** | `apps/consumer` | Shoppers | None | Search an item, map of nearby shops with In stock / Low / Out, shop page, out-of-stock referral |
 | **Retailer** | `apps/retailer` | Shop owners | Phone OTP, role `retailer` | Onboarding (shelf photo, scan + count, starter pack), scan-to-bill, loose-item tiles, stock list, weekly recount, e-bill share, reorder suggestions, place and track supplier orders, receive into stock, group buys, data export |
 | **Supplier** | `apps/supplier` | Distributors/wholesalers | Phone OTP, role `supplier` | Profile, wholesale catalogue and prices, incoming orders (accept, reject, dispatch, deliver), invoices, delivery tracking, anonymised demand view, create group buys |

@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: KadaNet API
+  title: കnnect API
   version: 0.1.0
   description: |
     Contract shared by frontend (Shreyas) and backend (Aswin, Adnan).

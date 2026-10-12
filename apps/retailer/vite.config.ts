@@ -20,9 +20,9 @@ export default defineConfig({
       devOptions: { enabled: false },
       manifest: {
         id: "/",
-        name: "KadaNet Retailer",
-        short_name: "KadaNet Shop",
-        description: "Manage shop stock, bills, and orders with KadaNet.",
+        name: "കnnect Retailer",
+        short_name: "കnnect Shop",
+        description: "Manage shop stock, bills, and orders with കnnect.",
         start_url: "/",
         scope: "/",
         display: "standalone",

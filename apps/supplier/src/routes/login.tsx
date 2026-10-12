@@ -16,7 +16,7 @@ import { t, useLocale } from "@/lib/i18n";
 const BRAND = "Kannect"; // the name is the logo's alt text, not a translated string
 
 export const Route = createFileRoute("/login")({
-  head: () => seo("Sign in", "Sign in to KadaNet Supplier with your mobile number and a one-time code."),
+  head: () => seo("Sign in", "Sign in to കnnect Supplier with your mobile number and a one-time code."),
   component: Login,
 });
 
@@ -66,7 +66,7 @@ function Login() {
     try {
       const s = await api.verifyOtp(full, otp);
       if (s.role !== "supplier") {
-        setErr("This number isn't registered as a supplier. Use the KadaNet app for your role.");
+        setErr("This number isn't registered as a supplier. Use the കnnect app for your role.");
         return;
       }
       signIn(s);

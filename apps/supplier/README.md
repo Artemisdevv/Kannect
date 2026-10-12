@@ -1,6 +1,6 @@
-# KadaNet Partner Hub
+# കnnect Partner Hub
 
-Build the KadaNet Supplier app: a mobile-first, installable PWA for distributors and wholesalers who supply local retailers, following the attached KadaNet Design System Specification and product requirements.
+Build the കnnect Supplier app: a mobile-first, installable PWA for distributors and wholesalers who supply local retailers, following the attached കnnect Design System Specification and product requirements.
 
 This project was built with [Lovable](https://lovable.dev).
 
