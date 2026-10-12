@@ -34,7 +34,7 @@ export function TodayPage() {
 
   return (
     <Shell active="Today">
-      <p className="eyebrow">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
+      <p className="eyebrow">{new Date().toLocaleDateString(locale === "ml" ? "ml-IN" : "en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
       <h1>{shop?.name ?? t("Your shop", locale)}</h1>
       {shop?.address && <p className="eyebrow">{shop.address}</p>}
 
@@ -100,9 +100,9 @@ export function TodayPage() {
                 <div className="product-art text-primary" aria-hidden="true"><Package size={25} /></div>
                 <div className="min-w-0">
                   <div className="product-name">{p.product?.name}</div>
-                  <div className="product-sub">{formatQty(p.stock_qty, p.product?.unit)}{p.product?.unit === "gram" ? "" : " left"}</div>
+                  <div className="product-sub">{formatQty(p.stock_qty, p.product?.unit, locale)}{p.product?.unit === "gram" ? "" : t(" left", locale)}</div>
                 </div>
-                <span className={`status-pill ${statusClass(p.stock_status)}`}>{STATUS_LABEL[p.stock_status ?? "low"]}</span>
+                <span className={`status-pill ${statusClass(p.stock_status)}`}>{t(STATUS_LABEL[p.stock_status ?? "low"] ?? "", locale)}</span>
               </div>
             ))}
             <Button variant="ghost" className="w-full text-primary" asChild>

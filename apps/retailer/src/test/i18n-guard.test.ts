@@ -24,6 +24,22 @@ const words = (text: string) => text.trim().split(/\s+/).filter((w) => /[A-Za-z]
 const sentenceLike = (text: string) => /^[A-Z]/.test(text.trim()) && words(text).length >= 2;
 const hasLetters = (text: string) => /[A-Za-z]{2,}/.test(text);
 
+/** True when a string is rendered straight onto the page, e.g. {ok ? "" : " left"} inside an element. */
+function isShownAsPageContent(node: ts.Node): boolean {
+  let p: ts.Node = node.parent;
+  const COMPARISONS = new Set([ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken]);
+  while (p) {
+    if (ts.isBinaryExpression(p) && COMPARISONS.has(p.operatorToken.kind)) return false; // x === "phone" is a test, not text
+    if (ts.isConditionalExpression(p) && p.condition === node) return false;
+    if (ts.isConditionalExpression(p) || ts.isBinaryExpression(p) || ts.isParenthesizedExpression(p)) {
+      p = p.parent;
+      continue;
+    }
+    return ts.isJsxExpression(p) && (ts.isJsxElement(p.parent) || ts.isJsxFragment(p.parent));
+  }
+  return false;
+}
+
 function calleeName(node: ts.CallExpression): string {
   const e = node.expression;
   if (ts.isIdentifier(e)) return e.text;
@@ -63,8 +79,14 @@ export function findUntranslated(path: string, source?: string): string[] {
         const parent = node.parent;
         const isAttr = ts.isJsxAttribute(parent);
         if (!isAttr && sentenceLike(node.text)) report(node, "string", node.text);
+        else if (!isAttr && hasLetters(node.text) && isShownAsPageContent(node)) report(node, "shown text", node.text);
       }
-      if (ts.isTemplateExpression(node)) {
+      // a template used straight as a text attribute: aria-label={`Count ${name}`}
+      if ((ts.isTemplateExpression(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isStringLiteral(node)) &&
+          ts.isJsxExpression(node.parent) && ts.isJsxAttribute(node.parent.parent) && TEXT_ATTRS.has(node.parent.parent.name.getText(sf))) {
+        const staticText = ts.isTemplateExpression(node) ? [node.head.text, ...node.templateSpans.map((x) => x.literal.text)].join(" ") : node.text;
+        if (hasLetters(staticText)) report(node, `attribute ${node.parent.parent.name.getText(sf)}`, staticText);
+      } else if (ts.isTemplateExpression(node)) {
         const staticText = [node.head.text, ...node.templateSpans.map((s) => s.literal.text)].join(" ");
         if (sentenceLike(staticText.replace(/\s+/g, " ").trim()) || (words(staticText).length >= 1 && /\s[a-z]{3,}/.test(staticText) && !/^[a-z-]+$/.test(staticText.trim()))) {
           report(node, "template", staticText);
@@ -94,12 +116,16 @@ describe("no untranslated English on the retailer screens", () => {
       expect(scan(`toast.error("Could not save");`)).toHaveLength(1);
       expect(scan(`const m = ok ? "Saving your bill" : "Confirm the bill";`)).toHaveLength(2);
       expect(scan("const m = `${n} item${n === 1 ? '' : 's'} left`;")).toHaveLength(1);
+      expect(scan("const A = () => <button aria-label={`Count ${name}`} />;")).toHaveLength(1);
+      expect(scan(`const A = () => <button aria-label={"Close"} />;`)).toHaveLength(1);
+      expect(scan(`const A = () => <p>{n === 1 ? "" : " left"}</p>;`)).toHaveLength(1);
     });
 
     it("accepts text that goes through t() or tf(), and non-text strings", () => {
       expect(scan(`const A = () => <p>{t("Plain English", locale)}</p>;`)).toEqual([]);
       expect(scan(`const A = () => <p title={t("Hello there", locale)}>{tf("Joined {n} packs", { n }, locale)}</p>;`)).toEqual([]);
       expect(scan(`const A = () => <div className="flex items-center gap-2" data-x="One Two" />;`)).toEqual([]);
+      expect(scan(`const A = () => <div className={on ? "bg-primary" : "bg-muted"}>{formatQty(n, "gram")}{t(on ? "left" : "right")}{step === "phone" && <b>{t("Hi")}</b>}</div>;`)).toEqual([]);
       expect(scan(`import { x } from "Some Module"; const k = ["shop", "orders"]; throw new Error("Not found here");`)).toEqual([]);
       expect(scan(`export const Route = createFileRoute("/x")({ head: () => pageHead("Group buys", "Join other shops today") });`)).toEqual([]);
     });

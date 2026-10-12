@@ -302,4 +302,10 @@ export const screensMl: Record<string, string> = {
   "Kg in stock (optional)": "സ്റ്റോക്കിലുള്ള കിലോ (ഓപ്ഷണൽ)",
   "Count in stock (optional)": "സ്റ്റോക്കിലുള്ള എണ്ണം (ഓപ്ഷണൽ)",
   "Add to my shop": "എന്റെ കടയിൽ ചേർക്കുക",
+
+  // shared dialog
+  "Close": "അടയ്ക്കുക",
+
+  // stock
+  "Count {name}": "{name} എണ്ണുക",
 };
