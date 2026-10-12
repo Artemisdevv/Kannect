@@ -473,7 +473,8 @@ const SpecularButton = ({
       gl.deleteBuffer(buffer);
       gl.deleteVertexArray(vao);
       gl.deleteProgram(program);
-      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      // Do not force-lose the context: React dev mode (StrictMode) remounts onto the same canvas,
+      // and a lost context there leaves a dead white box. The canvas frees it when it unmounts.
     };
   }, []);
 
