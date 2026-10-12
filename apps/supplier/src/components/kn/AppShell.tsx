@@ -32,6 +32,8 @@ function useOnline() {
   return online;
 }
 
+const BRAND = "Kannect"; // the name is the logo's alt text, not a translated string
+
 export function AppShell({ children, title }: { children: ReactNode; title?: string }) {
   const locale = useLocale();
   const { ready, session } = useSession();
@@ -52,9 +54,9 @@ export function AppShell({ children, title }: { children: ReactNode; title?: str
   return (
     <div className="app-shell flex flex-col">
       <header className="no-print sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 px-6 backdrop-blur">
-        <Link to="/" className="flex min-h-12 items-center gap-2 font-bold text-primary">
-          <img src="/favicon.png" alt="" width={28} height={28} className="rounded-lg" />
-            <span>KadaNet <span className="font-medium text-muted-foreground">{t("Supplier", locale)}</span></span>
+        <Link to="/" className="flex min-h-12 items-center gap-2" aria-label={BRAND}>
+          <img src="/kannect-logo.png" alt={BRAND} className="h-8 w-auto" />
+          <span className="text-[10px] font-medium uppercase text-muted-foreground">{t("Supplier", locale)}</span>
         </Link>
         {IS_DEMO && (
           <span className="status-pill bg-warning-surface text-warning" title="Sample data, not live activity">

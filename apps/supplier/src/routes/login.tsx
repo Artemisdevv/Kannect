@@ -11,6 +11,9 @@ import { DEMO_OTP } from "@/lib/api/demo";
 import { errorText } from "@/components/kn/states";
 import { useSession } from "@/lib/session";
 import { seo } from "@/lib/seo";
+import { t, useLocale } from "@/lib/i18n";
+
+const BRAND = "Kannect"; // the name is the logo's alt text, not a translated string
 
 export const Route = createFileRoute("/login")({
   head: () => seo("Sign in", "Sign in to KadaNet Supplier with your mobile number and a one-time code."),
@@ -18,6 +21,7 @@ export const Route = createFileRoute("/login")({
 });
 
 function Login() {
+  const locale = useLocale();
   const { session, ready, signIn } = useSession();
   const navigate = useNavigate();
   const [step, setStep] = useState<"phone" | "otp">("phone");
@@ -77,8 +81,8 @@ function Login() {
 
   return (
     <div className="app-shell flex flex-col px-6 py-10">
-      <img src="/icon-192.png" alt="KadaNet" width={64} height={64} className="rounded-[18px]" />
-      <p className="eyebrow mt-6">KadaNet Supplier</p>
+      <img src="/kannect-logo.png" alt={BRAND} className="h-12 w-auto self-start" />
+      <p className="eyebrow mt-6">{t("Supplier", locale)}</p>
       <h1>{step === "phone" ? "Sign in with your mobile" : "Enter the code"}</h1>
       <p className="mt-2 text-sm text-muted-foreground">
         {step === "phone"

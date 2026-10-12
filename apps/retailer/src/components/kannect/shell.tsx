@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Bell, Ellipsis, House, Package, ReceiptText, Store, Truck } from "lucide-react";
+import { Bell, Ellipsis, House, Package, ReceiptText, Truck } from "lucide-react";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { getShop, subscribe } from "@/api";
@@ -34,6 +34,8 @@ const nav = [
   { to: "/more" as const, label: "More", icon: Ellipsis },
 ];
 
+const BRAND = "Kannect"; // the name is the logo's alt text, not a translated string
+
 export function useShop() {
   return useSyncExternalStore(subscribe, getShop, () => null);
 }
@@ -51,14 +53,9 @@ export function Shell({ children, active }: { children: ReactNode; active: strin
   return (
     <div className="app-shell">
       <header className="app-header">
-        <Link to="/" className="brand min-w-0">
-          <span className="brand-mark shrink-0">
-            <Store size={23} />
-          </span>
-          <div>
-            Kannect {/* i18n-ignore */}
-            <div className="brand-caption">{t("Retailer", locale)}</div>
-          </div>
+        <Link to="/" className="brand min-w-0" aria-label={BRAND}>
+          <img src="/kannect-logo.png" alt={BRAND} className="brand-logo" />
+          <span className="brand-caption">{t("Retailer", locale)}</span>
         </Link>
         <div className="flex items-center gap-1">
           <LanguageSwitcher />

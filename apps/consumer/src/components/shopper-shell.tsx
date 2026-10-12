@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useRouterState } from '@tanstack/react-router';
-import { ShoppingBag, MapPin, ChevronDown, Search, Store, SlidersHorizontal, LocateFixed, WifiOff, Loader2, HandHelping } from 'lucide-react';
+import { MapPin, ChevronDown, Search, Store, SlidersHorizontal, LocateFixed, WifiOff, Loader2, HandHelping } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -16,6 +16,8 @@ type ShopperContext = {
   resetSearch: () => void; nearby: ShopResult[]; nearbyLoading: boolean; nearbyError: string;
 };
 const Context = createContext<ShopperContext | null>(null);
+const BRAND = "Kannect"; // the name is the logo's alt text, not a translated string
+
 export function useShopper() {
   const value = useContext(Context);
   if (!value) throw new Error('Shopper context is missing');
@@ -107,7 +109,7 @@ export function ShopperShell({ children }: { children: ReactNode }) {
   return <Context.Provider value={{ area, query, setQuery, resetSearch, nearby, nearbyLoading, nearbyError, response, loading, error, offline, search, locationOpen, setLocationOpen, hasLocation: !!coordinates }}>
     <div className="app-shell">
       <header className="app-header">
-        <Link to="/" className="brand min-w-0" aria-label={t('Kannect home', locale)}><span className="brand-mark"><ShoppingBag /></span><span>Kannect<span className="text-accent-foreground">.</span></span></Link>
+        <Link to="/" className="brand min-w-0" aria-label={t('Kannect home', locale)}><img src="/kannect-logo.png" alt={BRAND} className="brand-logo" /></Link>
         <Button variant="ghost" className="area-button px-2" onClick={() => setLocationOpen(true)} aria-label={t('Choose your area', locale)}><MapPin className="text-accent-foreground" /><span className="min-w-0"><small>{t('Looking around', locale)}</small><strong className="max-w-32 truncate">{area}</strong></span><ChevronDown className="size-3" /></Button>
       </header>
       {offline && <div className="offline-banner flex items-center gap-2" role="status"><WifiOff size={15} />{t('You’re offline. Reconnect to check live shop availability.', locale)}</div>}

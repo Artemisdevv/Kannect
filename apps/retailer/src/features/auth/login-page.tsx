@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Store } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -14,6 +13,8 @@ import { PhoneEmailButton } from "./phone-email-button";
 import { LIMITS, parsePhone, tidy, validateShop, type ShopErrors } from "@/lib/validation";
 
 const SHOP_TYPES = ["grocery", "provision", "vegetable", "bakery", "stationery", "general"] as const;
+
+const BRAND = "Kannect"; // the name is the logo's alt text, not a translated string
 
 type Step = "phone" | "otp" | "shop";
 
@@ -99,13 +100,10 @@ export function LoginPage() {
       <main className="app-main">
         <div className="mt-6 mb-6 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="brand-mark">
-              <Store size={23} />
-            </span>
-            <div>
-              <h1 className="m-0">Kannect {/* i18n-ignore */}</h1>
-              <p className="eyebrow">{t("Retailer", locale)}</p>
-            </div>
+            <h1 className="m-0">
+              <img src="/kannect-logo.png" alt={BRAND} className="brand-logo" />
+            </h1>
+            <span className="brand-caption">{t("Retailer", locale)}</span>
           </div>
           <LanguageSwitcher />
         </div>

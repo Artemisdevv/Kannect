@@ -44,6 +44,7 @@
 .brand { display:flex; align-items:center; gap:9px; font-size:23px; font-weight:800; color:var(--primary); }
 .brand-mark { width:35px; height:39px; display:grid; place-items:center; color:var(--primary); }
 .brand-mark svg { width:31px; height:31px; stroke-width:1.7; }
+.brand-logo { display:block; height:34px; width:auto; }
 .area-button { display:flex; gap:8px; align-items:center; text-align:left; }
 .area-button small { display:block; color:var(--muted-foreground); font-size:10px; font-weight:400; }
 .area-button strong { display:block; font-size:12px; font-weight:650; }
