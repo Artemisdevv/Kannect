@@ -12,7 +12,7 @@ type ShopperContext = {
   area: string; query: string; setQuery: (q: string) => void;
   response: SearchResponse | null; loading: boolean; error: string; offline: boolean;
   search: (q: string) => Promise<void>; locationOpen: boolean; setLocationOpen: (v: boolean) => void;
-  hasLocation: boolean;
+  hasLocation: boolean; origin: Coordinates | undefined; locate: () => void; locating: boolean;
   resetSearch: () => void; nearby: ShopResult[]; nearbyLoading: boolean; nearbyError: string;
 };
 const Context = createContext<ShopperContext | null>(null);
@@ -51,6 +51,12 @@ export function ShopperShell({ children }: { children: ReactNode }) {
       .finally(() => { if (!cancelled) setNearbyLoading(false); });
     return () => { cancelled = true; };
   }, [area, coordinates]);
+  // When location was already allowed, put the shopper on the map straight away (no prompt shown).
+  useEffect(() => {
+    const permissions = (navigator as Navigator & { permissions?: Permissions }).permissions;
+    permissions?.query({ name: 'geolocation' }).then(status => { if (status.state === 'granted') locate(false); }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     const update = () => setOffline(!navigator.onLine);
     update(); window.addEventListener('online', update); window.addEventListener('offline', update);
@@ -97,16 +103,16 @@ export function ShopperShell({ children }: { children: ReactNode }) {
     if (!isKnownArea(value.trim())) { setLocationMessage('We don’t cover that area yet. Choose one from the list, or use your location.'); return; }
     resetSearch(); setArea(value.trim()); setCoordinates(undefined); setLocationOpen(false); setLocationMessage('');
   }
-  function locate() {
+  function locate(openDialogOnError = true) {
     setLocationMessage('');
-    if (!navigator.geolocation) { setLocationMessage('Location isn’t available on this device. Choose an area below.'); return; }
+    if (!navigator.geolocation) { setLocationMessage('Location isn’t available on this device. Choose an area below.'); if (openDialogOnError) setLocationOpen(true); return; }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(position => {
       resetSearch(); setCoordinates({ latitude: position.coords.latitude, longitude: position.coords.longitude });
       setLocating(false); setArea('Your location'); setResponse(null); setLocationOpen(false);
-    }, e => { setLocating(false); setLocationMessage(e.code === 1 ? 'Location permission was denied. You can still search by choosing an area.' : 'We couldn’t find your location. Choose an area or try again.'); }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
+    }, e => { setLocating(false); setLocationMessage(e.code === 1 ? 'Location permission was denied. You can still search by choosing an area.' : 'We couldn’t find your location. Choose an area or try again.'); if (openDialogOnError) setLocationOpen(true); }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 });
   }
-  return <Context.Provider value={{ area, query, setQuery, resetSearch, nearby, nearbyLoading, nearbyError, response, loading, error, offline, search, locationOpen, setLocationOpen, hasLocation: !!coordinates }}>
+  return <Context.Provider value={{ area, query, setQuery, resetSearch, nearby, nearbyLoading, nearbyError, response, loading, error, offline, search, locationOpen, setLocationOpen, hasLocation: !!coordinates, origin: coordinates, locate: () => locate(true), locating }}>
     <div className="app-shell">
       <header className="app-header">
         <Link to="/" className="brand min-w-0" aria-label={t('Kannect home', locale)}><img src="/kannect-logo.png" alt={BRAND} className="brand-logo" /></Link>
@@ -121,7 +127,7 @@ export function ShopperShell({ children }: { children: ReactNode }) {
         <Link to="/settings" className="nav-item" activeOptions={{ exact: true }} activeProps={{ className: 'active' }}><SlidersHorizontal /><span>{t('Settings', locale)}</span></Link>
       </nav>
       <Dialog open={locationOpen} onOpenChange={setLocationOpen}><DialogContent><DialogHeader><DialogTitle>{t('Your neighbourhood', locale)}</DialogTitle><DialogDescription>{t('Choose an area, or send your location to find shops nearby. This app does not save your precise coordinates.', locale)}</DialogDescription></DialogHeader>
-        <Button variant="botanical" onClick={locate} disabled={locating}>{locating ? <Loader2 className="animate-spin" /> : <LocateFixed />}{locating ? t('Finding your location…', locale) : t('Use my location', locale)}</Button>
+        <Button variant="botanical" onClick={() => locate(false)} disabled={locating}>{locating ? <Loader2 className="animate-spin" /> : <LocateFixed />}{locating ? t('Finding your location…', locale) : t('Use my location', locale)}</Button>
         {locationMessage && <p className="text-xs leading-relaxed text-warning" role="alert">{t(locationMessage, locale)}</p>}
         <p className="text-xs text-muted-foreground">{t('Or choose an area in Kochi', locale)}</p>
         <div className="grid gap-2">{areas.map(a => <Button key={a} variant={a === area ? 'secondary' : 'outline'} onClick={() => chooseArea(a)}><MapPin />{a}</Button>)}</div>

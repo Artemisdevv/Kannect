@@ -154,3 +154,17 @@ def test_needs_a_retailer_with_a_shop():
     assert client(FakeVoice(spoken()), ROWS, role="supplier").post(
         "/shop/ai/voice-bill", files={"audio": ("a.ogg", b"abc", "audio/ogg")}, headers=AUTH
     ).status_code in (401, 403)
+
+
+WATER = product("1L water bottle", barcode="669568259154")
+
+
+@pytest.mark.parametrize("spoken,name", [("oru vellam", "Water"), ("vellam", "vellam"), ("one water", "water")])
+def test_voice_bill_suggests_a_water_bottle_for_water(spoken, name):
+    voice = FakeVoice(VoiceResult(transcript=spoken, lines=[VoiceLine(spoken=spoken, name=name, quantity=1, unit="unknown", confidence=0.8)]))
+    rows = [shop_row(WATER, "14.00"), *ROWS]
+    body = post(client(voice, rows), name="bill.ogg").json()
+    line = body["suggestions"][0]
+    assert line["product"]["name"] == "1L water bottle"
+    assert line["quantity"] == 1
+    assert line["needs_check"] is True

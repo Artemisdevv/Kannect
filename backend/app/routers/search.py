@@ -44,7 +44,7 @@ def _result(row: Any) -> dict[str, Any]:
             "name": row["shop_name"],
             "address": row["address"],
             "phone": row["phone"],
-            "location": {"lat": row["lat"], "lng": row["lng"]},
+            "location": {"lat": row["lat"], "lng": row["lng"]} if row["lat"] is not None else None,
         },
         "product": _product(row),
         "price": float(row["price"]) if row["price"] is not None else None,
@@ -90,8 +90,14 @@ def _origin_filter(
             "ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography))::integer",
             {"lat": lat, "lng": lng},
         )
+    # A shop's GPS pin is what counts. For a named area, the area is located from the pins of the
+    # shops whose address names it, so shops with a pin but no matching address text are found
+    # too. A shop with no pin at all is still matched by its address text.
     return (
-        "POSITION(LOWER(:area) IN LOWER(COALESCE(s.address, ''))) > 0",
+        "(POSITION(LOWER(:area) IN LOWER(COALESCE(s.address, ''))) > 0 OR "
+        "ST_DWithin(s.location::geography, (SELECT ST_Centroid(ST_Collect(a.location::geometry))::geography "
+        "FROM shop a WHERE a.location IS NOT NULL "
+        "AND POSITION(LOWER(:area) IN LOWER(COALESCE(a.address, ''))) > 0), :radius))",
         "NULL::integer",
         {"area": normalized_area},
     )
@@ -133,7 +139,7 @@ def search(
     FROM stock st
     JOIN shop s ON s.id = st.shop_id
     JOIN product p ON p.id = st.product_id
-    WHERE p.is_active AND s.location IS NOT NULL {status_filter}
+    WHERE p.is_active {status_filter}
       AND {" AND ".join(word_filters)}
       AND {origin_filter}
     ORDER BY distance_m, p.name
@@ -158,8 +164,7 @@ def nearby_shops(
     SELECT s.id, s.name, s.address, s.phone, ST_Y(s.location) AS lat, ST_X(s.location) AS lng,
       {distance_expression} AS distance_m
     FROM shop s
-    WHERE s.location IS NOT NULL
-      AND EXISTS (SELECT 1 FROM shop_product sp WHERE sp.shop_id = s.id)
+    WHERE EXISTS (SELECT 1 FROM shop_product sp WHERE sp.shop_id = s.id)
       AND {origin_filter}
     ORDER BY distance_m NULLS LAST, s.name
     LIMIT :limit
@@ -173,7 +178,7 @@ def nearby_shops(
                     "name": r["name"],
                     "address": r["address"],
                     "phone": r["phone"],
-                    "location": {"lat": r["lat"], "lng": r["lng"]},
+                    "location": {"lat": r["lat"], "lng": r["lng"]} if r["lat"] is not None else None,
                 },
                 "distance_m": r["distance_m"],
             }

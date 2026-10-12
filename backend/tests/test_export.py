@@ -90,20 +90,26 @@ def test_export_json_contains_shop_products_sales_and_stock_history(export_data)
         assert "shop_id" in str(statement)
 
 
-def test_export_csv_has_product_sale_and_stock_event_rows(export_data):
-    session, owner, _shop_id, bill_id, event_id = export_data
+def test_export_csv_is_a_readable_sectioned_sheet(export_data):
+    session, owner, _shop_id, _bill_id, _event_id = export_data
 
     response = export_shop_data(format="csv", db=session, owner=owner)
-    rows = list(csv.DictReader(io.StringIO(response.body.decode("utf-8-sig"))))
+    text = response.body.decode("utf-8-sig")
+    rows = list(csv.reader(io.StringIO(text)))
 
     assert response.media_type == "text/csv; charset=utf-8"
     assert 'filename="kannect-shop-export.csv"' in response.headers["content-disposition"]
-    assert [row["record_type"] for row in rows] == ["product", "sale", "stock_event"]
-    assert rows[0]["stock_quantity"] == "10"
-    assert rows[1]["bill_id"] == str(bill_id)
-    assert rows[1]["line_total"] == "0.10"
-    assert rows[2]["stock_event_id"] == str(event_id)
-    assert rows[2]["event_type"] == "restock"
+    assert rows[0] == ["KANNECT SHOP REPORT"]
+    assert ["Shop", "Anoop Stores"] in rows
+    assert ["Total sales (Rs)", "0.10"] in rows
+    # raw ids and internal column names never reach the shopkeeper
+    assert str(_bill_id) not in text and str(_event_id) not in text
+    assert "record_type" not in text
+    # stock: 10 g of rice is shown as kg, with a status the owner understands
+    assert ["Rice", "48.00", "kg", "0.01 kg", "LOW - reorder soon"] in rows
+    sales_header = rows.index(["Date", "Time", "Bill no.", "Item", "Quantity", "Rate (Rs)", "Amount (Rs)", "Paid by"])
+    assert rows[sales_header + 1][2:] == ["1", "Rice", "0.002 kg", "48.00", "0.10", "Cash"]
+    assert ["11 Oct 2026", "05:30 AM", "Rice", "Stock added", "0.01 kg", "Counted by you"] in rows
 
 
 def test_export_requires_a_registered_shop():

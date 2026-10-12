@@ -56,6 +56,13 @@ export async function createShop(body: Body<"/shop", "post">) {
   return shop;
 }
 
+/** Change the shop's saved details, for example its map location. */
+export async function updateShop(body: Partial<components["schemas"]["ShopInput"]>) {
+  const shop = unwrap(await api.PATCH("/shop", { body: body as never }));
+  setShop(shop as never);
+  return shop;
+}
+
 export async function listShopProducts() {
   return unwrap(await api.GET("/shop/products"));
 }
@@ -195,6 +202,15 @@ export function voiceBill(audio: Blob) {
 
 export async function listSuppliers(q?: string) {
   return unwrap(await api.GET("/suppliers", { params: { query: q ? { q } : {} } }));
+}
+
+/** One supplier's wholesale catalogue (everything they have listed, not only what this shop is low on). */
+export async function listSupplierProducts(supplierId: string, q?: string) {
+  return unwrap(
+    await api.GET("/suppliers/{supplier_id}/products", {
+      params: { path: { supplier_id: supplierId }, query: q ? { q } : {} },
+    }),
+  );
 }
 
 export async function reorderSuggestions() {

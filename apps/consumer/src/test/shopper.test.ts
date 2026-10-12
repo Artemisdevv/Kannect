@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { alternatives, getReferral, getShopPage, nearbyShops, resultMapShops, searchProducts, type ShopResult } from '@/lib/shopper';
+import { alternatives, formatDistance, getReferral, getShopPage, haversineKm, nearbyShops, resultMapShops, searchProducts, type ShopResult } from '@/lib/shopper';
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -106,5 +106,22 @@ describe('helpers', () => {
     });
     const list = [mk('a', 'out'), mk('b', 'in'), mk('c', 'low'), mk('d', 'in', 'p2')];
     expect(alternatives(list, list[0]!).map(s => s.id)).toEqual(['b']);
+  });
+});
+
+describe('distance from the shopper', () => {
+  it('measures a straight line and words it for people', () => {
+    const km = haversineKm({ latitude: 8.9952, longitude: 76.6949 }, { latitude: 9.0042, longitude: 76.6949 });
+    expect(km).toBeGreaterThan(0.95);
+    expect(km).toBeLessThan(1.05);
+    expect(formatDistance(0.347, 'en')).toBe('350 m away');
+    expect(formatDistance(1.04, 'en')).toBe('1.0 km away');
+  });
+
+  it('fills the distance when the server sent none (area search with a shared position)', async () => {
+    fetchMock.mockResolvedValueOnce(json({ shops: [{ shop }] }));
+    const [first] = await nearbyShops('Your location', { latitude: 9.99, longitude: 76.31 });
+    expect(first!.distanceKm).toBeGreaterThan(0.9);
+    expect(first!.distanceKm).toBeLessThan(1.2);
   });
 });

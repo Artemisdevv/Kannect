@@ -1,4 +1,4 @@
-import { ChevronRight, Leaf, Truck } from "lucide-react";
+import { ChevronRight, Leaf, Store, Truck } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { keys, useOrders, useReceiveOrder, useReorderSuggestions } from "@/features/queries";
 import { OrderRouteMap } from "@/features/orders/order-route-map";
+import { SupplierBrowser, type SupplierRow } from "@/features/orders/supplier-browser";
 import { newId, orderStatusLabel, rupees } from "@/lib/format";
 import { t, tf, useLocale, type Locale } from "@/lib/i18n";
 import { useQueryClient } from "@tanstack/react-query";
@@ -39,6 +40,7 @@ export function OrdersPage() {
   const receive = useReceiveOrder();
   const qc = useQueryClient();
   const [list, setList] = useState(false);
+  const [browse, setBrowse] = useState(false);
   const [detail, setDetail] = useState<Order | null>(null);
   const [picked, setPicked] = useState<Suggestion | null>(null);
   const [optionIndex, setOptionIndex] = useState(0);
@@ -51,6 +53,17 @@ export function OrdersPage() {
     setOptionIndex(0);
     setPacks(String(s.suggested_packs ?? 1));
     setOrderId(newId());
+  };
+
+  // an item picked from a supplier's full catalogue is ordered the same way as a suggestion
+  const chooseFromCatalogue = (row: SupplierRow) => {
+    choose({
+      shop_product: { product: row.product },
+      reason: t("From the supplier's catalogue", locale),
+      suggested_packs: row.min_order_packs ?? 1,
+      options: [row],
+    } as Suggestion);
+    setBrowse(false);
   };
 
   const option = picked?.options?.[optionIndex];
@@ -112,6 +125,14 @@ export function OrdersPage() {
         <ChevronRight />
       </Button>
 
+      <Button variant="outline" className="w-full mt-2 justify-between" onClick={() => setBrowse(true)}>
+        <span className="flex items-center gap-2">
+          <Store />
+          {t("Browse supplier catalogue", locale)}
+        </span>
+        <ChevronRight />
+      </Button>
+
       <Heading title={t("Your orders", locale)} />
       {orders.isLoading && <p className="text-muted-foreground text-sm">{t("Loading…", locale)}</p>}
       {orders.data && orders.data.length === 0 && (
@@ -131,6 +152,8 @@ export function OrdersPage() {
           </button>
         ))}
       </div>
+
+      <SupplierBrowser open={browse} onOpenChange={setBrowse} onPick={chooseFromCatalogue} />
 
       <Dialog open={list} onOpenChange={setList}>
         <DialogContent className="mobile-dialog">

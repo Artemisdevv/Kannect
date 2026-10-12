@@ -5,6 +5,7 @@ Gemini hears the audio and returns structured lines; the endpoint matches them t
 own products. Suggests only: the owner confirms, then the app calls POST /shop/bills.
 """
 
+import re
 from typing import Protocol
 
 from fastapi import HTTPException
@@ -24,7 +25,68 @@ For each item:
 - unit: exactly one of piece, kg, g, litre, ml, dozen, pack, unknown. "kilo" is kg, "ara kilo" is 0.5 kg, "kaal kilo" is 0.25 kg, "nooru gram" is 100 g, "oru" is one
 - confidence: 0 to 1, how sure you are of this item
 
+Words for drinking water and bottled drinks matter: "vellam", "kudikkan vellam", "water" or "kuppi vellam" all mean a water bottle, name it "Water bottle".
+
 Rules: only goods being sold, not chit-chat or prices. Never invent an item or quantity that was not said. If the audio has no items, return an empty list."""
+
+
+# Malayalam / Manglish words a shopkeeper says -> what the product is called on the shelf.
+ALIASES = {
+    "vellam": "water bottle",
+    "kudikkan vellam": "water bottle",
+    "kuppi vellam": "water bottle",
+    "paal": "milk",
+    "pal": "milk",
+    "panchasara": "sugar",
+    "chaya": "tea",
+    "chayapodi": "tea",
+    "ari": "rice",
+    "uppu": "salt",
+    "mulaku": "chilli",
+    "enna": "oil",
+    "velichenna": "coconut oil",
+    "muttai": "egg",
+    "mutta": "egg",
+    "pazham": "banana",
+    "ulli": "onion",
+    "savala": "onion",
+    "thakkali": "tomato",
+    "urulakizhangu": "potato",
+    "kizhangu": "potato",
+    "biscuit": "biscuit",
+    "sabun": "soap",
+}
+FILLER_WORDS = {"oru", "onnu", "one", "two", "randu", "moonu", "the", "of", "and", "a", "pack", "packet", "bottle"}
+
+
+def _words(text: str) -> list[str]:
+    return re.sub(r"[^a-z0-9 ]+", " ", (text or "").lower()).split()
+
+
+def apply_alias(text: str) -> str:
+    """Replace a spoken Malayalam/Manglish word by the product word ("vellam" -> "water bottle")."""
+    folded = " ".join(_words(text))
+    if folded in ALIASES:
+        return ALIASES[folded]
+    return " ".join(ALIASES.get(word, word) for word in folded.split())
+
+
+def suggest_by_words(heard: str, products: list, limit: int = 4) -> list:
+    """Shop products that share a word with what was said, best first: "water" -> "1L water bottle".
+
+    Used when the fuzzy catalogue match finds nothing, so the owner still gets something to tap.
+    """
+    query = {w for w in _words(apply_alias(heard)) if len(w) > 2 and w not in FILLER_WORDS}
+    if not query:
+        return []
+    scored = []
+    for product in products:
+        key = _words(f"{product.brand or ''} {product.name} {product.name_ml or ''}")
+        hits = sum(any(word == k or (len(word) >= 4 and k.startswith(word)) for k in key) for word in query)
+        if hits:
+            scored.append((-hits, len(key), product.name.casefold(), product))
+    scored.sort(key=lambda item: item[:3])
+    return [item[3] for item in scored[:limit]]
 
 
 class VoiceLine(BaseModel):

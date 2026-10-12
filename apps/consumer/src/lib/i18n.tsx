@@ -232,6 +232,10 @@ const finalMl: Record<string, string> = {
   "Enter another area": 'മറ്റൊരു പ്രദേശം നൽകുക',
   "Neighbourhood shops": 'അടുത്തുള്ള കടകൾ',
   "Could not cancel.": 'റദ്ദാക്കാനായില്ല.',
+  " m away": ' മീ. അകലെ',
+  "You are here": 'നിങ്ങൾ ഇവിടെ',
+  "You": 'നിങ്ങൾ',
+  "Show where I am": 'ഞാൻ എവിടെയാണെന്ന് കാണിക്കുക',
 };
 
 export function t(text: string, locale = getLocale()) { return locale === 'ml' ? (ml[text] ?? extraMl[text] ?? moreMl[text] ?? finalMl[text] ?? remainingMl[text] ?? text) : text; }

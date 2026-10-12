@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowUpRight, Camera, ChevronRight, HandHelping, Package, ReceiptText, ScanLine, Truck } from "lucide-react";
 
 import { Heading, Shell, useShop } from "@/components/kannect/shell";
+import { LocationCard } from "@/features/home/location-card";
 import { Button } from "@/components/ui/button";
 import { useBills, useOrders, usePickups, useShopProducts } from "@/features/queries";
 import { formatQty, rupees, STATUS_LABEL, statusClass, orderStatusLabel } from "@/lib/format";
@@ -37,6 +38,8 @@ export function TodayPage() {
       <p className="eyebrow">{new Date().toLocaleDateString(locale === "ml" ? "ml-IN" : "en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
       <h1>{shop?.name ?? t("Your shop", locale)}</h1>
       {shop?.address && <p className="eyebrow">{shop.address}</p>}
+
+      {shop && !shop.location && <LocationCard className="mt-4" />}
 
       {empty && (
         <div className="list-surface p-5 mt-4 space-y-3">

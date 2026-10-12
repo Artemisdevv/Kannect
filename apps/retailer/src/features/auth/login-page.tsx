@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { LanguageSwitcher } from "@/components/kannect/language-switcher";
 import { shopTypeLabel } from "@/lib/format";
+import { getCurrentPoint } from "@/lib/location";
 import { t, tf, useLocale, type Locale } from "@/lib/i18n";
 import { PhoneEmailButton } from "./phone-email-button";
 import { LIMITS, parsePhone, tidy, validateShop, type ShopErrors } from "@/lib/validation";
@@ -262,15 +263,11 @@ export function LoginPage() {
   );
 }
 
-function currentLocation(): Promise<{ lat: number; lng: number } | null> {
-  return new Promise((resolve) => {
-    if (!navigator.geolocation) return resolve(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(null),
-      { timeout: 8000 },
-    );
-    // the browser's own timeout does not count the time its permission prompt is open
-    setTimeout(() => resolve(null), 8000);
-  });
+async function currentLocation(): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const { lat, lng } = await getCurrentPoint();
+    return { lat, lng };
+  } catch {
+    return null; // the shop can still be created; the owner adds the location later from More
+  }
 }

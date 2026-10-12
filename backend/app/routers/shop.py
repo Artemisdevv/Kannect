@@ -3,7 +3,7 @@
 import csv
 import io
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID, uuid4
@@ -25,6 +25,7 @@ from app.stock import (
     rough_stock_quantity,
     shop_product_payload,
     stock_quantity,
+    stock_status,
 )
 
 router = APIRouter(prefix="/shop", tags=["shop"])
@@ -298,82 +299,108 @@ def export_shop_data(
             headers={"Content-Disposition": 'attachment; filename="kannect-shop-export.json"'},
         )
 
-    output = io.StringIO(newline="")
-    columns = [
-        "record_type",
-        "shop_id",
-        "shop_name",
-        "product_id",
-        "product_name",
-        "barcode",
-        "unit",
-        "price",
-        "stock_quantity",
-        "low_threshold",
-        "needs_recount",
-        "bill_id",
-        "bill_client_id",
-        "created_at",
-        "quantity",
-        "unit_price",
-        "line_total",
-        "bill_total",
-        "payment_mode",
-        "customer_contact",
-        "stock_event_id",
-        "stock_event_client_id",
-        "event_type",
-        "count_source",
-    ]
-    writer = csv.DictWriter(output, fieldnames=columns)
-    writer.writeheader()
-    for product in payload["products"]:
-        writer.writerow(
-            {
-                "record_type": "product",
-                "shop_id": shop_id,
-                "shop_name": owner.shop.name,
-                **{key: value for key, value in product.items() if key != "name"},
-                "product_name": product["name"],
-            }
-        )
-    for bill_data in payload["bills"]:
-        for line in bill_data["items"]:
-            writer.writerow(
-                {
-                    "record_type": "sale",
-                    "shop_id": shop_id,
-                    "shop_name": owner.shop.name,
-                    "bill_id": bill_data["id"],
-                    "bill_client_id": bill_data["client_id"],
-                    "created_at": bill_data["created_at"],
-                    "bill_total": bill_data["total"],
-                    "payment_mode": bill_data["payment_mode"],
-                    "customer_contact": bill_data["customer_contact"],
-                    **{key: value for key, value in line.items() if key != "name"},
-                    "product_name": line["name"],
-                }
-            )
-    for event in payload["stock_events"]:
-        writer.writerow(
-            {
-                "record_type": "stock_event",
-                "shop_id": shop_id,
-                "shop_name": owner.shop.name,
-                "stock_event_id": event["id"],
-                "stock_event_client_id": event["client_id"],
-                "product_id": event["product_id"],
-                "quantity": event["quantity"],
-                "created_at": event["created_at"],
-                "count_source": event["count_source"],
-                "event_type": event["type"],
-            }
-        )
     return Response(
-        content="\ufeff" + output.getvalue(),
+        content="﻿" + _readable_csv(owner.shop.name, products, bills, events),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="kannect-shop-export.csv"'},
     )
+
+
+IST = timezone(timedelta(hours=5, minutes=30))
+STATUS_LABELS = {"in_stock": "OK", "low": "LOW - reorder soon", "out": "OUT OF STOCK"}
+EVENT_LABELS = {"restock": "Stock added", "correction": "Stock count set", "sale": "Sold"}
+SOURCE_LABELS = {
+    "owner_exact": "Counted by you",
+    "photo_estimate": "Estimated from photo",
+    "level_guess": "Rough guess",
+}
+
+
+def _qty_text(quantity: Any, unit: str | None) -> str:
+    """Grams are shown as kg, pieces as a plain number, so a shopkeeper can read them."""
+    if unit == "gram":
+        kilos = Decimal(quantity) / Decimal(1000)
+        return f"{kilos.normalize():f} kg"
+    return f"{quantity} pcs"
+
+
+def _money(value: Any) -> str:
+    return f"{Decimal(value):.2f}"
+
+
+def _readable_csv(shop_name: str | None, products, bills, events) -> str:
+    """A spreadsheet a shopkeeper can read: summary, stock, sales and stock changes in sections."""
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    local = lambda moment: moment.astimezone(IST)  # noqa: E731
+    units = {row.product_id: row.product.unit for row in products}
+    names = {row.product_id: row.product.name for row in products}
+
+    stock_rows = []
+    for row in products:
+        quantity = stock_quantity(row.stock_events)
+        status = stock_status(quantity, row.low_threshold)
+        if row.needs_recount:
+            label = f"{STATUS_LABELS.get(status, status)} (recount needed)"
+        else:
+            label = STATUS_LABELS.get(status, status)
+        stock_rows.append((row.product.name, row.product.unit, row.price, quantity, label, status))
+    stock_rows.sort(key=lambda item: item[0].casefold())
+
+    total_sales = sum((Decimal(bill.total) for bill in bills), Decimal(0))
+    writer.writerow(["KANNECT SHOP REPORT"])
+    writer.writerow(["Shop", shop_name or ""])
+    writer.writerow(["Report date", local(datetime.now(timezone.utc)).strftime("%d %b %Y, %I:%M %p")])
+    writer.writerow([])
+    writer.writerow(["SUMMARY"])
+    writer.writerow(["Total sales (Rs)", _money(total_sales)])
+    writer.writerow(["Number of bills", len(bills)])
+    writer.writerow(["Products in your shop", len(stock_rows)])
+    writer.writerow(["Products low or out of stock", sum(1 for item in stock_rows if item[5] != "in_stock")])
+    writer.writerow([])
+
+    writer.writerow(["STOCK NOW (what you have in the shop today)"])
+    writer.writerow(["Product", "Selling price (Rs)", "Price per", "In stock", "Status"])
+    for name, unit, price, quantity, label, _ in stock_rows:
+        writer.writerow(
+            [name, _money(price), "kg" if unit == "gram" else "piece", _qty_text(quantity, unit), label]
+        )
+    writer.writerow([])
+
+    writer.writerow(["SALES (every item you sold, newest first)"])
+    writer.writerow(["Date", "Time", "Bill no.", "Item", "Quantity", "Rate (Rs)", "Amount (Rs)", "Paid by"])
+    for number, bill in sorted(enumerate(bills, start=1), key=lambda pair: pair[1].created_at, reverse=True):
+        when = local(bill.created_at)
+        for line in bill.items:
+            writer.writerow(
+                [
+                    when.strftime("%d %b %Y"),
+                    when.strftime("%I:%M %p"),
+                    number,
+                    line.name,
+                    _qty_text(line.quantity, line.unit),
+                    _money(line.unit_price),
+                    _money(line.line_total),
+                    (bill.payment_mode or "").title(),
+                ]
+            )
+    writer.writerow([])
+
+    writer.writerow(["STOCK CHANGES (restocks, recounts and sales, newest first)"])
+    writer.writerow(["Date", "Time", "Product", "What happened", "Quantity", "How it was counted"])
+    for event in sorted(events, key=lambda item: item.created_at, reverse=True):
+        when = local(event.created_at)
+        writer.writerow(
+            [
+                when.strftime("%d %b %Y"),
+                when.strftime("%I:%M %p"),
+                names.get(event.product_id, "Removed product"),
+                EVENT_LABELS.get(event.type, event.type),
+                _qty_text(event.quantity, units.get(event.product_id)),
+                SOURCE_LABELS.get(event.count_source or "", ""),
+            ]
+        )
+    return output.getvalue()
 
 
 @router.get("/products")

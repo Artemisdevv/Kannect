@@ -1,6 +1,7 @@
 // Shopper data layer: public search, nearby shops, shop page and referral, from the Kannect API.
 import { api, call } from "@/api/client";
 import type { components } from "@/api/schema";
+import { t, type Locale } from "@/lib/i18n";
 
 export type StockStatus = "in" | "low" | "out";
 export type Coordinates = { latitude: number; longitude: number };
@@ -59,6 +60,24 @@ function distance(distanceM?: number | null) {
     ? distanceM / 1000
     : undefined;
 }
+/** Straight-line distance between two points, in km. */
+export function haversineKm(a: Coordinates, b: Coordinates): number {
+  const rad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = rad(b.latitude - a.latitude);
+  const dLng = rad(b.longitude - a.longitude);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.latitude)) * Math.cos(rad(b.latitude)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+/** "350 m away" under a kilometre, "1.4 km away" beyond. */
+export function formatDistance(km: number, locale?: Locale): string {
+  if (km < 1) return `${Math.max(10, Math.round((km * 1000) / 10) * 10)}${t(' m away', locale)}`;
+  return `${km.toFixed(1)}${t(' km away', locale)}`;
+}
+/** Use the server's distance when it sent one; otherwise measure from where the shopper is. */
+function withDistance<T extends ShopResult>(shop: T, origin?: Coordinates): T {
+  if (shop.distanceKm !== undefined || !validCoordinates(origin) || !shop.coordinates) return shop;
+  return { ...shop, distanceKm: haversineKm(origin, shop.coordinates) };
+}
 function parseStatus(value?: string): StockStatus | null {
   if (value === undefined) return null;
   const status = STATUS[value];
@@ -115,7 +134,7 @@ export async function searchProducts(query: string, area: string, coordinatesArg
   const data = await call((signal) =>
     api.GET("/search", { params: { query: { q: query.trim(), ...origin, include_out: true } }, signal }),
   );
-  return { shops: (data.results ?? []).map((r) => fromResult(r, area)) };
+  return { shops: (data.results ?? []).map((r) => withDistance(fromResult(r, area), coordinatesArg)) };
 }
 
 /** Shops around the shopper, nearest first, for browsing before any search. */
@@ -126,7 +145,7 @@ export async function nearbyShops(area: string, coordinatesArg?: Coordinates): P
   );
   return (data.shops ?? []).map((result) => {
     const distanceKm = distance(result.distance_m);
-    return toShop(result.shop, { ...(distanceKm !== undefined ? { distanceKm } : {}) }, area);
+    return withDistance(toShop(result.shop, { ...(distanceKm !== undefined ? { distanceKm } : {}) }, area), coordinatesArg);
   });
 }
 

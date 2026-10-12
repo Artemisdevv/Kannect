@@ -5,7 +5,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Availability, ShopCard } from '@/components/shop-result';
 import { ReserveDialog, lineTotal, qtyLabel, type ReserveLine } from '@/components/reserve-dialog';
-import { getReferral, getShopPage, rupees, type ShopResult } from '@/lib/shopper';
+import { useShopper } from '@/components/shopper-shell';
+import { formatDistance, getReferral, getShopPage, haversineKm, rupees, type ShopResult } from '@/lib/shopper';
 import { t, useLocale } from '@/lib/i18n';
 
 type Item = { productId: string; name: string; unit: 'piece' | 'gram'; price: number | null; status: 'in' | 'low' | 'out'; reservable: number | null };
@@ -25,6 +26,7 @@ export const Route = createFileRoute('/shops/$shopId')({
 function ShopDetail() {
   const locale = useLocale();
   const { shopId } = Route.useParams();
+  const { origin } = useShopper();
   const page = useQuery({ queryKey: ['shop', shopId], queryFn: () => getShopPage(shopId), retry: 1 });
   const [cart, setCart] = useState<Record<string, number>>({});
   const [reserving, setReserving] = useState(false);
@@ -42,7 +44,7 @@ function ShopDetail() {
   const total = lines.reduce((sum, l) => sum + lineTotal(l), 0);
   return <main className="app-main">
     <Button variant="ghost" asChild className="-ml-4"><Link to="/"><ArrowLeft />{t('Back', locale)}</Link></Button>
-    <div className="detail-header"><div className="detail-symbol"><Store /></div><h1>{shop.name}</h1><p>{shop.address}</p></div>
+    <div className="detail-header"><div className="detail-symbol"><Store /></div><h1>{shop.name}</h1><p>{shop.address}</p>{origin && shop.coordinates && <p className="font-semibold">{formatDistance(haversineKm(origin, shop.coordinates), locale)}</p>}</div>
     <div className="flex flex-wrap gap-2 mt-4">
       {shop.coordinates && <Button variant="secondary" asChild><a href={`https://www.google.com/maps/dir/?api=1&destination=${shop.coordinates.latitude},${shop.coordinates.longitude}`} target="_blank" rel="noopener noreferrer"><Navigation />{t('Directions', locale)}</a></Button>}
       {shop.phone && <Button variant="outline" asChild><a href={`tel:${shop.phone}`}><Phone />{t('Call', locale)}</a></Button>}

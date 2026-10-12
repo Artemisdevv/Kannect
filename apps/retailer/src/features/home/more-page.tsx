@@ -1,5 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Camera, ChevronRight, ClipboardCheck, Download, HandHelping, Loader2, LogOut, Users } from "lucide-react";
+
+import { LocationCard } from "@/features/home/location-card";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useState } from "react";
@@ -75,6 +77,8 @@ export function MorePage() {
           </span>
         </Button>
       </div>
+
+      <LocationCard className="mt-4" />
 
       <div className="list-surface mt-4 p-4 text-sm space-y-1">
         <p className="font-semibold">{shop?.name}</p>

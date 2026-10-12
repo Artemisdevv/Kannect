@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { textElement } from "@/lib/safe-dom";
-import { type MapShop, type StockStatus } from "@/lib/shopper";
+import { type Coordinates, type MapShop, type StockStatus } from "@/lib/shopper";
 import { t, useLocale } from "@/lib/i18n";
 import "leaflet/dist/leaflet.css";
 
@@ -14,8 +14,11 @@ export function ShopMap({
   shops,
   selectedId,
   onSelect,
+  origin,
 }: {
   shops: MapShop[];
+  /** Where the shopper is, when they shared it: drawn as a blue dot. */
+  origin?: Coordinates | undefined;
   selectedId?: string | undefined;
   onSelect: (id: string) => void;
 }) {
@@ -74,7 +77,15 @@ export function ShopMap({
         marker.on("click", () => selectRef.current(shop.id));
         markers.current.set(shop.id, marker);
       }
-      leafletMap.fitBounds(layer.getBounds().pad(0.2), { maxZoom: 14 });
+      const bounds = layer.getBounds();
+      if (origin) {
+        const here: [number, number] = [origin.latitude, origin.longitude];
+        L.circleMarker(here, { radius: 18, weight: 0, fillColor: "#2563eb", fillOpacity: 0.18, interactive: false }).addTo(leafletMap);
+        const you = L.circleMarker(here, { radius: 8, color: "#fff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }).addTo(leafletMap);
+        you.bindTooltip(textElement(t("You are here", locale)), { direction: "top", permanent: true });
+        bounds.extend(here);
+      }
+      leafletMap.fitBounds(bounds.pad(0.2), { maxZoom: 16 });
       cleanup = () => {
         markers.current.clear();
         leafletMap.remove();
@@ -85,7 +96,8 @@ export function ShopMap({
       disposed = true;
       cleanup?.();
     };
-  }, [positioned]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positioned, origin?.latitude, origin?.longitude]);
 
   useEffect(() => {
     const marker = selectedId ? markers.current.get(selectedId) : undefined;
@@ -115,6 +127,12 @@ export function ShopMap({
               <i className="out" />
               {t('Out', locale)}
             </span>
+            {origin && (
+              <span>
+                <i className="you" />
+                {t('You', locale)}
+              </span>
+            )}
             <span>
               <i className="mixed" />
               {t('Mixed or not applicable', locale)}

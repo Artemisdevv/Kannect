@@ -115,6 +115,7 @@
 .map-legend i.in_stock { background:#18834b; }
 .map-legend i.low { background:#d68a12; }
 .map-legend i.out { background:#bc3a3a; }
+.map-legend i.you { background:#2563eb; }
 .map-note { color:var(--muted-foreground); font-size:11px; margin-top:10px; }
 .empty-state { text-align:center; padding:45px 10px; }
 .empty-state > svg { width:45px; height:45px; margin:0 auto 18px; color:var(--muted-foreground); stroke-width:1.3; }

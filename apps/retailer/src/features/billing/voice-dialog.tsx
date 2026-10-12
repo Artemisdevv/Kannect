@@ -10,6 +10,7 @@ import { t, useLocale } from "@/lib/i18n";
 
 type Result = Awaited<ReturnType<typeof voiceBill>>;
 type Suggestion = NonNullable<Result["suggestions"]>[number];
+type Product = NonNullable<Suggestion["product"]>;
 
 export type VoiceLine = { productId: string; quantity: number };
 
@@ -30,6 +31,8 @@ export function VoiceDialog({
   const [phase, setPhase] = useState<"idle" | "recording" | "working" | "review">("idle");
   const [result, setResult] = useState<Result | null>(null);
   const [skip, setSkip] = useState<Set<number>>(new Set());
+  // when the owner taps another suggested item for a spoken line
+  const [swap, setSwap] = useState<Record<number, Product>>({});
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
 
@@ -37,6 +40,7 @@ export function VoiceDialog({
     setPhase("idle");
     setResult(null);
     setSkip(new Set());
+    setSwap({});
   };
 
   const start = async () => {
@@ -74,7 +78,7 @@ export function VoiceDialog({
     const lines = suggestions
       .map((s, i) => ({ s, i }))
       .filter(({ s, i }) => usable(s) && !skip.has(i))
-      .map(({ s }) => ({ productId: s.product!.id as string, quantity: s.quantity as number }));
+      .map(({ s, i }) => ({ productId: (swap[i] ?? s.product)!.id as string, quantity: s.quantity as number }));
     if (lines.length === 0) {
       toast.error(t("Nothing to add yet.", locale));
       return;
@@ -125,13 +129,24 @@ export function VoiceDialog({
               {suggestions.map((s, i) => (
                 <div key={i} className="product-row" style={{ gridTemplateColumns: "minmax(0,1fr) auto" }}>
                   <div className="min-w-0">
-                    <div className="product-name">{s.product?.name ?? s.name ?? s.spoken}</div>
+                    <div className="product-name">{(swap[i] ?? s.product)?.name ?? s.name ?? s.spoken}</div>
                     <div className="product-sub">
                       {usable(s)
                         ? `${formatQty(s.quantity, s.unit, locale)} · ${priceLabel(s.price ?? undefined, s.unit, locale)}`
                         : (s.note ?? t("Not found in your shop's products", locale))}
                     </div>
-                    {usable(s) && s.note && <div className="product-sub text-warning">{s.note}</div>}
+                    {usable(s) && s.note && !swap[i] && <div className="product-sub text-warning">{s.note}</div>}
+                    {(s.alternatives?.length ?? 0) > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1" aria-label={t("Other matching items", locale)}>
+                        {[...(swap[i] && s.product ? [s.product] : []), ...(s.alternatives ?? [])]
+                          .filter((alt) => alt.id !== (swap[i] ?? s.product)?.id)
+                          .map((alt) => (
+                            <Button key={alt.id} variant="outline" size="sm" className="h-8 text-xs" onClick={() => setSwap({ ...swap, [i]: alt })}>
+                              {alt.name}
+                            </Button>
+                          ))}
+                      </div>
+                    )}
                   </div>
                   {usable(s) && (
                     <Button

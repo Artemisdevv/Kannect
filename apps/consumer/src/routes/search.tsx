@@ -22,7 +22,7 @@ export const Route = createFileRoute('/search')({
 const suggestions = [{ name: 'Rice & grains', sub: 'Everyday staples', query: 'rice', Icon: Wheat }, { name: 'Dairy', sub: 'Fresh essentials', query: 'milk', Icon: Milk }, { name: 'Vegetables', sub: 'Farm to kitchen', query: 'tomato', Icon: Carrot }, { name: 'Fruits', sub: 'A little freshness', query: 'banana', Icon: Apple }];
 function SearchPage() {
   const locale = useLocale();
-  const { query, setQuery, resetSearch, response, loading, error, search, area, setLocationOpen, offline } = useShopper();
+  const { query, setQuery, resetSearch, response, loading, error, search, area, setLocationOpen, offline, origin } = useShopper();
   const [view, setView] = useState<'list' | 'map'>('list');
   const [selectedShopId, setSelectedShopId] = useState<string>();
   const showingResults = !!response || loading || !!error;
@@ -41,7 +41,7 @@ function SearchPage() {
       {loading ? <div className="empty-state" role="status"><Loader2 className="animate-spin" /><h2>{t('Checking nearby shops…', locale)}</h2><p>{t('Finding matches for ', locale)}“{query}”.</p></div> : error ? <div className="empty-state" role="alert">{offline ? <WifiOff /> : <SearchX />}<h2>{t('Let’s try that again', locale)}</h2><p>{t(error, locale)}</p><Button onClick={() => void search(query)}>{t('Retry search', locale)}</Button></div> : response && <>
         <div className="section-heading"><div className="min-w-0"><h2>{response.shops.length ? `${response.shops.length} ${t('shops with', locale)} “${query}”` : t('Search results', locale)}</h2><p>{area} · {t('Reported availability', locale)}</p></div><div className="view-toggle" role="group" aria-label={t('Result view', locale)}><Button variant={view === 'list' ? 'secondary' : 'ghost'} size="icon" aria-label={t('List view', locale)} aria-pressed={view === 'list'} onClick={() => setView('list')}><List /></Button><Button variant={view === 'map' ? 'secondary' : 'ghost'} size="icon" aria-label={t('Map view', locale)} aria-pressed={view === 'map'} onClick={() => setView('map')}><Map /></Button></div></div>
         {response.cachedAt && <div className="demo-banner"><Info size={14} />{t('Saved results · Availability may be out of date.', locale)}</div>}
-        {view === 'map' && <ShopMap shops={resultMapShops(response.shops)} selectedId={selectedShopId} onSelect={setSelectedShopId} />}
+        {view === 'map' && <ShopMap shops={resultMapShops(response.shops)} selectedId={selectedShopId} onSelect={setSelectedShopId} origin={origin} />}
         {response.shops.length ? <div className="shop-list" aria-label={t('Matching shops', locale)}>{response.shops.map(shop => <ShopCard key={shop.uid} shop={shop} selected={selectedShopId === shop.id} onSelect={() => setSelectedShopId(shop.id)} />)}</div> : <div className="empty-state"><SearchX /><h2>{t(isKnownArea(area) ? 'No matching products' : 'No shops in this area yet', locale)}</h2><p>{t('No shops near ', locale)}{area} {t('have this item right now. Try another word, or another area.', locale)}</p><Button variant="secondary" onClick={() => setLocationOpen(true)}><MapPin />{t('Change area', locale)}</Button></div>}
       </>}
     </>}

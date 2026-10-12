@@ -37,7 +37,7 @@ from app.services.shelf_vision import (
     suggested_level,
     worst_quality,
 )
-from app.services.voice_bill import GeminiVoiceBill, VoiceVision
+from app.services.voice_bill import GeminiVoiceBill, VoiceVision, apply_alias, suggest_by_words
 from app.services.voice_bill import to_base_units as voice_base_units
 from app.stock import stock_quantity, stock_status
 
@@ -346,17 +346,26 @@ def voice_bill(
             continue
         product, alternatives = None, []
         if not line.brand.strip():  # produce and staples are said without a brand
-            heard = Detection(name=line.name or line.spoken, category="other")
+            line.name = apply_alias(line.name or line.spoken)
+            heard = Detection(name=line.name, category="other")
             product = match_loose(heard, loose_pool)
         if product is None:
             best, alts, _ = classify(index.match(line.brand.strip(), line.name.strip(), ""))
             product = best.product if best else None
             alternatives = [a.product for a in alts]
+        guessed = False
+        if product is None:
+            if not alternatives:
+                alternatives = suggest_by_words(f"{line.brand} {line.name} {line.spoken}", pool)
+            if alternatives:  # offer the closest shop item; the owner confirms or switches
+                product, alternatives, guessed = alternatives[0], alternatives[1:], True
         unit = product.unit if product else (alternatives[0].unit if alternatives else None)
         base_qty, note = voice_base_units(line, unit)
         row = by_product.get(product.id) if product else None
         if product is None:
             note = note or "Not found in your shop's products: pick one or add it"
+        elif guessed:
+            note = note or "Best guess: check this is the right item, or pick another"
         suggestions.append(
             {
                 "spoken": line.spoken or line.name,
@@ -367,7 +376,7 @@ def voice_bill(
                 "unit": unit or "piece",
                 "price": float(row.price) if row else None,
                 "confidence": max(0.0, min(1.0, line.confidence)),
-                "needs_check": product is None or note is not None or line.confidence < 0.6,
+                "needs_check": product is None or guessed or note is not None or line.confidence < 0.6,
                 "note": note,
             }
         )

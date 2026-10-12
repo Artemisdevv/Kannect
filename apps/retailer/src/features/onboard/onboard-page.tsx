@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError, createProduct, shelfPhoto } from "@/api";
+import { compressAll } from "@/lib/compress-image";
 import { PhotoPicker } from "./photo-picker";
 import { Shell } from "@/components/kannect/shell";
 import { Button } from "@/components/ui/button";
@@ -98,7 +99,7 @@ export function OnboardPage() {
   const addBulk = useAddProductsBulk();
   const recount = useRecount();
   const [files, setFiles] = useState<File[]>([]);
-  const [thorough, setThorough] = useState(true);
+  const [thorough, setThorough] = useState(false); // thorough re-reads zoomed tiles: about 30 s a photo
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -107,7 +108,7 @@ export function OnboardPage() {
   const read = async () => {
     setBusy(true);
     try {
-      const res = await shelfPhoto(files, thorough);
+      const res = await shelfPhoto(await compressAll(files), thorough);
       const detections = res.detections ?? [];
       const next = detections.map(toRow).filter((r): r is Row => r !== null);
       setRows(next);

@@ -65,6 +65,7 @@ vi.mock("@/api", () => ({
 vi.mock("@/components/kannect/shell", () => ({
   Heading: ({ title }: { title: string }) => <h2>{title}</h2>,
   Shell: ({ children }: { children: React.ReactNode }) => <main>{children}</main>,
+  useShop: () => null,
 }));
 
 const order = {
