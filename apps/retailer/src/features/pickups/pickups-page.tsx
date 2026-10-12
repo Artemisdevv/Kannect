@@ -17,14 +17,17 @@ const HOLD_CHOICES = [
   { minutes: 480, label: "Today (8 h)" },
 ]; // i18n-ignore: translated where they are shown
 
-const STATUS_TEXT: Record<string, string> = {
-  requested: "New request",
-  accepted: "Held for pickup",
-  declined: "Declined",
-  cancelled: "Cancelled by shopper",
-  collected: "Picked up",
-  expired: "Hold ran out",
-};
+function statusText(status: string | undefined, locale: Locale) {
+  switch (status) {
+    case "requested": return t("New request", locale);
+    case "accepted": return t("Held for pickup", locale);
+    case "declined": return t("Declined", locale);
+    case "cancelled": return t("Cancelled by shopper", locale);
+    case "collected": return t("Picked up", locale);
+    case "expired": return t("Hold ran out", locale);
+    default: return status ?? "";
+  }
+}
 
 function when(iso: string | null | undefined, locale: Locale) {
   if (!iso) return "";
@@ -84,7 +87,7 @@ export function PickupsPage() {
         <div className="min-w-0">
           <div className="product-name">{r.customer_name}</div>
           <div className="product-sub">
-            {tf("{status} · asked {time}", { status: STATUS_TEXT[r.status ?? ""] ? t(STATUS_TEXT[r.status ?? ""]!, locale) : (r.status ?? ""), time: when(r.created_at, locale) }, locale)}
+            {tf("{status} · asked {time}", { status: statusText(r.status, locale), time: when(r.created_at, locale) }, locale)}
             {r.status === "accepted" && r.hold_until ? tf(" · held until {time}", { time: when(r.hold_until, locale) }, locale) : ""}
           </div>
         </div>
