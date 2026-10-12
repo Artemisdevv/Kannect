@@ -1,0 +1,25 @@
+.scroll-velocity,
+.scroll-velocity > div {
+  width: 100%;
+}
+
+.scroll-velocity .scroller {
+  display: flex;
+  width: max-content;
+  white-space: nowrap;
+  text-align: center;
+  font-family: "Manrope", sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .17em;
+}
+
+.scroll-velocity .scroller > span {
+  flex: none;
+}
+
+@media (max-width: 760px) {
+  .scroll-velocity .scroller {
+    font-size: 8px;
+  }
+}

@@ -1,4 +1,5 @@
 import Iridescence from "@/components/Iridescence";
+import ScrollVelocity from "@/components/ScrollVelocity";
 import SpotlightCard from "@/components/SpotlightCard";
 import SpecularButton from "@/components/SpecularButton";
 
@@ -93,7 +94,7 @@ export default function App() {
       <div className="landing__shade" aria-hidden="true" />
 
       <header className="header">
-        <a className="brand" href="#home" aria-label="കnnect home"><img src="/brand-mark.png" alt="കnnect" /></a>
+        <a className="brand" href="#home" aria-label="കnnect home"><img src="/branding/kannect-logo.png" alt="കnnect" /></a>
         <nav aria-label="Main navigation">
           <SpecularButton href="#network" className="nav-button" size="sm" radius={999} tint="#9c5425" tintOpacity={0.07} textColor="#ffefd9" lineColor="#ffd59b" baseColor="#8e542e" intensity={0.78} idleIntensity={0.2} shineSize={7} shineFade={28} thickness={1} glow={0.65} proximity={150} blur={0}>The network <span className="button-arrow">↘</span></SpecularButton>
           <SpecularButton href="#apps" className="nav-button" size="sm" radius={999} tint="#9c5425" tintOpacity={0.07} textColor="#ffefd9" lineColor="#ffd59b" baseColor="#8e542e" intensity={0.78} idleIntensity={0.2} shineSize={7} shineFade={28} thickness={1} glow={0.65} proximity={150} blur={0}>Who it’s for <span className="button-arrow">↘</span></SpecularButton>
@@ -114,7 +115,16 @@ export default function App() {
       </section>
 
       <div className="ticker" aria-label="Shop local, stay connected, keep good things moving">
-        <div className="ticker__track">{Array.from({ length: 2 }).map((_, index) => <span key={index}>SHOP LOCAL <i>✳</i> STAY CONNECTED <i>✳</i> KEEP GOOD THINGS MOVING <i>✳</i> SHOP LOCAL <i>✳</i> STAY CONNECTED <i>✳</i></span>)}</div>
+        <ScrollVelocity
+          texts={[<>SHOP LOCAL <i>✳</i> STAY CONNECTED <i>✳</i> KEEP GOOD THINGS MOVING <i>✳</i></>]}
+          velocity={36}
+          className="ticker__copy"
+          numCopies={6}
+          damping={85}
+          stiffness={750}
+          parallaxClassName="ticker__parallax"
+          scrollerClassName="ticker__track"
+        />
       </div>
 
       <section className="network" id="network">
@@ -151,7 +161,7 @@ export default function App() {
               "--spotlight-card-shadow": "0 22px 55px rgba(5, 2, 0, .18)",
             }}
           >
-            <div className="role-card__top"><span className="role-card__signature"><span>{role.number} /</span><img src="/brand-mark.png" alt="കnnect" /><i className="role-card__icon" aria-hidden="true">{role.symbol}</i></span></div>
+            <div className="role-card__top"><span className="role-card__signature"><span>{role.number} /</span><img src="/branding/app-icon.ico" alt="കnnect" /><i className="role-card__icon" aria-hidden="true">{role.symbol}</i></span></div>
             <p className="role-card__audience">{role.name}</p>
             <h3>{role.title}</h3>
             <p className="role-card__body">{role.body}</p>
@@ -202,7 +212,7 @@ export default function App() {
         </div>
         <div className="download__device-wrap">
           <div className="download__glow" aria-hidden="true" /><div className="download__halo download__halo--one" /><div className="download__halo download__halo--two" />
-          <div className="download__device"><div className="download__device-top"><img src="/brand-mark.png" alt="കnnect" /><span>•••</span></div><div className="download__device-art"><div className="download__device-sun" /><div className="download__device-hill download__device-hill--back" /><div className="download__device-hill download__device-hill--front" /><div className="download__device-shop">⌂</div></div><div className="download__device-caption"><span>GOOD THINGS</span><strong>move locally.</strong><i>Find your neighbourhood.</i></div><div className="download__device-dots"><i /><i /><i /></div></div>
+          <div className="download__device"><div className="download__device-top"><img src="/branding/app-icon.ico" alt="കnnect" /><span>•••</span></div><div className="download__device-art"><div className="download__device-sun" /><div className="download__device-hill download__device-hill--back" /><div className="download__device-hill download__device-hill--front" /><div className="download__device-shop">⌂</div></div><div className="download__device-caption"><span>GOOD THINGS</span><strong>move locally.</strong><i>Find your neighbourhood.</i></div><div className="download__device-dots"><i /><i /><i /></div></div>
           <div className="download__qr-card"><QrPlaceholder /><div><span>ANDROID</span><strong>Ready when you are.</strong><small>APK + QR arriving soon</small></div></div>
         </div>
       </section>
@@ -212,7 +222,7 @@ export default function App() {
           <span className="closing__asterisk">✳</span><p>The best things are<br />happening <em>right here.</em></p><a href="#home">Back to the top <span>↑</span></a>
         </section>
 
-        <footer className="footer"><a className="brand" href="#home" aria-label="കnnect home"><img src="/brand-mark.png" alt="കnnect" /></a><span>Good things move locally.</span><nav aria-label="Footer navigation"><a href="#network">Our network</a><a href="#apps">For everyone</a><a href="#download">Get the app</a></nav><span>© 2026 കnnect</span></footer>
+        <footer className="footer"><a className="brand" href="#home" aria-label="കnnect home"><img src="/branding/kannect-logo.png" alt="കnnect" /></a><span>Good things move locally.</span><nav aria-label="Footer navigation"><a href="#network">Our network</a><a href="#apps">For everyone</a><a href="#download">Get the app</a></nav><span>© 2026 കnnect</span></footer>
       </div>
     </main>
   );
