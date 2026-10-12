@@ -6,6 +6,7 @@ import { ApiError, voiceBill } from "@/api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { formatQty, priceLabel } from "@/lib/format";
+import { t, useLocale } from "@/lib/i18n";
 
 type Result = Awaited<ReturnType<typeof voiceBill>>;
 type Suggestion = NonNullable<Result["suggestions"]>[number];
@@ -25,6 +26,7 @@ export function VoiceDialog({
   onOpenChange: (open: boolean) => void;
   onAdd: (lines: VoiceLine[]) => void;
 }) {
+  const locale = useLocale();
   const [phase, setPhase] = useState<"idle" | "recording" | "working" | "review">("idle");
   const [result, setResult] = useState<Result | null>(null);
   const [skip, setSkip] = useState<Set<number>>(new Set());
@@ -53,7 +55,7 @@ export function VoiceDialog({
           setResult(await voiceBill(blob));
           setPhase("review");
         } catch (e) {
-          toast.error(e instanceof ApiError ? e.message : "Could not process the recording.");
+          toast.error(e instanceof ApiError ? e.message : t("Could not process the recording.", locale));
           setPhase("idle");
         }
       };
@@ -61,7 +63,7 @@ export function VoiceDialog({
       recorder.current = rec;
       setPhase("recording");
     } catch {
-      toast.error("Microphone not available. Allow microphone access and try again.");
+      toast.error(t("Microphone not available. Allow microphone access and try again.", locale));
     }
   };
 
@@ -74,7 +76,7 @@ export function VoiceDialog({
       .filter(({ s, i }) => usable(s) && !skip.has(i))
       .map(({ s }) => ({ productId: s.product!.id as string, quantity: s.quantity as number }));
     if (lines.length === 0) {
-      toast.error("Nothing to add yet.");
+      toast.error(t("Nothing to add yet.", locale));
       return;
     }
     onAdd(lines);
@@ -91,34 +93,33 @@ export function VoiceDialog({
       }}
     >
       <DialogContent className="mobile-dialog">
-        <DialogTitle>Speak the bill</DialogTitle>
+        <DialogTitle>{t("Speak the bill", locale)}</DialogTitle>
         <DialogDescription>
-          Say each item with its quantity, in Malayalam or English. Example: "ara kilo thakkali,
-          randu Parle-G".
+          {t("Say each item with its quantity, in Malayalam or English. Example: “ara kilo thakkali, randu Parle-G”.", locale)}
         </DialogDescription>
 
         {phase === "idle" && (
           <Button className="w-full h-14" onClick={() => void start()}>
-            <Mic /> Start speaking
+            <Mic /> {t("Start speaking", locale)}
           </Button>
         )}
         {phase === "recording" && (
           <Button className="w-full h-14" variant="destructive" onClick={() => recorder.current?.stop()}>
-            <Square /> Stop and read
+            <Square /> {t("Stop and read", locale)}
           </Button>
         )}
-        {phase === "working" && <p className="text-sm text-muted-foreground">Listening to the recording…</p>}
+        {phase === "working" && <p className="text-sm text-muted-foreground">{t("Listening to the recording…", locale)}</p>}
 
         {phase === "review" && (
           <div className="space-y-3">
             {result?.transcript && (
               <p className="text-sm rounded-2xl bg-secondary p-3">
-                <span className="text-xs text-muted-foreground block">I heard</span>
+                <span className="text-xs text-muted-foreground block">{t("I heard", locale)}</span>
                 {result.transcript}
               </p>
             )}
             {suggestions.length === 0 && (
-              <p className="text-sm text-muted-foreground">No items were found. Try again, speaking closer to the phone.</p>
+              <p className="text-sm text-muted-foreground">{t("No items were found. Try again, speaking closer to the phone.", locale)}</p>
             )}
             <div className="list-surface">
               {suggestions.map((s, i) => (
@@ -127,8 +128,8 @@ export function VoiceDialog({
                     <div className="product-name">{s.product?.name ?? s.name ?? s.spoken}</div>
                     <div className="product-sub">
                       {usable(s)
-                        ? `${formatQty(s.quantity, s.unit)} · ${priceLabel(s.price ?? undefined, s.unit)}`
-                        : (s.note ?? "Not found in your shop's products")}
+                        ? `${formatQty(s.quantity, s.unit, locale)} · ${priceLabel(s.price ?? undefined, s.unit, locale)}`
+                        : (s.note ?? t("Not found in your shop's products", locale))}
                     </div>
                     {usable(s) && s.note && <div className="product-sub text-warning">{s.note}</div>}
                   </div>
@@ -143,20 +144,20 @@ export function VoiceDialog({
                         setSkip(next);
                       }}
                     >
-                      {skip.has(i) ? "Skipped" : "Add"}
+                      {skip.has(i) ? t("Skipped", locale) : t("Add", locale)}
                     </Button>
                   )}
                 </div>
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              Check the list against what was said. Anything missing, add by search or scan.
+              {t("Check the list against what was said. Anything missing, add by search or scan.", locale)}
             </p>
             <Button className="w-full" onClick={add}>
-              Add to bill
+              {t("Add to bill", locale)}
             </Button>
             <Button variant="ghost" className="w-full" onClick={reset}>
-              Record again
+              {t("Record again", locale)}
             </Button>
           </div>
         )}

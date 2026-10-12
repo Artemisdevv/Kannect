@@ -9,12 +9,14 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useCreateBill, useShopProducts } from "@/features/queries";
 import { ScanDialog } from "@/features/scan/scan-dialog";
 import { clampToStock, formatQty, lineTotal, newId, priceLabel, rupees, STATUS_LABEL, statusClass, stepFor } from "@/lib/format";
+import { t, tf, useLocale } from "@/lib/i18n";
 
 import { VoiceDialog, type VoiceLine } from "./voice-dialog";
 
 type PaymentMode = "cash" | "upi" | "card" | "other";
 
 export function BillingPage() {
+  const locale = useLocale();
   const products = useShopProducts();
   const createBill = useCreateBill();
   const [search, setSearch] = useState("");
@@ -46,8 +48,8 @@ export function BillingPage() {
   const limitMessage = (id: string, max: number) => {
     const unit = byId.get(id)?.product?.unit;
     return max === 0
-      ? "Out of stock. Count it in Stock first if you have some."
-      : `Only ${formatQty(max, unit)} in stock.`;
+      ? t("Out of stock. Count it in Stock first if you have some.", locale)
+      : tf("Only {qty} in stock.", { qty: formatQty(max, unit, locale) }, locale);
   };
 
   const addQty = (id: string, delta: number) => {
@@ -78,13 +80,13 @@ export function BillingPage() {
       billId.current = newId();
       setCart({});
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not save the bill. Try again.");
+      toast.error(e instanceof ApiError ? e.message : t("Could not save the bill. Try again.", locale));
     }
   };
 
   const onScanned = (row: ShopProduct) => {
     if (row.product?.id) addQty(row.product.id, stepFor(row.product.unit));
-    toast.success(`Added ${row.product?.name}`);
+    toast.success(tf("Added {name}", { name: row.product?.name ?? "" }, locale));
   };
 
   const onVoice = (lines: VoiceLine[]) => {
@@ -96,36 +98,40 @@ export function BillingPage() {
       if (qty > 0) next[l.productId] = qty;
     });
     setCart(next);
-    toast.success(`Added ${lines.length} item${lines.length === 1 ? "" : "s"}`);
-    if (capped) toast.info(`${capped} item${capped === 1 ? " was" : "s were"} limited to what is in stock.`);
+    toast.success(tf(lines.length === 1 ? "Added {n} item" : "Added {n} items", { n: lines.length }, locale));
+    if (capped) {
+      toast.info(
+        tf(capped === 1 ? "{n} item was limited to what is in stock." : "{n} items were limited to what is in stock.", { n: capped }, locale),
+      );
+    }
   };
 
   return (
     <Shell active="Billing">
-      <p className="eyebrow">Billing</p>
-      <h1>Create a bill</h1>
+      <p className="eyebrow">{t("Billing", locale)}</p>
+      <h1>{t("Create a bill", locale)}</h1>
 
       <div className="flex gap-2 my-3">
         <input
           className="page-search min-w-0"
-          aria-label="Search billing products"
-          placeholder="Search products…"
+          aria-label={t("Search billing products", locale)}
+          placeholder={t("Search products…", locale)}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <Button size="icon" aria-label="Scan barcode" onClick={() => setScan(true)}>
+        <Button size="icon" aria-label={t("Scan barcode", locale)} onClick={() => setScan(true)}>
           <ScanLine />
         </Button>
-        <Button size="icon" variant="secondary" aria-label="Speak the bill" onClick={() => setVoice(true)}>
+        <Button size="icon" variant="secondary" aria-label={t("Speak the bill", locale)} onClick={() => setVoice(true)}>
           <Mic />
         </Button>
       </div>
 
-      {products.isLoading && <p className="py-6 text-center text-muted-foreground">Loading your products…</p>}
-      {products.isError && <p className="py-6 text-center text-destructive">Could not load products. Pull to retry.</p>}
+      {products.isLoading && <p className="py-6 text-center text-muted-foreground">{t("Loading your products…", locale)}</p>}
+      {products.isError && <p className="py-6 text-center text-destructive">{t("Could not load products. Pull to retry.", locale)}</p>}
       {products.data && products.data.length === 0 && (
         <p className="py-6 text-center text-muted-foreground">
-          Your shop has no products yet. Scan a barcode or start with a shelf photo from More.
+          {t("Your shop has no products yet. Scan a barcode or start with a shelf photo from More.", locale)}
         </p>
       )}
 
@@ -142,25 +148,25 @@ export function BillingPage() {
               <div className="min-w-0">
                 <div className="product-name">{row.product?.name}</div>
                 <div className="product-sub">
-                  {priceLabel(row.price, row.product?.unit)} · {formatQty(row.stock_qty ?? 0, row.product?.unit)} in stock ·{" "}
+                  {priceLabel(row.price, row.product?.unit, locale)} · {tf("{qty} in stock", { qty: formatQty(row.stock_qty ?? 0, row.product?.unit, locale) }, locale)} ·{" "}
                   <span className={`status-pill ${statusClass(row.stock_status)}`}>
-                    {STATUS_LABEL[row.stock_status ?? "in_stock"]}
+                    {t(STATUS_LABEL[row.stock_status ?? "in_stock"] ?? "", locale)}
                   </span>
                 </div>
               </div>
               <div className="quantity-controls">
                 {qty > 0 && (
                   <>
-                    <Button variant="outline" size="icon" aria-label={`Remove one ${row.product?.name}`} onClick={() => addQty(id, -step)}>
+                    <Button variant="outline" size="icon" aria-label={tf("Remove one {name}", { name: row.product?.name ?? "" }, locale)} onClick={() => addQty(id, -step)}>
                       <Minus />
                     </Button>
-                    <span>{formatQty(qty, row.product?.unit)}</span>
+                    <span>{formatQty(qty, row.product?.unit, locale)}</span>
                   </>
                 )}
                 <Button
                   variant="outline"
                   size="icon"
-                  aria-label={qty >= (row.stock_qty ?? 0) ? `No more ${row.product?.name} in stock` : `Add ${row.product?.name}`}
+                  aria-label={tf(qty >= (row.stock_qty ?? 0) ? "No more {name} in stock" : "Add {name}", { name: row.product?.name ?? "" }, locale)}
                   disabled={qty >= Math.max(0, row.stock_qty ?? 0)}
                   onClick={() => addQty(id, step)}
                 >
@@ -172,22 +178,22 @@ export function BillingPage() {
         })}
       </div>
       {products.data && shown.length === 0 && products.data.length > 0 && (
-        <p className="py-6 text-center text-muted-foreground">No matching products. Try a different name or scan it.</p>
+        <p className="py-6 text-center text-muted-foreground">{t("No matching products. Try a different name or scan it.", locale)}</p>
       )}
 
       <div className="flex justify-between mt-4 mb-2">
-        <span>{items.length} item{items.length === 1 ? "" : "s"}</span>
+        <span>{tf(items.length === 1 ? "{n} item" : "{n} items", { n: items.length }, locale)}</span>
         <strong>{rupees(total)}</strong>
       </div>
       <Button className="w-full" disabled={items.length === 0} onClick={() => { setDone(null); setReview(true); }}>
-        Review bill <ChevronRight />
+        {t("Review bill", locale)} <ChevronRight />
       </Button>
 
       <Dialog open={review} onOpenChange={setReview}>
         <DialogContent className="mobile-dialog">
-          <DialogTitle>{done ? "Bill saved" : "Review bill"}</DialogTitle>
+          <DialogTitle>{done ? t("Bill saved", locale) : t("Review bill", locale)}</DialogTitle>
           <DialogDescription>
-            {done ? "Stock has been updated." : "Check the quantities before confirming."}
+            {done ? t("Stock has been updated.", locale) : t("Check the quantities before confirming.", locale)}
           </DialogDescription>
           {done ? (
             <>
@@ -196,36 +202,36 @@ export function BillingPage() {
               {done.url && (
                 <Button
                   variant="outline"
-                  onClick={() => navigator.clipboard?.writeText(done.url!).then(() => toast.success("Link copied"))}
+                  onClick={() => navigator.clipboard?.writeText(done.url!).then(() => toast.success(t("Link copied", locale)))}
                 >
-                  Copy e-bill link
+                  {t("Copy e-bill link", locale)}
                 </Button>
               )}
-              <Button onClick={() => setReview(false)}>Start another bill</Button>
+              <Button onClick={() => setReview(false)}>{t("Start another bill", locale)}</Button>
             </>
           ) : (
             <>
               {items.map(({ id, qty, row }) => (
                 <div key={id} className="flex justify-between text-sm">
                   <span>
-                    {row.product?.name} × {formatQty(qty, row.product?.unit)}
-                    <span className="block text-muted-foreground">{priceLabel(row.price, row.product?.unit)}</span>
+                    {row.product?.name} × {formatQty(qty, row.product?.unit, locale)}
+                    <span className="block text-muted-foreground">{priceLabel(row.price, row.product?.unit, locale)}</span>
                   </span>
                   <strong>{rupees(lineTotal(row.price ?? 0, qty, row.product?.unit))}</strong>
                 </div>
               ))}
               <div className="flex justify-between border-t pt-3">
-                <strong>Total</strong>
+                <strong>{t("Total", locale)}</strong>
                 <strong>{rupees(total)}</strong>
               </div>
-              <select className="page-search" aria-label="Payment" value={payment} onChange={(e) => setPayment(e.target.value as PaymentMode)}>
-                <option value="cash">Cash</option>
-                <option value="upi">UPI</option>
-                <option value="card">Card</option>
-                <option value="other">Other</option>
+              <select className="page-search kn-select" aria-label={t("Payment", locale)} value={payment} onChange={(e) => setPayment(e.target.value as PaymentMode)}>
+                <option value="cash">{t("Cash", locale)}</option>
+                <option value="upi">{t("UPI", locale)}</option>
+                <option value="card">{t("Card", locale)}</option>
+                <option value="other">{t("Other", locale)}</option>
               </select>
               <Button disabled={createBill.isPending} onClick={() => void confirm()}>
-                {createBill.isPending ? "Saving…" : "Confirm bill"}
+                {createBill.isPending ? t("Saving…", locale) : t("Confirm bill", locale)}
               </Button>
             </>
           )}
