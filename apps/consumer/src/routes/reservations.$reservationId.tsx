@@ -52,15 +52,15 @@ function ReservationPage() {
   }
   const r = query.data;
   if (query.isError || !r) {
-    return <main className="app-main">{back}<div className="empty-state" role="alert"><Store /><h2>{t('Couldn’t load this request', locale)}</h2><p>{query.error instanceof Error ? query.error.message : t('Please try again.', locale)}</p><Button onClick={() => void query.refetch()}>{t('Try again', locale)}</Button></div></main>;
+    return <main className="app-main">{back}<div className="empty-state" role="alert"><Store /><h2>{t('Couldn’t load this request', locale)}</h2><p>{query.error instanceof Error ? t(query.error.message, locale) : t('Please try again.', locale)}</p><Button onClick={() => void query.refetch()}>{t('Try again', locale)}</Button></div></main>;
   }
 
   return <main className="app-main">
     {back}
     <div className="detail-header"><div className="detail-symbol"><Store /></div><h1>{r.shop?.name}</h1><p>{r.shop?.address}</p></div>
     <div className="detail-product" style={{ display: 'block' }}>
-      <span className={`availability ${tone(r.status)}`}>{STATUS_LABEL[r.status ?? ''] ?? r.status}</span>
-      <p className="mt-3 text-sm" role="status">{statusMessage(r)}</p>
+      <span className={`availability ${tone(r.status)}`}>{t(STATUS_LABEL[r.status ?? ''] ?? r.status ?? '', locale)}</span>
+      <p className="mt-3 text-sm" role="status">{statusMessage(r, locale)}</p>
     </div>
     <div className="section-heading"><h2>{t('Your items', locale)}</h2></div>
     <div className="detail-product" style={{ display: 'block' }}>
@@ -78,6 +78,6 @@ function ReservationPage() {
       {r.shop?.address && <Button variant="secondary" asChild><a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${r.shop.name ?? ''} ${r.shop.address}`)}`} target="_blank" rel="noopener noreferrer"><MapPin />{t('Directions', locale)}</a></Button>}
       {isOpen(r.status) && <Button variant="ghost" disabled={cancel.isPending} onClick={() => cancel.mutate()}>{cancel.isPending ? t('Cancelling…', locale) : t('Cancel request', locale)}</Button>}
     </div>
-    {cancel.isError && <p className="mt-3 text-sm text-warning" role="alert">{cancel.error instanceof Error ? cancel.error.message : t('Could not cancel.', locale)}</p>}
+    {cancel.isError && <p className="mt-3 text-sm text-warning" role="alert">{cancel.error instanceof Error ? t(cancel.error.message, locale) : t('Could not cancel.', locale)}</p>}
   </main>;
 }

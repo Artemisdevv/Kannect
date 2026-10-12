@@ -107,12 +107,12 @@ export function ShopperShell({ children }: { children: ReactNode }) {
   return <Context.Provider value={{ area, query, setQuery, resetSearch, nearby, nearbyLoading, nearbyError, response, loading, error, offline, search, locationOpen, setLocationOpen, hasLocation: !!coordinates }}>
     <div className="app-shell">
       <header className="app-header">
-        <Link to="/" className="brand min-w-0" aria-label="Kannect home"><span className="brand-mark"><ShoppingBag /></span><span>Kannect<span className="text-accent-foreground">.</span></span></Link>
-        <Button variant="ghost" className="area-button px-2" onClick={() => setLocationOpen(true)} aria-label="Choose your area"><MapPin className="text-accent-foreground" /><span className="min-w-0"><small>Looking around</small><strong className="max-w-32 truncate">{area}</strong></span><ChevronDown className="size-3" /></Button>
+        <Link to="/" className="brand min-w-0" aria-label={t('Kannect home', locale)}><span className="brand-mark"><ShoppingBag /></span><span>Kannect<span className="text-accent-foreground">.</span></span></Link>
+        <Button variant="ghost" className="area-button px-2" onClick={() => setLocationOpen(true)} aria-label={t('Choose your area', locale)}><MapPin className="text-accent-foreground" /><span className="min-w-0"><small>{t('Looking around', locale)}</small><strong className="max-w-32 truncate">{area}</strong></span><ChevronDown className="size-3" /></Button>
       </header>
       {offline && <div className="offline-banner flex items-center gap-2" role="status"><WifiOff size={15} />{t('You’re offline. Reconnect to check live shop availability.', locale)}</div>}
       {children}
-      <nav className="bottom-nav" aria-label="Main navigation">
+      <nav className="bottom-nav" aria-label={t('Main navigation', locale)}>
         <Link to="/" className="nav-item" activeOptions={{ exact: true }} activeProps={{ className: 'active' }}><Store /><span>{t('Nearby shops', locale)}</span></Link>
         <Link to="/search" className="nav-item nav-search" activeOptions={{ exact: true }} activeProps={{ className: 'active' }} onClick={() => { if (pathname === '/search') resetSearch(); }}><Search /><span>{t('Search', locale)}</span></Link>
         <Link to="/reservations" className="nav-item" activeProps={{ className: 'active' }}><HandHelping /><span>{t('Requests', locale)}</span></Link>
@@ -120,7 +120,7 @@ export function ShopperShell({ children }: { children: ReactNode }) {
       </nav>
       <Dialog open={locationOpen} onOpenChange={setLocationOpen}><DialogContent><DialogHeader><DialogTitle>{t('Your neighbourhood', locale)}</DialogTitle><DialogDescription>{t('Choose an area, or send your location to find shops nearby. This app does not save your precise coordinates.', locale)}</DialogDescription></DialogHeader>
         <Button variant="botanical" onClick={locate} disabled={locating}>{locating ? <Loader2 className="animate-spin" /> : <LocateFixed />}{locating ? t('Finding your location…', locale) : t('Use my location', locale)}</Button>
-        {locationMessage && <p className="text-xs leading-relaxed text-warning" role="alert">{locationMessage}</p>}
+        {locationMessage && <p className="text-xs leading-relaxed text-warning" role="alert">{t(locationMessage, locale)}</p>}
         <p className="text-xs text-muted-foreground">{t('Or choose an area in Kochi', locale)}</p>
         <div className="grid gap-2">{areas.map(a => <Button key={a} variant={a === area ? 'secondary' : 'outline'} onClick={() => chooseArea(a)}><MapPin />{a}</Button>)}</div>
         <form className="flex gap-2" onSubmit={e => { e.preventDefault(); chooseArea(manualArea); }}><Input aria-label={t('Another area', locale)} placeholder={t('Enter another area', locale)} value={manualArea} onChange={e => setManualArea(e.target.value)} /><Button type="submit" disabled={!manualArea.trim()}>{t('Choose', locale)}</Button></form>

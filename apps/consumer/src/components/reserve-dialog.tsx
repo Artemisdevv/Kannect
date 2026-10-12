@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { parsePhone, tidy } from '@/lib/phone';
 import { createReservation, saveContact, saveReservation, savedContact } from '@/lib/reservations';
 import { rupees } from '@/lib/shopper';
+import { t, useLocale } from '@/lib/i18n';
 
 export type ReserveLine = { productId: string; name: string; unit: 'piece' | 'gram'; price: number; quantity: number };
 
@@ -17,6 +18,7 @@ export function ReserveDialog({ open, onOpenChange, shop, lines, onDone }: {
   open: boolean; onOpenChange: (open: boolean) => void;
   shop: { id: string; name: string }; lines: ReserveLine[]; onDone: () => void;
 }) {
+  const locale = useLocale();
   const navigate = useNavigate();
   const saved = savedContact();
   const [name, setName] = useState(saved.name);
@@ -30,7 +32,7 @@ export function ReserveDialog({ open, onOpenChange, shop, lines, onDone }: {
 
   const parsed = parsePhone(phone);
   const cleanName = tidy(name);
-  const nameError = cleanName.length < 2 ? 'Enter your name so the shop knows who is coming.' : '';
+  const nameError = cleanName.length < 2 ? t('Enter your name so the shop knows who is coming.', locale) : '';
   const total = lines.reduce((sum, l) => sum + lineTotal(l), 0);
 
   async function submit() {
@@ -43,7 +45,7 @@ export function ReserveDialog({ open, onOpenChange, shop, lines, onDone }: {
         ...(tidy(note) ? { note: tidy(note) } : {}),
         items: lines.map(l => ({ productId: l.productId, quantity: l.quantity })),
       });
-      if (!res.id || !res.access_token) throw new Error('The shop did not confirm your request. Please try again.');
+      if (!res.id || !res.access_token) throw new Error(t('The shop did not confirm your request. Please try again.', locale));
       saveContact({ name: cleanName, phone });
       saveReservation({ id: res.id, token: res.access_token, shopName: shop.name, at: Date.now() });
       clientId.current = crypto.randomUUID();
@@ -56,21 +58,21 @@ export function ReserveDialog({ open, onOpenChange, shop, lines, onDone }: {
   }
 
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent>
-    <DialogHeader><DialogTitle>Reserve at {shop.name}</DialogTitle>
-      <DialogDescription>These are set aside for you while the shop answers (they have 10 minutes). You pay at the shop when you collect. No payment now.</DialogDescription></DialogHeader>
+    <DialogHeader><DialogTitle>{t('Reserve at ', locale)}{shop.name}</DialogTitle>
+      <DialogDescription>{t('These are set aside for you while the shop answers (they have 10 minutes). You pay at the shop when you collect. No payment now.', locale)}</DialogDescription></DialogHeader>
     <div className="rounded-2xl bg-secondary p-3 text-sm space-y-1">
       {lines.map(l => <div key={l.productId} className="flex justify-between gap-3"><span>{l.name} × {qtyLabel(l.quantity, l.unit)}</span><strong>{rupees(lineTotal(l))}</strong></div>)}
-      <div className="flex justify-between border-t pt-1 font-semibold"><span>Estimated total</span><span>{rupees(total)}</span></div>
+      <div className="flex justify-between border-t pt-1 font-semibold"><span>{t('Estimated total', locale)}</span><span>{rupees(total)}</span></div>
     </div>
     <form className="grid gap-3" onSubmit={e => { e.preventDefault(); void submit(); }}>
-      <div><Input aria-label="Your name" placeholder="Your name" maxLength={80} autoComplete="name" value={name} aria-invalid={touched && !!nameError} onChange={e => setName(e.target.value)} />
+      <div><Input aria-label={t('Your name', locale)} placeholder={t('Your name', locale)} maxLength={80} autoComplete="name" value={name} aria-invalid={touched && !!nameError} onChange={e => setName(e.target.value)} />
         {touched && nameError && <p className="text-xs text-warning mt-1" role="alert">{nameError}</p>}</div>
-      <div><Input aria-label="Mobile number" placeholder="Mobile number" type="tel" inputMode="tel" autoComplete="tel" value={phone} aria-invalid={touched && !!parsed.error} onChange={e => setPhone(e.target.value)} />
-        {touched && parsed.error && <p className="text-xs text-warning mt-1" role="alert">{parsed.error}</p>}
-        <p className="text-xs text-muted-foreground mt-1">The shop may call you. Your number is only shared with this shop.</p></div>
-      <Input aria-label="Note for the shop (optional)" placeholder="Note for the shop (optional)" maxLength={300} value={note} onChange={e => setNote(e.target.value)} />
-      {error && <p className="text-sm text-warning" role="alert">{error}</p>}
-      <Button type="submit" disabled={busy}>{busy ? <><Loader2 className="animate-spin" />Sending…</> : 'Send request'}</Button>
+      <div><Input aria-label={t('Mobile number', locale)} placeholder={t('Mobile number', locale)} type="tel" inputMode="tel" autoComplete="tel" value={phone} aria-invalid={touched && !!parsed.error} onChange={e => setPhone(e.target.value)} />
+        {touched && parsed.error && <p className="text-xs text-warning mt-1" role="alert">{t(parsed.error, locale)}</p>}
+        <p className="text-xs text-muted-foreground mt-1">{t('The shop may call you. Your number is only shared with this shop.', locale)}</p></div>
+      <Input aria-label={t('Note for the shop (optional)', locale)} placeholder={t('Note for the shop (optional)', locale)} maxLength={300} value={note} onChange={e => setNote(e.target.value)} />
+      {error && <p className="text-sm text-warning" role="alert">{t(error, locale)}</p>}
+      <Button type="submit" disabled={busy}>{busy ? <><Loader2 className="animate-spin" />{t('Sending…', locale)}</> : t('Send request', locale)}</Button>
     </form>
   </DialogContent></Dialog>;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { textElement } from "@/lib/safe-dom";
 import { type MapShop, type StockStatus } from "@/lib/shopper";
+import { t, useLocale } from "@/lib/i18n";
 import "leaflet/dist/leaflet.css";
 
 const colors: Record<StockStatus, string> = {
@@ -18,6 +19,7 @@ export function ShopMap({
   selectedId?: string | undefined;
   onSelect: (id: string) => void;
 }) {
+  const locale = useLocale();
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<import("leaflet").Map | null>(null);
   const markers = useRef(new Map<string, import("leaflet").CircleMarker>());
@@ -98,35 +100,34 @@ export function ShopMap({
             ref={container}
             className="shop-map"
             role="region"
-            aria-label="Map of nearby shops"
+            aria-label={t('Map of nearby shops', locale)}
           />
-          <div className="map-legend" aria-label="Availability marker key">
+          <div className="map-legend" aria-label={t('Availability marker key', locale)}>
             <span>
               <i className="in_stock" />
-              In stock
+              {t('In stock', locale)}
             </span>
             <span>
               <i className="low" />
-              Low
+              {t('Low', locale)}
             </span>
             <span>
               <i className="out" />
-              Out
+              {t('Out', locale)}
             </span>
             <span>
               <i className="mixed" />
-              Mixed or not applicable
+              {t('Mixed or not applicable', locale)}
             </span>
           </div>
           <span className="sr-only">
-            {positioned.length} shops shown on map.
+            {positioned.length} {t('shops shown on map.', locale)}
           </span>
         </>
       )}
       {!positioned.length && (
         <p className="map-note">
-          No shops in these results have saved map coordinates. The accessible
-          shop list is below.
+          {t('No shops in these results have saved map coordinates. The accessible shop list is below.', locale)}
         </p>
       )}
     </div>

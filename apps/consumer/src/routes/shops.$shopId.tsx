@@ -30,7 +30,7 @@ function ShopDetail() {
   const [reserving, setReserving] = useState(false);
 
   if (page.isLoading) return <main className="app-main"><div className="empty-state" role="status"><Loader2 className="animate-spin" /><h2>{t('Loading shop…', locale)}</h2></div></main>;
-  if (page.isError || !page.data) return <main className="app-main"><div className="empty-state" role="alert"><Store /><h1>{t('Shop not found', locale)}</h1><p>{page.error instanceof Error ? page.error.message : t('We couldn’t load this shop.', locale)}</p><Button asChild><Link to="/search">{t('Back to search', locale)}</Link></Button></div></main>;
+  if (page.isError || !page.data) return <main className="app-main"><div className="empty-state" role="alert"><Store /><h1>{t('Shop not found', locale)}</h1><p>{page.error instanceof Error ? t(page.error.message, locale) : t('We couldn’t load this shop.', locale)}</p><Button asChild><Link to="/search">{t('Back to search', locale)}</Link></Button></div></main>;
 
   const { shop, products } = page.data;
   const change = (p: Item, delta: number) => setCart(c => {

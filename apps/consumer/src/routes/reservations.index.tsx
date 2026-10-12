@@ -48,7 +48,7 @@ function ReservationsPage() {
             <div className="min-w-0">
               <h3>{r?.shop?.name ?? s.shopName}</h3>
               <p>{r ? `${count} ${count === 1 ? t('item', locale) : t('items', locale)} · ${rupees(r.total ?? 0)}` : results[i]?.isError ? t('Couldn’t check just now', locale) : t('Checking…', locale)}</p>
-              {r && <div className="shop-meta"><span className={`availability ${tone(r.status)}`}>{STATUS_LABEL[r.status ?? ''] ?? r.status}</span></div>}
+              {r && <div className="shop-meta"><span className={`availability ${tone(r.status)}`}>{t(STATUS_LABEL[r.status ?? ''] ?? r.status ?? '', locale)}</span></div>}
             </div>
             <Button variant="ghost" size="icon" asChild>
               <Link to="/reservations/$reservationId" params={{ reservationId: s.id }} aria-label={t('Open request', locale)}><ArrowUpRight /></Link>
