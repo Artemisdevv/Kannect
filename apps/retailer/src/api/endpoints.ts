@@ -149,6 +149,25 @@ async function postFile<T>(path: string, field: string, files: Blob[], params = 
   return body as T;
 }
 
+/** The shop's own data as a spreadsheet (CSV): products and prices, every sale line, stock changes. */
+export async function exportShopCsv(): Promise<Blob> {
+  const token = getToken();
+  const response = await fetch(`${API_URL}/shop/export?format=csv`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (response.status === 401 && token) clearSession();
+  if (!response.ok) {
+    const body = await response.json().catch(() => undefined);
+    throw new ApiError(
+      response.status,
+      body?.error?.code ?? "internal",
+      body?.error?.message ?? `Request failed (${response.status})`,
+      body,
+    );
+  }
+  return response.blob();
+}
+
 /** Up to 6 shelf photos. `thorough` re-reads zoomed tiles: better, but about 30 s per photo. */
 export function shelfPhoto(images: Blob[], thorough = true) {
   return postFile<Ok<"/shop/ai/shelf-photo", "post">>(

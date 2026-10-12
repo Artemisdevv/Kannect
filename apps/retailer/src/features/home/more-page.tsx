@@ -1,11 +1,15 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Camera, ChevronRight, ClipboardCheck, HandHelping, LogOut, Users } from "lucide-react";
+import { Camera, ChevronRight, ClipboardCheck, Download, HandHelping, Loader2, LogOut, Users } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { signOut } from "@/api";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { exportShopCsv, signOut } from "@/api";
 import { Shell, useShop } from "@/components/kannect/shell";
 import { Button } from "@/components/ui/button";
 import { shopTypeLabel } from "@/lib/format";
+import { saveFile } from "@/lib/save-file";
 import { t, useLocale } from "@/lib/i18n";
 
 export function MorePage() {
@@ -13,6 +17,20 @@ export function MorePage() {
   const shop = useShop();
   const navigate = useNavigate();
   const qc = useQueryClient();
+
+  const [exporting, setExporting] = useState(false);
+  const exportData = async () => {
+    setExporting(true);
+    try {
+      const csv = await exportShopCsv();
+      await saveFile(`kannect-${new Date().toISOString().slice(0, 10)}.csv`, csv, t("Kannect shop data", locale));
+      toast.success(t("Your data is ready", locale));
+    } catch {
+      toast.error(t("Could not export your data. Try again.", locale));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const logout = async () => {
     signOut();
@@ -47,6 +65,15 @@ export function MorePage() {
             </Link>
           </Button>
         ))}
+        <Button variant="ghost" className="w-full justify-between rounded-none h-16 px-4" disabled={exporting} onClick={() => void exportData()}>
+          <span className="flex items-center gap-3">
+            {exporting ? <Loader2 className="animate-spin" /> : <Download />}
+            <span className="text-left">
+              {exporting ? t("Preparing your file…", locale) : t("Export my data", locale)}
+              <span className="block text-xs text-muted-foreground font-normal">{t("Download your sales and stock as a spreadsheet", locale)}</span>
+            </span>
+          </span>
+        </Button>
       </div>
 
       <div className="list-surface mt-4 p-4 text-sm space-y-1">

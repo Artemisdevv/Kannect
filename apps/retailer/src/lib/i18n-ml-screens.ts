@@ -308,4 +308,15 @@ export const screensMl: Record<string, string> = {
 
   // stock
   "Count {name}": "{name} എണ്ണുക",
+
+  // WhatsApp share and data export
+  "Send on WhatsApp": "വാട്സ്ആപ്പിൽ അയയ്ക്കുക",
+  "Your bill from {shop}: {amount}. See it here: {url}": "{shop} ൽ നിന്നുള്ള നിങ്ങളുടെ ബിൽ: {amount}. ഇവിടെ കാണാം: {url}",
+  "Your bill: {amount}. See it here: {url}": "നിങ്ങളുടെ ബിൽ: {amount}. ഇവിടെ കാണാം: {url}",
+  "Export my data": "എന്റെ ഡാറ്റ എക്സ്പോർട്ട് ചെയ്യുക",
+  "Preparing your file…": "ഫയൽ തയ്യാറാക്കുന്നു…",
+  "Download your sales and stock as a spreadsheet": "നിങ്ങളുടെ വിൽപ്പനയും സ്റ്റോക്കും സ്പ്രെഡ്ഷീറ്റായി ഡൗൺലോഡ് ചെയ്യുക",
+  "Kannect shop data": "കണക്ട് കടയുടെ ഡാറ്റ",
+  "Your data is ready": "നിങ്ങളുടെ ഡാറ്റ തയ്യാറാണ്",
+  "Could not export your data. Try again.": "ഡാറ്റ എക്സ്പോർട്ട് ചെയ്യാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",
 };

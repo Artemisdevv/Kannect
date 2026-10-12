@@ -1,15 +1,16 @@
-import { ChevronRight, CircleCheck, Mic, Minus, Package, Plus, ScanLine } from "lucide-react";
+import { ChevronRight, CircleCheck, MessageCircle, Mic, Minus, Package, Plus, ScanLine } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError, type ShopProduct } from "@/api";
-import { Shell } from "@/components/kannect/shell";
+import { Shell, useShop } from "@/components/kannect/shell";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useCreateBill, useShopProducts } from "@/features/queries";
 import { ScanDialog } from "@/features/scan/scan-dialog";
 import { clampToStock, formatQty, lineTotal, newId, priceLabel, rupees, STATUS_LABEL, statusClass, stepFor } from "@/lib/format";
 import { t, tf, useLocale } from "@/lib/i18n";
+import { billShareText, whatsappLink } from "@/lib/share";
 
 import { VoiceDialog, type VoiceLine } from "./voice-dialog";
 
@@ -17,6 +18,7 @@ type PaymentMode = "cash" | "upi" | "card" | "other";
 
 export function BillingPage() {
   const locale = useLocale();
+  const shop = useShop();
   const products = useShopProducts();
   const createBill = useCreateBill();
   const [search, setSearch] = useState("");
@@ -199,6 +201,17 @@ export function BillingPage() {
             <>
               <CircleCheck className="text-primary mx-auto" size={48} />
               <p className="text-center text-lg font-semibold">{rupees(done.total)}</p>
+              {done.url && (
+                <Button asChild>
+                  <a
+                    href={whatsappLink(billShareText({ shop: shop?.name, total: done.total, url: done.url }, locale))}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <MessageCircle /> {t("Send on WhatsApp", locale)}
+                  </a>
+                </Button>
+              )}
               {done.url && (
                 <Button
                   variant="outline"
