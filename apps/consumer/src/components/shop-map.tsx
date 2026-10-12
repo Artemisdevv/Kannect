@@ -55,6 +55,13 @@ export function ShopMap({
             '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         },
       ).addTo(leafletMap);
+      // The view must be set before any marker is added: Leaflet throws while drawing a circle on a
+      // map that has no centre yet, and then no dot is drawn at all.
+      const points: [number, number][] = positioned.flatMap((shop) =>
+        shop.coordinates ? [[shop.coordinates.latitude, shop.coordinates.longitude] as [number, number]] : [],
+      );
+      if (origin) points.push([origin.latitude, origin.longitude]);
+      leafletMap.fitBounds(L.latLngBounds(points).pad(0.2), { maxZoom: 16 });
       const layer = L.featureGroup().addTo(leafletMap);
       for (const shop of positioned) {
         if (!shop.coordinates) continue;
@@ -77,15 +84,12 @@ export function ShopMap({
         marker.on("click", () => selectRef.current(shop.id));
         markers.current.set(shop.id, marker);
       }
-      const bounds = layer.getBounds();
       if (origin) {
         const here: [number, number] = [origin.latitude, origin.longitude];
         L.circleMarker(here, { radius: 18, weight: 0, fillColor: "#2563eb", fillOpacity: 0.18, interactive: false }).addTo(leafletMap);
         const you = L.circleMarker(here, { radius: 8, color: "#fff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }).addTo(leafletMap);
         you.bindTooltip(textElement(t("You are here", locale)), { direction: "top", permanent: true });
-        bounds.extend(here);
       }
-      leafletMap.fitBounds(bounds.pad(0.2), { maxZoom: 16 });
       cleanup = () => {
         markers.current.clear();
         leafletMap.remove();

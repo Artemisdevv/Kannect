@@ -53,7 +53,7 @@ export function ShopperShell({ children }: { children: ReactNode }) {
   }, [area, coordinates]);
   // Ask for the shopper's position once on launch so they appear on the map. If it is refused or
   // unavailable nothing is shown; the area list and the "Show where I am" button still work.
-  useEffect(() => { locate(false); // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { locate(false, true); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     const update = () => setOffline(!navigator.onLine);
@@ -101,10 +101,11 @@ export function ShopperShell({ children }: { children: ReactNode }) {
     if (!isKnownArea(value.trim())) { setLocationMessage('We don’t cover that area yet. Choose one from the list, or use your location.'); return; }
     resetSearch(); setArea(value.trim()); setCoordinates(undefined); setLocationOpen(false); setLocationMessage('');
   }
-  function locate(openDialogOnError = true) {
+  // `silent` is the automatic try on launch: it must not lock the buttons while a permission prompt is open
+  function locate(openDialogOnError = true, silent = false) {
     setLocationMessage('');
     if (!navigator.geolocation) { setLocationMessage('Location isn’t available on this device. Choose an area below.'); if (openDialogOnError) setLocationOpen(true); return; }
-    setLocating(true);
+    if (!silent) setLocating(true);
     navigator.geolocation.getCurrentPosition(position => {
       resetSearch(); setCoordinates({ latitude: position.coords.latitude, longitude: position.coords.longitude });
       setLocating(false); setArea('Your location'); setResponse(null); setLocationOpen(false);
