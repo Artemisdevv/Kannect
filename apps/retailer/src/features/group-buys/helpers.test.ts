@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_PACKS, clampPacks, isClosed, packSizeLabel, productLabel, tierProgress } from "./helpers";
+import { MAX_PACKS, clampPacks, deadlineLabel, isClosed, packSizeLabel, productLabel, tierProgress } from "./helpers";
 
 const tiers = [
   { min_packs: 40, price: 80 },
@@ -72,5 +72,42 @@ describe("labels", () => {
     expect(packSizeLabel(12, "piece")).toBe("12 pcs per pack");
     expect(packSizeLabel(1000, "gram")).toBe("1000 g per pack");
     expect(packSizeLabel(undefined, undefined)).toBe("");
+  });
+});
+
+describe("deadlineLabel", () => {
+  const now = Date.parse("2026-10-12T10:00:00Z");
+  const at = (ms: number) => new Date(now + ms).toISOString();
+  const H = 3600000;
+
+  it("counts days, hours and minutes in plain words", () => {
+    expect(deadlineLabel(at(3 * 24 * H), "en", now)).toBe("in 3 days");
+    expect(deadlineLabel(at(24 * H), "en", now)).toBe("in 1 day");
+    expect(deadlineLabel(at(5 * H), "en", now)).toBe("in 5 hours");
+    expect(deadlineLabel(at(H), "en", now)).toBe("in 1 hour");
+    expect(deadlineLabel(at(30 * 60000), "en", now)).toBe("in 30 minutes");
+    expect(deadlineLabel(at(60000), "en", now)).toBe("in 1 minute");
+  });
+
+  it("says it is about to close, then that it has closed", () => {
+    expect(deadlineLabel(at(20000), "en", now)).toBe("in less than a minute");
+    expect(deadlineLabel(at(0), "en", now)).toBe("Closed");
+    expect(deadlineLabel(at(-H), "en", now)).toBe("Closed");
+  });
+
+  it("shows a dash when there is no usable deadline", () => {
+    expect(deadlineLabel(undefined, "en", now)).toBe("—");
+    expect(deadlineLabel("soon", "en", now)).toBe("—");
+  });
+
+  it("is fully Malayalam when the language is Malayalam", () => {
+    for (const ms of [3 * 24 * H, H, 30 * 60000, 20000, -H]) {
+      expect(deadlineLabel(at(ms), "ml", now)).not.toMatch(/[A-Za-z]/);
+    }
+  });
+
+  it("describes the pack size in Malayalam too", () => {
+    expect(packSizeLabel(12, "piece", "ml")).not.toMatch(/[A-Za-z]/);
+    expect(packSizeLabel(1000, "gram", "ml")).not.toMatch(/[A-Za-z]/);
   });
 });
