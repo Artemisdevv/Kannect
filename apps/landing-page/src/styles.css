@@ -296,3 +296,13 @@ h1, h2 { margin: 0; font: 500 clamp(64px, 9.2vw, 122px)/.91 "Manrope", sans-seri
   .landing__intro-curtain { display: none; }
   .hero h1, .header, .hero__copy, .hero__actions, .hero__chapter, .ticker, .network, .roles, .rhythm, .download, .closing, .footer { opacity: 1; animation: none; }
 }
+
+.download__app-button { text-decoration: none; }
+.download__app-meta { margin-left: 4px; font-size: 10px; opacity: .78; letter-spacing: .02em; }
+.download__fineprint { max-width: 420px; }
+.download__fineprint a, .download__qr-card a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.download__apps { display: flex; flex-direction: column; gap: 10px; width: min(100%, 420px); margin: 0 auto 6px; }
+.download__app-link { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border: 1px solid rgba(255, 226, 180, .4); border-radius: 999px; color: #fff3e4; background: rgba(180, 106, 53, .32); text-decoration: none; transition: background .2s, transform .2s; }
+.download__app-link:hover, .download__app-link:focus-visible { background: rgba(180, 106, 53, .6); transform: translateY(-1px); }
+.download__app-link strong { font-size: 14px; }
+.download__app-link .download__app-meta { margin-left: auto; }

@@ -52,17 +52,12 @@ function NetworkIllustration() {
   );
 }
 
-function QrPlaceholder() {
-  return (
-    <div className="qr-placeholder" aria-label="QR code will be added when the Android APK is ready">
-      <div className="qr-placeholder__grid" aria-hidden="true">
-        <span className="qr-finder qr-finder--tl" /><span className="qr-finder qr-finder--tr" />
-        <span className="qr-finder qr-finder--bl" /><span className="qr-dots" /><span className="qr-stamp">k</span>
-      </div>
-      <span className="qr-placeholder__caption">SCAN TO GET THE APP</span>
-    </div>
-  );
-}
+const RELEASES = "https://github.com/Artemisdevv/Kannect/releases";
+const downloads = [
+  { app: "Consumer", who: "For shoppers", file: "kannect-consumer.apk", size: "5.5 MB" },
+  { app: "Retailer", who: "For shopkeepers", file: "kannect-retailer.apk", size: "29 MB" },
+  { app: "Supplier", who: "For suppliers", file: "kannect-supplier.apk", size: "5.4 MB" },
+];
 
 export default function App() {
   return (
@@ -204,16 +199,16 @@ export default function App() {
         <div className="download__copy">
           <p className="section-label"><span>04</span> TAKE കnnect WITH YOU</p>
           <h2>Your neighbourhood<br />is <em>just around the corner.</em></h2>
-          <p>Bring the local loop along for the day. Separate Android apps for shoppers, shops and suppliers are on the way.</p>
+          <p>Bring the local loop along for the day. Pick the Android app that fits your side of the counter.</p>
           <div className="download__apps" aria-label="Android apps">
-            {["Consumer", "Retailer", "Supplier"].map((app) => <SpecularButton key={app} className="button button--disabled download__app-button" size="md" radius={999} tint="#764b2d" tintOpacity={0.1} textColor="#f5dec4" lineColor="#d7a16b" baseColor="#76502f" intensity={0.38} idleIntensity={0.08} shineSize={5} shineFade={22} thickness={0.8} glow={0.35} followMouse={false} blur={0} disabled><span className="button__android">◉</span> {app} <span className="button__coming-soon">Coming soon</span></SpecularButton>)}
+            {downloads.map(({ app, who, file, size }) => <a key={app} className="download__app-link" href={`${RELEASES}/latest/download/${file}`} download><span className="button__android">◉</span><strong>{app}</strong><span className="download__app-meta">{who} · {size}</span><span className="button-arrow">↓</span></a>)}
           </div>
-          <span className="download__fineprint">APK links and app specific QR codes will go live with each release.</span>
+          <span className="download__fineprint">Open the file on your phone and allow installs from your browser when asked. These are demo builds. <a href={RELEASES}>All releases</a></span>
         </div>
         <div className="download__device-wrap">
           <div className="download__glow" aria-hidden="true" /><div className="download__halo download__halo--one" /><div className="download__halo download__halo--two" />
           <div className="download__device"><div className="download__device-top"><img src="/branding/app-icon.ico" alt="കnnect" /><span>•••</span></div><div className="download__device-art"><div className="download__device-sun" /><div className="download__device-hill download__device-hill--back" /><div className="download__device-hill download__device-hill--front" /><div className="download__device-shop">⌂</div></div><div className="download__device-caption"><span>GOOD THINGS</span><strong>move locally.</strong><i>Find your neighbourhood.</i></div><div className="download__device-dots"><i /><i /><i /></div></div>
-          <div className="download__qr-card"><QrPlaceholder /><div><span>ANDROID</span><strong>Ready when you are.</strong><small>APK + QR arriving soon</small></div></div>
+          <div className="download__qr-card"><div><span>ANDROID</span><strong>Free demo builds.</strong><small><a href={RELEASES}>See every release ↗</a></small></div></div>
         </div>
       </section>
 
