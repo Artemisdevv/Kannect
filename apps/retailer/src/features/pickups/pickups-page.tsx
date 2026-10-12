@@ -8,13 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { usePickupActions, usePickups } from "@/features/queries";
 import { formatQty, rupees } from "@/lib/format";
+import { t, tf, useLocale, type Locale } from "@/lib/i18n";
 
 const HOLD_CHOICES = [
   { minutes: 60, label: "1 hour" },
   { minutes: 120, label: "2 hours" },
   { minutes: 240, label: "4 hours" },
   { minutes: 480, label: "Today (8 h)" },
-];
+]; // i18n-ignore: translated where they are shown
 
 const STATUS_TEXT: Record<string, string> = {
   requested: "New request",
@@ -25,9 +26,9 @@ const STATUS_TEXT: Record<string, string> = {
   expired: "Hold ran out",
 };
 
-function when(iso?: string | null) {
+function when(iso: string | null | undefined, locale: Locale) {
   if (!iso) return "";
-  return new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+  return new Date(iso).toLocaleString(locale === "ml" ? "ml-IN" : "en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
 
 const message = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback);
@@ -35,6 +36,7 @@ const message = (e: unknown, fallback: string) => (e instanceof ApiError ? e.mes
 type Action = { kind: "accept" | "decline" | "collect"; reservation: Reservation };
 
 export function PickupsPage() {
+  const locale = useLocale();
   const pickups = usePickups();
   const actions = usePickupActions();
   const [action, setAction] = useState<Action | null>(null);
@@ -60,17 +62,17 @@ export function PickupsPage() {
     try {
       if (action.kind === "accept") {
         await actions.accept.mutateAsync({ id, holdMinutes: hold });
-        toast.success("Accepted. The shopper can see it is held for them.");
+        toast.success(t("Accepted. The shopper can see it is held for them.", locale));
       } else if (action.kind === "decline") {
         await actions.decline.mutateAsync({ id, ...(reason.trim() ? { reason: reason.trim() } : {}) });
-        toast.success("Declined");
+        toast.success(t("Declined", locale));
       } else {
         await actions.collect.mutateAsync({ id, paymentMode: payment });
-        toast.success("Handed over and billed");
+        toast.success(t("Handed over and billed", locale));
       }
       setAction(null);
     } catch (e) {
-      toast.error(message(e, "Could not update this request."));
+      toast.error(message(e, t("Could not update this request.", locale)));
     }
   };
 
@@ -82,8 +84,8 @@ export function PickupsPage() {
         <div className="min-w-0">
           <div className="product-name">{r.customer_name}</div>
           <div className="product-sub">
-            {STATUS_TEXT[r.status ?? ""] ?? r.status} · asked {when(r.created_at)}
-            {r.status === "accepted" && r.hold_until ? ` · held until ${when(r.hold_until)}` : ""}
+            {tf("{status} · asked {time}", { status: STATUS_TEXT[r.status ?? ""] ? t(STATUS_TEXT[r.status ?? ""]!, locale) : (r.status ?? ""), time: when(r.created_at, locale) }, locale)}
+            {r.status === "accepted" && r.hold_until ? tf(" · held until {time}", { time: when(r.hold_until, locale) }, locale) : ""}
           </div>
         </div>
         <strong>{rupees(r.total)}</strong>
@@ -91,35 +93,35 @@ export function PickupsPage() {
       <ul className="text-sm space-y-0.5">
         {(r.items ?? []).map((i) => (
           <li key={i.product_id}>
-            {i.name} × {formatQty(i.quantity, i.unit)}
+            {i.name} × {formatQty(i.quantity, i.unit, locale)}
           </li>
         ))}
       </ul>
       {r.note && <p className="text-xs rounded-xl bg-secondary p-2">“{r.note}”</p>}
-      {r.decline_reason && <p className="text-xs text-muted-foreground">Reason given: {r.decline_reason}</p>}
+      {r.decline_reason && <p className="text-xs text-muted-foreground">{tf("Reason given: {reason}", { reason: r.decline_reason }, locale)}</p>}
       <div className="flex flex-wrap gap-2 pt-1">
         <Button size="sm" variant="outline" asChild>
           <a href={`tel:${r.customer_phone}`}>
-            <Phone /> Call
+            <Phone /> {t("Call", locale)}
           </a>
         </Button>
         {r.status === "requested" && (
           <>
             <Button size="sm" onClick={() => open("accept", r)}>
-              <Check /> Accept
+              <Check /> {t("Accept", locale)}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => open("decline", r)}>
-              <X /> Decline
+              <X /> {t("Decline", locale)}
             </Button>
           </>
         )}
         {r.status === "accepted" && (
           <>
             <Button size="sm" onClick={() => open("collect", r)}>
-              <PackageCheck /> Handed over
+              <PackageCheck /> {t("Handed over", locale)}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => open("decline", r)}>
-              <X /> Release
+              <X /> {t("Release", locale)}
             </Button>
           </>
         )}
@@ -129,33 +131,33 @@ export function PickupsPage() {
 
   return (
     <Shell active="Orders">
-      <p className="eyebrow">Shoppers asking you to set items aside</p>
-      <h1>Pickup requests</h1>
+      <p className="eyebrow">{t("Shoppers asking you to set items aside", locale)}</p>
+      <h1>{t("Pickup requests", locale)}</h1>
 
-      {pickups.isLoading && <p className="text-sm text-muted-foreground mt-3">Loading…</p>}
-      {pickups.isError && <p className="text-sm text-destructive mt-3">Could not load requests. Pull down to retry.</p>}
+      {pickups.isLoading && <p className="text-sm text-muted-foreground mt-3">{t("Loading…", locale)}</p>}
+      {pickups.isError && <p className="text-sm text-destructive mt-3">{t("Could not load requests. Pull down to retry.", locale)}</p>}
       {pickups.data && all.length === 0 && (
         <div className="list-surface p-5 mt-4 space-y-1">
-          <p className="text-sm">No pickup requests yet.</p>
-          <p className="text-xs text-muted-foreground">When a shopper reserves something from your shop in the Kannect app, it shows up here.</p>
+          <p className="text-sm">{t("No pickup requests yet.", locale)}</p>
+          <p className="text-xs text-muted-foreground">{t("When a shopper reserves something from your shop in the Kannect app, it shows up here.", locale)}</p>
         </div>
       )}
 
       {waiting.length > 0 && (
         <>
-          <Heading title={`New (${waiting.length})`} />
+          <Heading title={tf("New ({n})", { n: waiting.length }, locale)} />
           <div className="list-surface">{waiting.map(card)}</div>
         </>
       )}
       {held.length > 0 && (
         <>
-          <Heading title={`Held for pickup (${held.length})`} />
+          <Heading title={tf("Held for pickup ({n})", { n: held.length }, locale)} />
           <div className="list-surface">{held.map(card)}</div>
         </>
       )}
       {past.length > 0 && (
         <>
-          <Heading title="Earlier" />
+          <Heading title={t("Earlier", locale)} />
           <div className="list-surface">{past.map(card)}</div>
         </>
       )}
@@ -163,9 +165,9 @@ export function PickupsPage() {
       <Dialog open={action !== null} onOpenChange={(o) => !o && setAction(null)}>
         <DialogContent className="mobile-dialog">
           <DialogTitle>
-            {action?.kind === "accept" && "Accept this request?"}
-            {action?.kind === "decline" && (action.reservation.status === "accepted" ? "Release the hold?" : "Decline this request?")}
-            {action?.kind === "collect" && "Handed over to the shopper?"}
+            {action?.kind === "accept" && t("Accept this request?", locale)}
+            {action?.kind === "decline" && t(action.reservation.status === "accepted" ? "Release the hold?" : "Decline this request?", locale)}
+            {action?.kind === "collect" && t("Handed over to the shopper?", locale)}
           </DialogTitle>
           <DialogDescription>
             {action?.reservation.customer_name} · {rupees(action?.reservation.total)}
@@ -174,15 +176,15 @@ export function PickupsPage() {
           {action?.kind === "accept" && (
             <>
               <p className="text-sm">
-                The items are held for this shopper and nobody else can be promised them. Stock only drops when you hand them over.
+                {t("The items are held for this shopper and nobody else can be promised them. Stock only drops when you hand them over.", locale)}
               </p>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Clock size={14} /> Hold for
+                <Clock size={14} /> {t("Hold for", locale)}
               </p>
               <div className="flex flex-wrap gap-2">
                 {HOLD_CHOICES.map((c) => (
                   <Button key={c.minutes} size="sm" variant={hold === c.minutes ? "secondary" : "outline"} onClick={() => setHold(c.minutes)}>
-                    {c.label}
+                    {t(c.label, locale)}
                   </Button>
                 ))}
               </div>
@@ -192,8 +194,8 @@ export function PickupsPage() {
           {action?.kind === "decline" && (
             <input
               className="page-search"
-              aria-label="Reason (optional)"
-              placeholder="Reason the shopper will see (optional)"
+              aria-label={t("Reason (optional)", locale)}
+              placeholder={t("Reason the shopper will see (optional)", locale)}
               maxLength={200}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -202,18 +204,18 @@ export function PickupsPage() {
 
           {action?.kind === "collect" && (
             <>
-              <p className="text-sm">This makes a bill for {rupees(action.reservation.total)} and takes the items off your stock.</p>
-              <select className="page-search" aria-label="Payment" value={payment} onChange={(e) => setPayment(e.target.value as typeof payment)}>
-                <option value="cash">Cash</option>
-                <option value="upi">UPI</option>
-                <option value="card">Card</option>
-                <option value="other">Other</option>
+              <p className="text-sm">{tf("This makes a bill for {amount} and takes the items off your stock.", { amount: rupees(action.reservation.total) }, locale)}</p>
+              <select className="page-search kn-select" aria-label={t("Payment", locale)} value={payment} onChange={(e) => setPayment(e.target.value as typeof payment)}>
+                <option value="cash">{t("Cash", locale)}</option>
+                <option value="upi">{t("UPI", locale)}</option>
+                <option value="card">{t("Card", locale)}</option>
+                <option value="other">{t("Other", locale)}</option>
               </select>
             </>
           )}
 
           <Button disabled={busy} onClick={() => void run()}>
-            {busy ? "Saving…" : action?.kind === "accept" ? "Accept and hold" : action?.kind === "decline" ? "Confirm" : "Bill it"}
+            {busy ? t("Saving…", locale) : t(action?.kind === "accept" ? "Accept and hold" : action?.kind === "decline" ? "Confirm" : "Bill it", locale)}
           </Button>
         </DialogContent>
       </Dialog>
