@@ -7,25 +7,22 @@ import { toast } from "sonner";
 import { ApiError, authConfig, createShop, isSignedIn, requestOtp, signIn, signInWithPhoneEmail } from "@/api";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { LanguageSwitcher } from "@/components/kannect/language-switcher";
+import { shopTypeLabel } from "@/lib/format";
+import { t, tf, useLocale, type Locale } from "@/lib/i18n";
 import { PhoneEmailButton } from "./phone-email-button";
 import { LIMITS, parsePhone, tidy, validateShop, type ShopErrors } from "@/lib/validation";
 
-const SHOP_TYPES = [
-  ["grocery", "Grocery"],
-  ["provision", "Provision store"],
-  ["vegetable", "Vegetables"],
-  ["bakery", "Bakery"],
-  ["stationery", "Stationery"],
-  ["general", "General store"],
-] as const;
+const SHOP_TYPES = ["grocery", "provision", "vegetable", "bakery", "stationery", "general"] as const;
 
 type Step = "phone" | "otp" | "shop";
 
-function errorText(e: unknown) {
-  return e instanceof ApiError ? e.message : "Could not reach the server. Check your connection.";
+function errorText(e: unknown, locale: Locale) {
+  return e instanceof ApiError ? e.message : t("Could not reach the server. Check your connection.", locale);
 }
 
 export function LoginPage() {
+  const locale = useLocale();
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>(isSignedIn() ? "shop" : "phone");
   const [phone, setPhone] = useState("");
@@ -42,10 +39,10 @@ export function LoginPage() {
     name: "",
     owner_name: "",
     address: "",
-    shop_type: "grocery" as (typeof SHOP_TYPES)[number][0],
+    shop_type: "grocery" as (typeof SHOP_TYPES)[number],
   });
 
-  const parsed = parsePhone(phone);
+  const parsed = parsePhone(phone, locale);
   const e164 = () => parsed.e164 ?? "";
 
   const run = async (fn: () => Promise<void>) => {
@@ -53,7 +50,7 @@ export function LoginPage() {
     try {
       await fn();
     } catch (e) {
-      toast.error(errorText(e));
+      toast.error(errorText(e, locale));
     } finally {
       setBusy(false);
     }
@@ -80,7 +77,7 @@ export function LoginPage() {
     });
 
   const register = () => {
-    const found = validateShop(shop);
+    const found = validateShop(shop, locale);
     setErrors(found);
     if (Object.keys(found).length > 0) return Promise.resolve();
     return run(async () => {
@@ -90,7 +87,7 @@ export function LoginPage() {
         shop_type: shop.shop_type,
         ...(tidy(shop.owner_name) ? { owner_name: tidy(shop.owner_name) } : {}),
         ...(tidy(shop.address) ? { address: tidy(shop.address) } : {}),
-        language: "en",
+        language: locale,
         ...(location ? { location } : {}),
       });
       await navigate({ to: "/onboard" });
@@ -100,35 +97,37 @@ export function LoginPage() {
   return (
     <div className="app-shell">
       <main className="app-main">
-        <div className="mt-10 mb-6 flex items-center gap-3">
-          <span className="brand-mark">
-            <Store size={23} />
-          </span>
-          <div>
-            <h1 className="m-0">Kannect</h1>
-            <p className="eyebrow">Retailer</p>
+        <div className="mt-6 mb-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="brand-mark">
+              <Store size={23} />
+            </span>
+            <div>
+              <h1 className="m-0">Kannect {/* i18n-ignore */}</h1>
+              <p className="eyebrow">{t("Retailer", locale)}</p>
+            </div>
           </div>
+          <LanguageSwitcher />
         </div>
 
         {step === "phone" && realLogin && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold">Sign in with your phone</h2>
+            <h2 className="text-lg font-semibold">{t("Sign in with your phone", locale)}</h2>
             <p className="text-sm text-muted-foreground">
-              We send a code by SMS to confirm your number.
+              {t("We send a code by SMS to confirm your number.", locale)}
             </p>
             {config.data?.phone_email_client_id && (
               <PhoneEmailButton clientId={config.data.phone_email_client_id} onVerified={(url) => void verifiedByPhoneEmail(url)} />
             )}
             {busy ? (
-              <p className="text-sm text-muted-foreground">Signing you in…</p>
+              <p className="text-sm text-muted-foreground">{t("Signing you in…", locale)}</p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                A small window opens to check your number. If it stays on “Verifying…”, switch off your
-                browser's ad-blocker or shields for this site and try again.
+                {t("A small window opens to check your number. If it stays on “Verifying…”, switch off your browser's ad-blocker or shields for this site and try again.", locale)}
               </p>
             )}
             <Button type="button" variant="ghost" className="w-full" onClick={() => setShowDemo(true)}>
-              Demo shop login (test accounts only)
+              {t("Demo shop login (test accounts only)", locale)}
             </Button>
           </div>
         )}
@@ -141,9 +140,9 @@ export function LoginPage() {
               void sendOtp();
             }}
           >
-            <h2 className="text-lg font-semibold">Sign in with your phone</h2>
+            <h2 className="text-lg font-semibold">{t("Sign in with your phone", locale)}</h2>
             <label className="text-sm" htmlFor="phone">
-              Mobile number
+              {t("Mobile number", locale)}
             </label>
             <input
               id="phone"
@@ -159,7 +158,7 @@ export function LoginPage() {
             />
             {phoneTouched && parsed.error && <p className="text-xs text-destructive">{parsed.error}</p>}
             <Button className="w-full" disabled={busy || Boolean(parsed.error)}>
-              {busy ? "Sending…" : "Send code"}
+              {busy ? t("Sending…", locale) : t("Send code", locale)}
             </Button>
           </form>
         )}
@@ -172,8 +171,8 @@ export function LoginPage() {
               void verify();
             }}
           >
-            <h2 className="text-lg font-semibold">Enter the code</h2>
-            <p className="text-sm text-muted-foreground">Sent to {e164()}</p>
+            <h2 className="text-lg font-semibold">{t("Enter the code", locale)}</h2>
+            <p className="text-sm text-muted-foreground">{tf("Sent to {phone}", { phone: e164() }, locale)}</p>
             <InputOTP maxLength={6} value={otp} onChange={setOtp} autoFocus>
               <InputOTPGroup>
                 {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -182,10 +181,10 @@ export function LoginPage() {
               </InputOTPGroup>
             </InputOTP>
             <Button className="w-full" disabled={busy || otp.length < 6}>
-              {busy ? "Checking…" : "Sign in"}
+              {busy ? t("Checking…", locale) : t("Sign in", locale)}
             </Button>
             <Button type="button" variant="ghost" className="w-full" onClick={() => setStep("phone")}>
-              Use a different number
+              {t("Use a different number", locale)}
             </Button>
           </form>
         )}
@@ -198,66 +197,65 @@ export function LoginPage() {
               void register();
             }}
           >
-            <h2 className="text-lg font-semibold">Set up your shop</h2>
+            <h2 className="text-lg font-semibold">{t("Set up your shop", locale)}</h2>
             <div>
               <input
                 className="page-search"
-                aria-label="Shop name"
-                placeholder="Shop name"
+                aria-label={t("Shop name", locale)}
+                placeholder={t("Shop name", locale)}
                 maxLength={LIMITS.shopName.max}
                 aria-invalid={Boolean(errors.name)}
                 value={shop.name}
                 onChange={(e) => setShop({ ...shop, name: e.target.value })}
-                onBlur={() => setErrors(validateShop(shop))}
+                onBlur={() => setErrors(validateShop(shop, locale))}
               />
               {errors.name && <p className="text-xs text-destructive mt-1 px-2">{errors.name}</p>}
             </div>
             <div>
               <input
                 className="page-search"
-                aria-label="Your name"
-                placeholder="Your name (optional)"
+                aria-label={t("Your name", locale)}
+                placeholder={t("Your name (optional)", locale)}
                 maxLength={LIMITS.ownerName.max}
                 aria-invalid={Boolean(errors.owner_name)}
                 value={shop.owner_name}
                 onChange={(e) => setShop({ ...shop, owner_name: e.target.value })}
-                onBlur={() => setErrors(validateShop(shop))}
+                onBlur={() => setErrors(validateShop(shop, locale))}
               />
               {errors.owner_name && <p className="text-xs text-destructive mt-1 px-2">{errors.owner_name}</p>}
             </div>
             <div>
               <input
                 className="page-search"
-                aria-label="Address"
-                placeholder="Area or address (optional)"
+                aria-label={t("Address", locale)}
+                placeholder={t("Area or address (optional)", locale)}
                 maxLength={LIMITS.address.max}
                 aria-invalid={Boolean(errors.address)}
                 value={shop.address}
                 onChange={(e) => setShop({ ...shop, address: e.target.value })}
-                onBlur={() => setErrors(validateShop(shop))}
+                onBlur={() => setErrors(validateShop(shop, locale))}
               />
               {errors.address && <p className="text-xs text-destructive mt-1 px-2">{errors.address}</p>}
             </div>
             <select
-              className="page-search"
-              aria-label="Shop type"
+              className="page-search kn-select"
+              aria-label={t("Shop type", locale)}
               value={shop.shop_type}
               onChange={(e) =>
                 setShop({ ...shop, shop_type: e.target.value as typeof shop.shop_type })
               }
             >
-              {SHOP_TYPES.map(([value, label]) => (
+              {SHOP_TYPES.map((value) => (
                 <option key={value} value={value}>
-                  {label}
+                  {shopTypeLabel(value, locale)}
                 </option>
               ))}
             </select>
             <p className="text-xs text-muted-foreground">
-              We use your phone's location so nearby shoppers can find you. If you decline, you
-              can add it later.
+              {t("We use your phone's location so nearby shoppers can find you. If you decline, you can add it later.", locale)}
             </p>
             <Button className="w-full" disabled={busy}>
-              {busy ? "Creating…" : "Create shop"}
+              {busy ? t("Creating…", locale) : t("Create shop", locale)}
             </Button>
           </form>
         )}
@@ -274,5 +272,7 @@ function currentLocation(): Promise<{ lat: number; lng: number } | null> {
       () => resolve(null),
       { timeout: 8000 },
     );
+    // the browser's own timeout does not count the time its permission prompt is open
+    setTimeout(() => resolve(null), 8000);
   });
 }

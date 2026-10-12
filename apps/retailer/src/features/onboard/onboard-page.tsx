@@ -9,6 +9,7 @@ import { Shell } from "@/components/kannect/shell";
 import { Button } from "@/components/ui/button";
 import { useAddProductsBulk, useRecount } from "@/features/queries";
 import { formatQty, newId } from "@/lib/format";
+import { t, tf, useLocale, type Locale } from "@/lib/i18n";
 import { tidy } from "@/lib/validation";
 
 type Result = Awaited<ReturnType<typeof shelfPhoto>>;
@@ -82,7 +83,17 @@ function toRow(d: Detection, i: number): Row | null {
 
 const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback);
 
+function qualityMessage(quality: string, locale: Locale) {
+  switch (quality) {
+    case "blurry": return t("The photo looks blurry. Retake it for better results.", locale);
+    case "too_dark": return t("The photo looks too dark. Retake it for better results.", locale);
+    case "too_far": return t("The photo looks too far away. Retake it for better results.", locale);
+    default: return t("The photo is not clear enough. Retake it for better results.", locale);
+  }
+}
+
 export function OnboardPage() {
+  const locale = useLocale();
   const navigate = useNavigate();
   const addBulk = useAddProductsBulk();
   const recount = useRecount();
@@ -102,10 +113,10 @@ export function OnboardPage() {
       setRows(next);
       setDropped(detections.length - next.length);
       if (res.image_quality && res.image_quality !== "good") {
-        toast.warning(`The photo looks ${String(res.image_quality).replace("_", " ")}. Retake it for better results.`);
+        toast.warning(qualityMessage(res.image_quality, locale));
       }
     } catch (e) {
-      toast.error(errorText(e, "Could not read the photo."));
+      toast.error(errorText(e, t("Could not read the photo.", locale)));
     } finally {
       setBusy(false);
     }
@@ -124,7 +135,7 @@ export function OnboardPage() {
       (r) => (r.pick === -1 && tidy(r.draft.name).length < 2) || (!r.inShop && !(Number(r.price) > 0)),
     );
     if (problems.length) {
-      toast.error("Each ticked item needs a name and a price. Untick the ones you don't want.");
+      toast.error(t("Each ticked item needs a name and a price. Untick the ones you don't want.", locale));
       return;
     }
     setSaving(true);
@@ -179,12 +190,12 @@ export function OnboardPage() {
         });
       }
       toast.success(
-        `Saved ${entries.length} product${entries.length === 1 ? "" : "s"}` +
-          (reused ? ` (${reused} matched existing products)` : ""),
+        tf(entries.length === 1 ? "Saved {n} product" : "Saved {n} products", { n: entries.length }, locale) +
+          (reused ? ` ${tf("({n} matched existing products)", { n: reused }, locale)}` : ""),
       );
       await navigate({ to: "/stock" });
     } catch (e) {
-      toast.error(errorText(e, "Could not save. Nothing was lost, try again."));
+      toast.error(errorText(e, t("Could not save. Nothing was lost, try again.", locale)));
     } finally {
       setSaving(false);
     }
@@ -192,22 +203,21 @@ export function OnboardPage() {
 
   return (
     <Shell active="More">
-      <p className="eyebrow">Set up from a photo</p>
-      <h1>Shelf photo</h1>
+      <p className="eyebrow">{t("Set up from a photo", locale)}</p>
+      <h1>{t("Shelf photo", locale)}</h1>
 
       {!rows && (
         <div className="space-y-4 mt-3">
           <p className="text-sm text-muted-foreground">
-            Take clear photos of your shelves, up to 6, with the camera or from your gallery. We guess what each product is, and you confirm
-            before anything is saved.
+            {t("Take clear photos of your shelves, up to 6, with the camera or from your gallery. We guess what each product is, and you confirm before anything is saved.", locale)}
           </p>
           <PhotoPicker files={files} onChange={setFiles} />
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={thorough} onChange={(e) => setThorough(e.target.checked)} />
-            Look closely for small labels (slower: about 30 seconds a photo)
+            {t("Look closely for small labels (slower: about 30 seconds a photo)", locale)}
           </label>
           <Button className="w-full" disabled={busy || files.length === 0} onClick={() => void read()}>
-            {busy ? "Reading your shelves… please wait" : "Read photos"}
+            {busy ? t("Reading your shelves… please wait", locale) : t("Read photos", locale)}
           </Button>
         </div>
       )}
@@ -216,8 +226,8 @@ export function OnboardPage() {
         <div className="space-y-3 mt-3">
           <p className="text-sm text-muted-foreground">
             {rows.length === 0
-              ? "We couldn't read any products. Try a closer, brighter photo."
-              : `We found ${rows.length} item${rows.length === 1 ? "" : "s"}. Untick anything wrong, correct the names and add prices.`}
+              ? t("We couldn't read any products. Try a closer, brighter photo.", locale)
+              : tf(rows.length === 1 ? "We found {n} item. Untick anything wrong, correct the names and add prices." : "We found {n} items. Untick anything wrong, correct the names and add prices.", { n: rows.length }, locale)}
           </p>
           <div className="list-surface">
             {rows.map((r) => (
@@ -229,11 +239,11 @@ export function OnboardPage() {
                       {r.pick >= 0 ? r.options[r.pick]?.label : tidy(`${r.draft.brand} ${r.draft.name} ${r.draft.size}`)}
                     </span>
                     <span className="product-sub block">
-                      {r.pick >= 0 && r.options.length > 0 && r.seen !== r.options[r.pick]?.label ? `Read as: ${r.seen}` : r.pick === -1 ? "New to our catalogue: you can correct it below" : ""}
+                      {r.pick >= 0 && r.options.length > 0 && r.seen !== r.options[r.pick]?.label ? tf("Read as: {seen}", { seen: r.seen }, locale) : r.pick === -1 ? t("New to our catalogue: you can correct it below", locale) : ""}
                     </span>
                     {r.inShop && (
                       <span className="product-sub block">
-                        In your shop now: {formatQty(r.currentQty, r.options[0]?.unit)}. Tick to replace it with the count below.
+                        {tf("In your shop now: {qty}. Tick to replace it with the count below.", { qty: formatQty(r.currentQty, r.options[0]?.unit, locale) }, locale)}
                       </span>
                     )}
                   </span>
@@ -244,7 +254,7 @@ export function OnboardPage() {
                     {r.options.length > 0 && (
                       <div className="space-y-1">
                         {r.options.length > 1 || r.pick === -1 ? (
-                          <p className="text-xs text-muted-foreground">Which one is it?</p>
+                          <p className="text-xs text-muted-foreground">{t("Which one is it?", locale)}</p>
                         ) : null}
                         {(r.options.length > 1 || r.pick === -1 ? r.options : []).map((o, idx) => (
                           <label key={o.id} className="flex items-center gap-2 text-sm">
@@ -255,12 +265,12 @@ export function OnboardPage() {
                         {(r.options.length > 1 || r.pick === -1) && (
                           <label className="flex items-center gap-2 text-sm">
                             <input type="radio" name={`pick-${r.key}`} checked={r.pick === -1} onChange={() => patch(r.key, { pick: -1 })} />
-                            None of these, add as a new product
+                            {t("None of these, add as a new product", locale)}
                           </label>
                         )}
                         {r.options.length === 1 && r.pick === 0 && (
                           <Button size="sm" variant="ghost" className="px-0 h-auto text-xs" onClick={() => patch(r.key, { pick: -1 })}>
-                            Not right? Add as a different product
+                            {t("Not right? Add as a different product", locale)}
                           </Button>
                         )}
                       </div>
@@ -268,42 +278,42 @@ export function OnboardPage() {
 
                     {r.pick === -1 && (
                       <div className="space-y-2">
-                        <input className="page-search" aria-label="Product name" placeholder="Product name" maxLength={255} value={r.draft.name} onChange={(e) => patchDraft(r.key, { name: e.target.value })} />
+                        <input className="page-search" aria-label={t("Product name", locale)} placeholder={t("Product name", locale)} maxLength={255} value={r.draft.name} onChange={(e) => patchDraft(r.key, { name: e.target.value })} />
                         <div className="flex gap-2">
-                          <input className="page-search min-w-0" aria-label="Brand" placeholder="Brand" maxLength={100} value={r.draft.brand} onChange={(e) => patchDraft(r.key, { brand: e.target.value })} />
-                          <input className="page-search min-w-0" aria-label="Size" placeholder="Size" maxLength={40} value={r.draft.size} onChange={(e) => patchDraft(r.key, { size: e.target.value })} />
+                          <input className="page-search min-w-0" aria-label={t("Brand", locale)} placeholder={t("Brand", locale)} maxLength={100} value={r.draft.brand} onChange={(e) => patchDraft(r.key, { brand: e.target.value })} />
+                          <input className="page-search min-w-0" aria-label={t("Size", locale)} placeholder={t("Size", locale)} maxLength={40} value={r.draft.size} onChange={(e) => patchDraft(r.key, { size: e.target.value })} />
                         </div>
                       </div>
                     )}
 
                     <div className="flex flex-wrap gap-2 items-center">
-                      <div className="quantity-controls" aria-label={`Count for ${r.seen}`}>
-                        <Button variant="outline" size="icon" aria-label="Fewer" onClick={() => patch(r.key, { count: String(Math.max(0, (Number(r.count) || 0) - step(r))) })}>
+                      <div className="quantity-controls" aria-label={tf("Count for {name}", { name: r.seen }, locale)}>
+                        <Button variant="outline" size="icon" aria-label={t("Decrease", locale)} onClick={() => patch(r.key, { count: String(Math.max(0, (Number(r.count) || 0) - step(r))) })}>
                           <Minus />
                         </Button>
                         <input
                           className="page-search w-20 text-center"
-                          aria-label="How many"
+                          aria-label={t("How many", locale)}
                           inputMode="decimal"
                           value={r.count}
                           onChange={(e) => patch(r.key, { count: e.target.value.replace(/[^\d.]/g, "") })}
                         />
-                        <Button variant="outline" size="icon" aria-label="More" onClick={() => patch(r.key, { count: String((Number(r.count) || 0) + step(r)) })}>
+                        <Button variant="outline" size="icon" aria-label={t("Increase", locale)} onClick={() => patch(r.key, { count: String((Number(r.count) || 0) + step(r)) })}>
                           <Plus />
                         </Button>
-                        <span className="text-xs text-muted-foreground">{isGram(r) ? "kg" : "pcs"}</span>
+                        <span className="text-xs text-muted-foreground">{t(isGram(r) ? "kg" : "pcs", locale)}</span>
                       </div>
                       {!r.inShop && (
                         <input
                           className="page-search max-w-40"
-                          aria-label={`Price for ${r.seen}`}
+                          aria-label={tf("Price for {name}", { name: r.seen }, locale)}
                           inputMode="decimal"
-                          placeholder={r.loose || r.options[r.pick]?.unit === "gram" ? "₹ per kg" : "₹ price"}
+                          placeholder={t(r.loose || r.options[r.pick]?.unit === "gram" ? "₹ per kg" : "₹ price", locale)}
                           value={r.price}
                           onChange={(e) => patch(r.key, { price: e.target.value })}
                         />
                       )}
-                      {!r.inShop && r.priceHint && <span className="text-xs text-muted-foreground">{r.priceHint}</span>}
+                      {!r.inShop && r.priceHint && <span className="text-xs text-muted-foreground">{t(r.priceHint, locale)}</span>}
                     </div>
                   </div>
                 )}
@@ -312,14 +322,14 @@ export function OnboardPage() {
           </div>
           {dropped > 0 && (
             <p className="text-xs text-muted-foreground">
-              {dropped} blurry or unclear item{dropped === 1 ? " was" : "s were"} left out. Add those by scanning their barcode in Billing or Stock.
+              {tf(dropped === 1 ? "{n} blurry or unclear item was left out. Add those by scanning their barcode in Billing or Stock." : "{n} blurry or unclear items were left out. Add those by scanning their barcode in Billing or Stock.", { n: dropped }, locale)}
             </p>
           )}
           <Button className="w-full" disabled={saving || chosen.length === 0} onClick={() => void save()}>
-            {saving ? "Saving…" : `Save ${chosen.length} to my shop`}
+            {saving ? t("Saving…", locale) : tf("Save {n} to my shop", { n: chosen.length }, locale)}
           </Button>
           <Button variant="ghost" className="w-full" onClick={() => setRows(null)}>
-            Start over
+            {t("Start over", locale)}
           </Button>
         </div>
       )}

@@ -11,7 +11,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { usePickups, useShopProducts } from "@/features/queries";
-import { t, useLocale } from "@/lib/i18n";
+import { t, tf, useLocale } from "@/lib/i18n";
+import { LanguageSwitcher } from "./language-switcher";
 
 export function pageHead(title: string, description: string) {
   const full = `${title} · Kannect Retailer`;
@@ -55,28 +56,31 @@ export function Shell({ children, active }: { children: ReactNode; active: strin
             <Store size={23} />
           </span>
           <div>
-            Kannect
-            <div className="brand-caption">Retailer</div>
+            Kannect {/* i18n-ignore */}
+            <div className="brand-caption">{t("Retailer", locale)}</div>
           </div>
         </Link>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Notifications"
-          className="relative"
-          onClick={() => setOpen(true)}
-        >
-          <Bell size={21} />
-          {(needAttention.length > 0 || newPickups > 0) && (
-            <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full bg-destructive" />
-          )}
-        </Button>
+        <div className="flex items-center gap-1">
+          <LanguageSwitcher />
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t("Notifications", locale)}
+            className="relative"
+            onClick={() => setOpen(true)}
+          >
+            <Bell size={21} />
+            {(needAttention.length > 0 || newPickups > 0) && (
+              <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full bg-destructive" />
+            )}
+          </Button>
+        </div>
       </header>
       <main className="app-main">
         {children}
         {shop?.name && <div className="demo-footer">{shop.name}</div>}
       </main>
-      <nav className="bottom-nav" aria-label="Main navigation">
+      <nav className="bottom-nav" aria-label={t("Main navigation", locale)}>
         {nav.map((n) => (
           <Link
             key={n.label}
@@ -96,16 +100,21 @@ export function Shell({ children, active }: { children: ReactNode; active: strin
           {newPickups > 0 && (
             <p className="text-sm">
               <Link to="/pickups" className="underline" onClick={() => setOpen(false)}>
-                {newPickups} pickup request{newPickups === 1 ? "" : "s"} waiting
+                {tf(newPickups === 1 ? "{n} pickup request waiting" : "{n} pickup requests waiting", { n: newPickups }, locale)}
               </Link>
             </p>
           )}
           {needAttention.length === 0 ? (
-            <p className="text-sm">Nothing needs restocking right now.</p>
+            <p className="text-sm">{t("Nothing needs restocking right now.", locale)}</p>
           ) : (
             <p className="text-sm">
-              {needAttention.length} product{needAttention.length === 1 ? "" : "s"} low or out of
-              stock. Open Orders for reorder suggestions.
+              {tf(
+                needAttention.length === 1
+                  ? "{n} product low or out of stock. Open Orders for reorder suggestions."
+                  : "{n} products low or out of stock. Open Orders for reorder suggestions.",
+                { n: needAttention.length },
+                locale,
+              )}
             </p>
           )}
           <Button onClick={() => setOpen(false)}>{t("Got it", locale)}</Button>

@@ -1,3 +1,4 @@
+import { getLocale, t, tf, type Locale } from "@/lib/i18n";
 // Money is rupees. Stock and quantities are integers in base units: pieces, or grams for loose
 // goods (which are priced per kg). These helpers keep that in one place.
 import type { ShopProduct } from "@/api";
@@ -13,17 +14,17 @@ export const rupees = (n: number | null | undefined) =>
 
 type Unit = "piece" | "gram" | string | undefined;
 
-export function formatQty(qty: number | null | undefined, unit: Unit): string {
-  if (qty === null || qty === undefined) return "Unknown";
+export function formatQty(qty: number | null | undefined, unit: Unit, locale: Locale = getLocale()): string {
+  if (qty === null || qty === undefined) return t("Unknown", locale);
   if (unit === "gram") {
-    return qty >= 1000 ? `${+(qty / 1000).toFixed(2)} kg` : `${qty} g`;
+    return qty >= 1000 ? tf("{n} kg", { n: +(qty / 1000).toFixed(2) }, locale) : tf("{n} g", { n: qty }, locale);
   }
   return `${qty}`;
 }
 
-export function priceLabel(price: number | undefined, unit: Unit): string {
+export function priceLabel(price: number | undefined, unit: Unit, locale: Locale = getLocale()): string {
   if (price === undefined) return "-";
-  return unit === "gram" ? `${rupees(price)}/kg` : rupees(price);
+  return unit === "gram" ? tf("{price}/kg", { price: rupees(price) }, locale) : rupees(price);
 }
 
 /** Line total in rupees: price is per piece, or per kg for gram items. */
@@ -50,7 +51,7 @@ export function statusClass(status: string | undefined): string {
 export function productSub(row: ShopProduct): string {
   const p = row.product;
   const size = p?.size ? `${p.size} · ` : "";
-  return `${size}${formatQty(row.stock_qty, p?.unit)} ${p?.unit === "gram" ? "" : "left"}`.trim();
+  return `${size}${formatQty(row.stock_qty, p?.unit)} ${p?.unit === "gram" ? "" : t("left")}`.trim();
 }
 
 export const newId = () => crypto.randomUUID();
@@ -64,4 +65,33 @@ export function clampToStock(current: number, delta: number, stock: number | nul
   const wanted = current + delta;
   const next = Math.min(Math.max(0, wanted), max);
   return { next, max, limited: delta > 0 && wanted > max };
+}
+
+const SHOP_TYPE_LABELS: Record<string, string> = {
+  grocery: "Grocery",
+  provision: "Provision store",
+  vegetable: "Vegetables",
+  bakery: "Bakery",
+  stationery: "Stationery",
+  general: "General store",
+};
+/** A shop type, ready to show: translated, and plain words for a type we do not know. */
+export function shopTypeLabel(type: string | undefined, locale?: Locale) {
+  if (!type) return "";
+  const english = SHOP_TYPE_LABELS[type];
+  return english ? t(english, locale) : type;
+}
+
+const ORDER_STATUS_TEXT: Record<string, string> = {
+  placed: "Waiting for supplier",
+  accepted: "Accepted",
+  rejected: "Rejected",
+  dispatched: "On the way",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+/** An order status, ready to show: translated, and the raw word for a status we do not know. */
+export function orderStatusLabel(status: string | undefined, locale?: Locale) {
+  const english = ORDER_STATUS_TEXT[status ?? ""];
+  return english ? t(english, locale) : (status ?? "");
 }

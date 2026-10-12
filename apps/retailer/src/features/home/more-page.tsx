@@ -5,7 +5,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { signOut } from "@/api";
 import { Shell, useShop } from "@/components/kannect/shell";
 import { Button } from "@/components/ui/button";
-import { LanguageSelector, t, useLocale } from "@/lib/i18n";
+import { shopTypeLabel } from "@/lib/format";
+import { t, useLocale } from "@/lib/i18n";
 
 export function MorePage() {
   const locale = useLocale();
@@ -20,18 +21,16 @@ export function MorePage() {
   };
 
   const items = [
-    { to: "/pickups" as const, icon: HandHelping, label: "Pickup requests", sub: "Shoppers asking you to set items aside" },
-    { to: "/onboard" as const, icon: Camera, label: "Set up from a shelf photo", sub: "Add many products at once" },
-    { to: "/stock" as const, icon: ClipboardCheck, label: "Weekly recount", sub: "Check and update your counts" },
-    { to: "/group-buys" as const, icon: Users, label: "Group buys", sub: "Join supplier deals with other shops" },
+    { to: "/pickups" as const, icon: HandHelping, label: t("Pickup requests", locale), sub: t("Shoppers asking you to set items aside", locale) },
+    { to: "/onboard" as const, icon: Camera, label: t("Set up from a shelf photo", locale), sub: t("Add many products at once", locale) },
+    { to: "/stock" as const, icon: ClipboardCheck, label: t("Weekly recount", locale), sub: t("Check and update your counts", locale) },
+    { to: "/group-buys" as const, icon: Users, label: t("Group buys", locale), sub: t("Join supplier deals with other shops", locale) },
   ];
 
   return (
     <Shell active="More">
       <p className="eyebrow">{shop?.name}</p>
       <h1>{t("More", locale)}</h1>
-
-      <div className="list-surface mt-4 px-4"><LanguageSelector /></div>
 
       <div className="list-surface mt-4">
         {items.map((item) => (
@@ -40,8 +39,8 @@ export function MorePage() {
               <span className="flex items-center gap-3">
                 <item.icon />
                 <span className="text-left">
-                  {t(item.label, locale)}
-                  <span className="block text-xs text-muted-foreground font-normal">{t(item.sub, locale)}</span>
+                  {item.label}
+                  <span className="block text-xs text-muted-foreground font-normal">{item.sub}</span>
                 </span>
               </span>
               <ChevronRight />
@@ -53,11 +52,11 @@ export function MorePage() {
       <div className="list-surface mt-4 p-4 text-sm space-y-1">
         <p className="font-semibold">{shop?.name}</p>
         {shop?.address && <p className="text-muted-foreground">{shop.address}</p>}
-        {shop?.shop_type && <p className="text-muted-foreground capitalize">{shop.shop_type} shop</p>}
+        {shop?.shop_type && <p className="text-muted-foreground">{shopTypeLabel(shop.shop_type, locale)}</p>}
       </div>
 
       <Button variant="outline" className="w-full mt-4" onClick={() => void logout()}>
-        <LogOut /> Sign out
+        <LogOut /> {t("Sign out", locale)}
       </Button>
     </Shell>
   );

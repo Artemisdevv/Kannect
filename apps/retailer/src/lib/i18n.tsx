@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
+import { screensMl } from './i18n-ml-screens';
 export type Locale = 'en' | 'ml';
 const KEY = 'kannect.retailer.locale';
 const listeners = new Set<() => void>();
@@ -144,11 +145,10 @@ const groupBuyMl: Record<string, string> = {
   "Could not join. Check your connection and try again.": "ചേരാനായില്ല. കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
 };
 
-export function t(text: string, locale = getLocale()) { return locale === 'ml' ? (ml[text] ?? extraMl[text] ?? homeMl[text] ?? groupBuyMl[text] ?? text) : text; }
+export function t(text: string, locale = getLocale()) { return locale === 'ml' ? (ml[text] ?? extraMl[text] ?? homeMl[text] ?? groupBuyMl[text] ?? screensMl[text] ?? text) : text; }
 /** Every Malayalam entry in one object (same precedence as t). For tests and tooling. */
-export const translations = (): Record<string, string> => ({ ...groupBuyMl, ...homeMl, ...extraMl, ...ml });
+export const translations = (): Record<string, string> => ({ ...screensMl, ...groupBuyMl, ...homeMl, ...extraMl, ...ml });
 /** Translate a whole sentence, then fill its {placeholders}: word order can differ per language. */
 export function tf(text: string, vars: Record<string, string | number>, locale = getLocale()) {
   return t(text, locale).replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? String(vars[name]) : whole));
 }
-export function LanguageSelector() { const locale = useLocale(); return <label className="flex min-h-12 items-center justify-between gap-4"><span>{t('Language', locale)}</span><select aria-label={t('Language', locale)} className="h-12 w-auto rounded-md border border-input bg-background px-3 text-sm" value={locale} onChange={(e) => setLocale(e.target.value as Locale)}><option value="en">English</option><option value="ml">Malayalam</option></select></label>; }

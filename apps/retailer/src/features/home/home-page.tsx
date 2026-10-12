@@ -4,8 +4,8 @@ import { ArrowUpRight, Camera, ChevronRight, HandHelping, Package, ReceiptText, 
 import { Heading, Shell, useShop } from "@/components/kannect/shell";
 import { Button } from "@/components/ui/button";
 import { useBills, useOrders, usePickups, useShopProducts } from "@/features/queries";
-import { formatQty, rupees, STATUS_LABEL, statusClass } from "@/lib/format";
-import { t, useLocale } from "@/lib/i18n";
+import { formatQty, rupees, STATUS_LABEL, statusClass, orderStatusLabel } from "@/lib/format";
+import { t, tf, useLocale } from "@/lib/i18n";
 
 const isToday = (iso?: string) => {
   if (!iso) return false;
@@ -34,7 +34,7 @@ export function TodayPage() {
 
   return (
     <Shell active="Today">
-      <p className="eyebrow">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
+      <p className="eyebrow">{new Date().toLocaleDateString(locale === "ml" ? "ml-IN" : "en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
       <h1>{shop?.name ?? t("Your shop", locale)}</h1>
       {shop?.address && <p className="eyebrow">{shop.address}</p>}
 
@@ -52,11 +52,11 @@ export function TodayPage() {
           <div className="brand-mark bg-secondary text-primary"><HandHelping size={22} /></div>
           <div className="min-w-0">
             <div className="product-name">
-              {newPickups.length > 0 ? `${newPickups.length} ${t(newPickups.length === 1 ? "pickup request" : "pickup requests", locale)} ${t("waiting", locale)}` : t("Items held for pickup", locale)}
+              {newPickups.length > 0 ? tf(newPickups.length === 1 ? "{n} pickup request waiting" : "{n} pickup requests waiting", { n: newPickups.length }, locale) : t("Items held for pickup", locale)}
             </div>
             <div className="product-sub">
-              {newPickups.length > 0 ? t("Shoppers want you to set items aside", locale) : `${heldPickups.length} ${t("held for a shopper", locale)}`}
-              {newPickups.length > 0 && heldPickups.length > 0 ? ` · ${heldPickups.length} held` : ""}
+              {newPickups.length > 0 ? t("Shoppers want you to set items aside", locale) : tf("{n} held for a shopper", { n: heldPickups.length }, locale)}
+              {newPickups.length > 0 && heldPickups.length > 0 ? ` · ${tf("{n} held", { n: heldPickups.length }, locale)}` : ""}
             </div>
           </div>
           <ChevronRight />
@@ -74,7 +74,7 @@ export function TodayPage() {
           <div className="summary-value">
             {attention.length} <span className="text-sm font-normal text-muted-foreground">{t("items", locale)}</span>
           </div>
-          <div className="summary-note">{low} low stock · {out} out of stock</div>
+          <div className="summary-note">{tf("{low} low stock · {out} out of stock", { low, out }, locale)}</div>
         </div>
       </div>
 
@@ -100,9 +100,9 @@ export function TodayPage() {
                 <div className="product-art text-primary" aria-hidden="true"><Package size={25} /></div>
                 <div className="min-w-0">
                   <div className="product-name">{p.product?.name}</div>
-                  <div className="product-sub">{formatQty(p.stock_qty, p.product?.unit)}{p.product?.unit === "gram" ? "" : " left"}</div>
+                  <div className="product-sub">{formatQty(p.stock_qty, p.product?.unit, locale)}{p.product?.unit === "gram" ? "" : t(" left", locale)}</div>
                 </div>
-                <span className={`status-pill ${statusClass(p.stock_status)}`}>{STATUS_LABEL[p.stock_status ?? "low"]}</span>
+                <span className={`status-pill ${statusClass(p.stock_status)}`}>{t(STATUS_LABEL[p.stock_status ?? "low"] ?? "", locale)}</span>
               </div>
             ))}
             <Button variant="ghost" className="w-full text-primary" asChild>
@@ -119,9 +119,9 @@ export function TodayPage() {
             <div className="brand-mark bg-secondary text-primary"><Truck size={22} /></div>
             <div className="min-w-0">
               <div className="product-name">{open.supplier?.name}</div>
-              <div className="product-sub">{open.items?.length ?? 0} item{(open.items?.length ?? 0) === 1 ? "" : "s"} · {rupees(open.total)}</div>
+              <div className="product-sub">{tf((open.items?.length ?? 0) === 1 ? "{n} item" : "{n} items", { n: open.items?.length ?? 0 }, locale)} · {rupees(open.total)}</div>
             </div>
-            <span className="status-pill">{open.status}</span>
+            <span className="status-pill">{orderStatusLabel(open.status, locale)}</span>
           </Link>
         </>
       )}

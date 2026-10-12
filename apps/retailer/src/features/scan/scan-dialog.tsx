@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useAddProductsBulk, useShopProducts } from "@/features/queries";
+import { t, tf, useLocale } from "@/lib/i18n";
 
 type Stage =
   | { name: "scan" }
@@ -38,13 +39,14 @@ export function ScanDialog({
   open,
   onOpenChange,
   onProduct,
-  title = "Scan a barcode",
+  title,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onProduct: (row: ShopProduct) => void;
   title?: string;
 }) {
+  const locale = useLocale();
   const [stage, setStage] = useState<Stage>({ name: "scan" });
   const products = useShopProducts();
   const video = useRef<HTMLVideoElement>(null);
@@ -54,7 +56,7 @@ export function ScanDialog({
   const handleCode = async (raw: string) => {
     const code = normalizeBarcode(raw);
     if (!code) {
-      toast.error("That doesn't look like a barcode (6 to 14 digits).");
+      toast.error(t("That doesn't look like a barcode (6 to 14 digits).", locale));
       return;
     }
     setStage({ name: "looking", code });
@@ -65,7 +67,7 @@ export function ScanDialog({
       if (mine) return finish(mine);
       setStage({ name: "add", product });
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not look that up.");
+      toast.error(e instanceof ApiError ? e.message : t("Could not look that up.", locale));
       setStage({ name: "scan" });
     }
   };
@@ -99,7 +101,7 @@ export function ScanDialog({
       const code = await getScanner().scanOnce?.();
       if (code) await handleCode(code);
     } catch {
-      toast.error("Could not open the scanner. Allow camera access, or type the number.");
+      toast.error(t("Could not open the scanner. Allow camera access, or type the number.", locale));
     }
   };
 
@@ -114,24 +116,24 @@ export function ScanDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="mobile-dialog">
-        <DialogTitle>{title}</DialogTitle>
+        <DialogTitle>{t(title ?? "Scan a barcode", locale)}</DialogTitle>
         <DialogDescription>
-          {stage.name === "scan" && "Point the camera at the barcode, or type the number."}
-          {stage.name === "looking" && "Looking it up…"}
-          {stage.name === "add" && "Found it. Add it to your shop."}
-          {stage.name === "create" && "New to Kannect. Add the details once for everyone."}
-          {stage.name === "similar" && "Is it one of these?"}
+          {stage.name === "scan" && t("Point the camera at the barcode, or type the number.", locale)}
+          {stage.name === "looking" && t("Looking it up…", locale)}
+          {stage.name === "add" && t("Found it. Add it to your shop.", locale)}
+          {stage.name === "create" && t("New to Kannect. Add the details once for everyone.", locale)}
+          {stage.name === "similar" && t("Is it one of these?", locale)}
         </DialogDescription>
 
         {stage.name === "scan" && (
           <>
             {getScanner().kind === "native" ? (
               <Button className="w-full h-14" onClick={() => void openNative()}>
-                <ScanLine /> Open camera scanner
+                <ScanLine /> {t("Open camera scanner", locale)}
               </Button>
             ) : cameraError ? (
               <p className="text-sm text-muted-foreground">
-                The camera isn't available here. Type the number printed under the barcode.
+                {t("The camera isn't available here. Type the number printed under the barcode.", locale)}
               </p>
             ) : (
               <video
@@ -150,13 +152,13 @@ export function ScanDialog({
             >
               <input
                 className="page-search min-w-0"
-                aria-label="Barcode number"
+                aria-label={t("Barcode number", locale)}
                 inputMode="numeric"
-                placeholder="Barcode number"
+                placeholder={t("Barcode number", locale)}
                 value={manual}
                 onChange={(e) => setManual(e.target.value)}
               />
-              <Button size="icon" aria-label="Look up" disabled={!manual.trim()}>
+              <Button size="icon" aria-label={t("Look up", locale)} disabled={!manual.trim()}>
                 <ScanLine />
               </Button>
             </form>
@@ -187,7 +189,7 @@ export function ScanDialog({
               >
                 <span>
                   {[p.brand, p.name, p.size].filter(Boolean).join(" ")}
-                  <span className="block text-xs text-muted-foreground">Use this one</span>
+                  <span className="block text-xs text-muted-foreground">{t("Use this one", locale)}</span>
                 </span>
               </Button>
             ))}
@@ -199,11 +201,11 @@ export function ScanDialog({
                   const r = await createProduct(toBody(stage.code, stage.draft), true);
                   if (r.created) setStage({ name: "add", product: r.product });
                 } catch (e) {
-                  toast.error(e instanceof ApiError ? e.message : "Could not add it.");
+                  toast.error(e instanceof ApiError ? e.message : t("Could not add it.", locale));
                 }
               }}
             >
-              No, it's a different product
+              {t("No, it's a different product", locale)}
             </Button>
           </div>
         )}
@@ -241,6 +243,7 @@ function CreateProductForm({
     unit: "piece",
     mrp: "",
   });
+  const locale = useLocale();
   const [busy, setBusy] = useState(false);
   const set = (patch: Partial<NewProduct>) => setDraft({ ...draft, ...patch });
 
@@ -251,7 +254,7 @@ function CreateProductForm({
       if (r.created) onCreated(r.product);
       else onSimilar(draft, r.similar);
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not add it.");
+      toast.error(e instanceof ApiError ? e.message : t("Could not add it.", locale));
     } finally {
       setBusy(false);
     }
@@ -265,22 +268,22 @@ function CreateProductForm({
         void submit();
       }}
     >
-      <p className="text-xs text-muted-foreground">Barcode {code}</p>
-      <input className="page-search" aria-label="Product name" placeholder="Product name" value={draft.name} onChange={(e) => set({ name: e.target.value })} />
-      <input className="page-search" aria-label="Brand" placeholder="Brand (optional)" value={draft.brand} onChange={(e) => set({ brand: e.target.value })} />
+      <p className="text-xs text-muted-foreground">{tf("Barcode {code}", { code }, locale)}</p>
+      <input className="page-search" aria-label={t("Product name", locale)} placeholder={t("Product name", locale)} value={draft.name} onChange={(e) => set({ name: e.target.value })} />
+      <input className="page-search" aria-label={t("Brand", locale)} placeholder={t("Brand (optional)", locale)} value={draft.brand} onChange={(e) => set({ brand: e.target.value })} />
       <div className="flex gap-2">
-        <input className="page-search min-w-0" aria-label="Size" placeholder="Size, e.g. 100 g" value={draft.size} onChange={(e) => set({ size: e.target.value })} />
-        <input className="page-search min-w-0" aria-label="MRP" inputMode="decimal" placeholder="MRP ₹" value={draft.mrp} onChange={(e) => set({ mrp: e.target.value })} />
+        <input className="page-search min-w-0" aria-label={t("Size", locale)} placeholder={t("Size, e.g. 100 g", locale)} value={draft.size} onChange={(e) => set({ size: e.target.value })} />
+        <input className="page-search min-w-0" aria-label={t("MRP", locale)} inputMode="decimal" placeholder={t("MRP ₹", locale)} value={draft.mrp} onChange={(e) => set({ mrp: e.target.value })} />
       </div>
-      <select className="page-search" aria-label="Sold by" value={draft.unit} onChange={(e) => set({ unit: e.target.value as NewProduct["unit"] })}>
-        <option value="piece">Sold by piece</option>
-        <option value="gram">Sold by weight (per kg)</option>
+      <select className="page-search kn-select" aria-label={t("Sold by", locale)} value={draft.unit} onChange={(e) => set({ unit: e.target.value as NewProduct["unit"] })}>
+        <option value="piece">{t("Sold by piece", locale)}</option>
+        <option value="gram">{t("Sold by weight (per kg)", locale)}</option>
       </select>
       <Button className="w-full" disabled={busy || !draft.name.trim()}>
-        {busy ? "Adding…" : "Add product"}
+        {busy ? t("Adding…", locale) : t("Add product", locale)}
       </Button>
       <Button type="button" variant="ghost" className="w-full" onClick={onCancel}>
-        Scan again
+        {t("Scan again", locale)}
       </Button>
     </form>
   );
@@ -295,6 +298,7 @@ function AddToShop({
   onAdded: (row: ShopProduct) => void;
   onCancel: () => void;
 }) {
+  const locale = useLocale();
   const add = useAddProductsBulk();
   const [price, setPrice] = useState(product.mrp ? String(product.mrp) : "");
   const [count, setCount] = useState("");
@@ -316,9 +320,9 @@ function AddToShop({
       });
       const row = res.items?.[0];
       if (row) onAdded(row);
-      else toast.error("That product is already in your shop.");
+      else toast.error(t("That product is already in your shop.", locale));
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not add it.");
+      toast.error(e instanceof ApiError ? e.message : t("Could not add it.", locale));
     }
   };
 
@@ -335,25 +339,25 @@ function AddToShop({
       </p>
       <input
         className="page-search"
-        aria-label={perKg ? "Price per kg" : "Your price"}
+        aria-label={t(perKg ? "Price per kg" : "Your price", locale)}
         inputMode="decimal"
-        placeholder={perKg ? "Your price per kg ₹" : "Your price ₹"}
+        placeholder={t(perKg ? "Your price per kg ₹" : "Your price ₹", locale)}
         value={price}
         onChange={(e) => setPrice(e.target.value)}
       />
       <input
         className="page-search"
-        aria-label={perKg ? "How many kg do you have" : "How many do you have"}
+        aria-label={t(perKg ? "How many kg do you have" : "How many do you have", locale)}
         inputMode="decimal"
-        placeholder={perKg ? "Kg in stock (optional)" : "Count in stock (optional)"}
+        placeholder={t(perKg ? "Kg in stock (optional)" : "Count in stock (optional)", locale)}
         value={count}
         onChange={(e) => setCount(e.target.value)}
       />
       <Button className="w-full" disabled={add.isPending || !(Number(price) > 0)}>
-        {add.isPending ? "Adding…" : "Add to my shop"}
+        {add.isPending ? t("Adding…", locale) : t("Add to my shop", locale)}
       </Button>
       <Button type="button" variant="ghost" className="w-full" onClick={onCancel}>
-        Scan again
+        {t("Scan again", locale)}
       </Button>
     </form>
   );
