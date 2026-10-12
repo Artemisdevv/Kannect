@@ -9,7 +9,7 @@ import { Shell } from "@/components/kannect/shell";
 import { Button } from "@/components/ui/button";
 import { useAddProductsBulk, useRecount } from "@/features/queries";
 import { formatQty, newId } from "@/lib/format";
-import { t, tf, useLocale } from "@/lib/i18n";
+import { t, tf, useLocale, type Locale } from "@/lib/i18n";
 import { tidy } from "@/lib/validation";
 
 type Result = Awaited<ReturnType<typeof shelfPhoto>>;
@@ -83,11 +83,14 @@ function toRow(d: Detection, i: number): Row | null {
 
 const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback);
 
-const QUALITY_MESSAGE: Record<string, string> = {
-  blurry: "The photo looks blurry. Retake it for better results.",
-  too_dark: "The photo looks too dark. Retake it for better results.",
-  too_far: "The photo looks too far away. Retake it for better results.",
-};
+function qualityMessage(quality: string, locale: Locale) {
+  switch (quality) {
+    case "blurry": return t("The photo looks blurry. Retake it for better results.", locale);
+    case "too_dark": return t("The photo looks too dark. Retake it for better results.", locale);
+    case "too_far": return t("The photo looks too far away. Retake it for better results.", locale);
+    default: return t("The photo is not clear enough. Retake it for better results.", locale);
+  }
+}
 
 export function OnboardPage() {
   const locale = useLocale();
@@ -110,7 +113,7 @@ export function OnboardPage() {
       setRows(next);
       setDropped(detections.length - next.length);
       if (res.image_quality && res.image_quality !== "good") {
-        toast.warning(t(QUALITY_MESSAGE[res.image_quality] ?? "The photo is not clear enough. Retake it for better results.", locale));
+        toast.warning(qualityMessage(res.image_quality, locale));
       }
     } catch (e) {
       toast.error(errorText(e, t("Could not read the photo.", locale)));
