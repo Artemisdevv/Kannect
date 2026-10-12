@@ -306,3 +306,11 @@ h1, h2 { margin: 0; font: 500 clamp(64px, 9.2vw, 122px)/.91 "Manrope", sans-seri
 .download__app-link:hover, .download__app-link:focus-visible { background: rgba(180, 106, 53, .6); transform: translateY(-1px); }
 .download__app-link strong { font-size: 14px; }
 .download__app-link .download__app-meta { margin-left: auto; }
+
+/* Scrollbar in the warm dark palette: slim amber thumb on a near-black track */
+html { color-scheme: dark; scrollbar-width: thin; scrollbar-color: #b46a35 #100903; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #100903; border-left: 1px solid rgba(255, 210, 164, .08); }
+::-webkit-scrollbar-thumb { border: 2px solid #100903; border-radius: 999px; background: linear-gradient(180deg, #d58345, #8e542e); }
+::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #ffc176, #b46a35); }
+::-webkit-scrollbar-corner { background: #100903; }
