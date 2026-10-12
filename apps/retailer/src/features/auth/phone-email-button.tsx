@@ -9,6 +9,8 @@
 // for the message ourselves and hand the URL straight to the server.
 import { useEffect, useRef } from "react";
 
+import { t, useLocale } from "@/lib/i18n";
+
 declare global {
   interface Window {
     phoneEmailListener?: (user: { user_json_url?: string }) => void;
@@ -17,7 +19,6 @@ declare global {
 
 const SCRIPT = "https://www.phone.email/sign_in_button_v1.js";
 const POPUP_ORIGIN = "https://auth.phone.email";
-const LABEL = "Continue with phone number";
 
 // A result URL is good for one login, and both paths below can report the same one.
 const handled = new Set<string>();
@@ -32,6 +33,10 @@ export function PhoneEmailButton({
   const holder = useRef<HTMLDivElement>(null);
   const latest = useRef(onVerified);
   latest.current = onVerified;
+  const locale = useLocale();
+  const label = t("Continue with phone number", locale);
+  const labelRef = useRef(label);
+  labelRef.current = label;
 
   useEffect(() => {
     const deliver = (url: unknown) => {
@@ -56,7 +61,7 @@ export function PhoneEmailButton({
     // The widget writes its own label ("Sign in with Phone"); use ours so it reads like the app.
     const relabel = () => {
       const text = holder.current?.querySelector("#btn_ph_login_text");
-      if (text && text.textContent !== LABEL) text.textContent = LABEL;
+      if (text && text.textContent !== labelRef.current) text.textContent = labelRef.current;
     };
     const watcher = new MutationObserver(relabel);
     if (holder.current) watcher.observe(holder.current, { childList: true, subtree: true, characterData: true });
@@ -69,6 +74,11 @@ export function PhoneEmailButton({
       delete window.phoneEmailListener;
     };
   }, []);
+
+  useEffect(() => {
+    const text = holder.current?.querySelector("#btn_ph_login_text");
+    if (text && text.textContent !== label) text.textContent = label;
+  }, [label]);
 
   return <div ref={holder} className="pe_signin_button" data-client-id={clientId} />;
 }

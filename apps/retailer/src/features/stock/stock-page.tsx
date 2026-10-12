@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useRecount, useShopProducts } from "@/features/queries";
 import { ScanDialog } from "@/features/scan/scan-dialog";
 import { formatQty, newId, priceLabel, STATUS_LABEL, statusClass, stepFor } from "@/lib/format";
-import { t, useLocale } from "@/lib/i18n";
+import { t, tf, useLocale } from "@/lib/i18n";
 
 const FILTERS = ["All", "Low", "Out", "Review"] as const;
 type Filter = (typeof FILTERS)[number];
@@ -74,7 +74,7 @@ export function StockPage() {
     <Shell active="Stock">
       <p className="eyebrow">{t("Your shop", locale)}</p>
       <h1>{t("Stock", locale)}</h1>
-      <p className="eyebrow">{products.data?.length ?? 0} products · Keep your shelves ready</p>
+      <p className="eyebrow">{tf("{n} products · Keep your shelves ready", { n: products.data?.length ?? 0 }, locale)}</p>
 
       <div className="flex gap-2 mt-3">
         <input
@@ -148,8 +148,7 @@ export function StockPage() {
               <div className="text-4xl font-bold tabular-nums">{formatQty(count, unit)}</div>
               {!unknown && delta !== 0 && (
                 <div className="text-xs text-muted-foreground">
-                  {delta > 0 ? "+" : "−"}
-                  {formatQty(Math.abs(delta), unit)} from {formatQty(current, unit)}
+                  {tf("{change} from {current}", { change: `${delta > 0 ? "+" : "−"}${formatQty(Math.abs(delta), unit)}`, current: formatQty(current, unit) }, locale)}
                 </div>
               )}
             </div>

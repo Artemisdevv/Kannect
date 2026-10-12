@@ -1,3 +1,4 @@
+import { t, type Locale } from "@/lib/i18n";
 // Money is rupees. Stock and quantities are integers in base units: pieces, or grams for loose
 // goods (which are priced per kg). These helpers keep that in one place.
 import type { ShopProduct } from "@/api";
@@ -64,4 +65,19 @@ export function clampToStock(current: number, delta: number, stock: number | nul
   const wanted = current + delta;
   const next = Math.min(Math.max(0, wanted), max);
   return { next, max, limited: delta > 0 && wanted > max };
+}
+
+const SHOP_TYPE_LABELS: Record<string, string> = {
+  grocery: "Grocery",
+  provision: "Provision store",
+  vegetable: "Vegetables",
+  bakery: "Bakery",
+  stationery: "Stationery",
+  general: "General store",
+};
+/** A shop type, ready to show: translated, and plain words for a type we do not know. */
+export function shopTypeLabel(type: string | undefined, locale?: Locale) {
+  if (!type) return "";
+  const english = SHOP_TYPE_LABELS[type];
+  return english ? t(english, locale) : type;
 }
